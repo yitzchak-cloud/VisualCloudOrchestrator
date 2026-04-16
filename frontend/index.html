@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Visual Cloud Orchestrator</title>
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/reactflow@11/dist/umd/index.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/reactflow@11/dist/style.css"/>
+<link rel="stylesheet" href="https://unpkg.com/@xyflow/react@12/dist/style.css"/>
+<link rel="stylesheet" href="https://unpkg.com/@xyflow/react@12/dist/style.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg0:#080b12;
+  --bg1:#0d1117;
+  --bg2:#111827;
+  --bg3:#1a2235;
+  --bg4:#1e2d42;
+  --border:#1e3a5f;
+  --border2:#243b55;
+  --text0:#f0f6ff;
+  --text1:#94a3b8;
+  --text2:#4a6080;
+  --accent:#3b82f6;
+  --accent2:#6366f1;
+  --green:#10b981;
+  --red:#ef4444;
+  --yellow:#f59e0b;
+  --font-mono:'JetBrains Mono',monospace;
+  --font-display:'Syne',sans-serif;
+  --r4:4px;--r8:8px;--r12:12px;--r16:16px;
+}
+
+html,body,#root{height:100%;width:100%;overflow:hidden;background:var(--bg0);color:var(--text0);font-family:var(--font-mono)}
+
+/* ── Layout ── */
+.app{display:flex;height:100vh;width:100vw;overflow:hidden}
+.sidebar{width:260px;min-width:260px;background:var(--bg1);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:10}
+.canvas-wrap{flex:1;position:relative;background:var(--bg0)}
+.panel-right{width:280px;min-width:280px;background:var(--bg1);border-left:1px solid var(--border);display:flex;flex-direction:column;transition:width .2s;z-index:10}
+.panel-right.collapsed{width:0;min-width:0;overflow:hidden}
+
+/* ── Topbar ── */
+.topbar{height:48px;background:var(--bg1);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:12px;position:absolute;top:0;left:0;right:0;z-index:20}
+.logo{font-family:var(--font-display);font-weight:800;font-size:15px;letter-spacing:-.5px;color:var(--text0);display:flex;align-items:center;gap:8px}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.topbar-spacer{flex:1}
+.btn{display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:var(--r8);border:none;cursor:pointer;font-family:var(--font-mono);font-size:12px;font-weight:500;transition:all .15s}
+.btn-ghost{background:transparent;color:var(--text1);border:1px solid var(--border2)}
+.btn-ghost:hover{background:var(--bg3);color:var(--text0);border-color:var(--border)}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#2563eb;box-shadow:0 0 16px rgba(59,130,246,.4)}
+.btn-deploy{background:linear-gradient(135deg,#10b981,#059669);color:#fff}
+.btn-deploy:hover{box-shadow:0 0 16px rgba(16,185,129,.4)}
+.btn-danger{background:var(--red);color:#fff}
+
+/* ── Sidebar ── */
+.sidebar-header{padding:14px 16px 10px;border-bottom:1px solid var(--border)}
+.sidebar-title{font-family:var(--font-display);font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--text2);text-transform:uppercase}
+.sidebar-search{margin:10px 12px;position:relative}
+.sidebar-search input{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r8);padding:7px 10px 7px 30px;color:var(--text0);font-family:var(--font-mono);font-size:12px;outline:none}
+.sidebar-search input:focus{border-color:var(--accent)}
+.sidebar-search input::placeholder{color:var(--text2)}
+.search-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text2);font-size:13px}
+.node-list{flex:1;overflow-y:auto;padding:8px}
+.node-list::-webkit-scrollbar{width:3px}
+.node-list::-webkit-scrollbar-track{background:transparent}
+.node-list::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px}
+
+.node-item{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 12px;border-radius:var(--r8);
+  cursor:grab;user-select:none;margin-bottom:4px;
+  border:1px solid transparent;
+  transition:all .15s;
+  background:var(--bg2);
+}
+.node-item:hover{border-color:var(--border);background:var(--bg3);transform:translateX(2px)}
+.node-item:active{cursor:grabbing;opacity:.8}
+.node-icon{width:32px;height:32px;border-radius:var(--r8);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.node-info{flex:1;min-width:0}
+.node-name{font-size:12px;font-weight:600;color:var(--text0);font-family:var(--font-display)}
+.node-desc{font-size:10px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ── Canvas ── */
+.canvas-wrap .react-flow{top:48px !important}
+.react-flow__background{background:var(--bg0) !important}
+.react-flow__background pattern circle{fill:var(--border) !important}
+
+/* ── Custom Nodes ── */
+.gcp-node{
+  background:var(--bg2);
+  border:1px solid var(--border2);
+  border-radius:var(--r12);
+  min-width:200px;
+  overflow:hidden;
+  transition:border-color .15s,box-shadow .15s;
+  position:relative;
+}
+.gcp-node::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:var(--node-color,var(--accent));
+  border-radius:var(--r12) var(--r12) 0 0;
+}
+.gcp-node:hover{border-color:var(--node-color,var(--accent));box-shadow:0 0 0 1px var(--node-color,var(--accent))33,0 8px 32px rgba(0,0,0,.4)}
+.gcp-node.selected{border-color:var(--node-color,var(--accent));box-shadow:0 0 0 2px var(--node-color,var(--accent))66,0 8px 32px rgba(0,0,0,.5)}
+.gcp-node.status-deployed::before{background:var(--green)}
+.gcp-node.status-error::before{background:var(--red)}
+.gcp-node.status-deploying::before{background:var(--yellow);animation:pulse-bar 1s ease-in-out infinite}
+@keyframes pulse-bar{0%,100%{opacity:1}50%{opacity:.3}}
+
+.node-header{padding:10px 12px 8px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)}
+.node-header-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.node-header-name{font-family:var(--font-display);font-size:13px;font-weight:700;color:var(--text0);flex:1}
+.node-header-type{font-size:9px;font-weight:600;letter-spacing:.1em;color:var(--text2);text-transform:uppercase;margin-top:1px}
+.status-badge{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.status-badge.idle{background:var(--text2)}
+.status-badge.deployed{background:var(--green);box-shadow:0 0 6px var(--green)}
+.status-badge.deploying{background:var(--yellow);animation:pulse-dot 1s ease-in-out infinite}
+.status-badge.error{background:var(--red);box-shadow:0 0 6px var(--red)}
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.7)}}
+
+.node-ports{padding:8px 0}
+.port-row{display:flex;align-items:center;padding:3px 0;position:relative;height:26px}
+.port-label{font-size:10px;color:var(--text1);padding:0 10px;flex:1}
+.port-label.input{padding-left:20px}
+.port-label.output{padding-right:20px;text-align:right}
+
+/* ── Custom Handles ── */
+.react-flow__handle{
+  width:10px!important;height:10px!important;
+  border-radius:50%!important;
+  border:2px solid var(--bg2)!important;
+  transition:transform .15s,box-shadow .15s!important;
+}
+.react-flow__handle:hover{transform:scale(1.4)!important;box-shadow:0 0 0 3px rgba(255,255,255,.1)!important}
+.react-flow__handle-left{left:-5px!important}
+.react-flow__handle-right{right:-5px!important}
+
+/* ── Edges ── */
+.react-flow__edge-path{stroke-width:1.5!important}
+.react-flow__edge.animated .react-flow__edge-path{stroke-dasharray:5 3}
+.react-flow__edge.invalid .react-flow__edge-path{stroke:var(--red)!important;stroke-dasharray:4 3}
+.react-flow__connection-line{stroke:var(--text1)!important;stroke-width:1.5!important;stroke-dasharray:5 3!important}
+
+/* ── MiniMap ── */
+.react-flow__minimap{background:var(--bg2)!important;border:1px solid var(--border)!important;border-radius:var(--r8)!important}
+.react-flow__minimap-mask{fill:var(--bg1)!important;opacity:.7!important}
+
+/* ── Controls ── */
+.react-flow__controls{background:var(--bg2)!important;border:1px solid var(--border)!important;border-radius:var(--r8)!important}
+.react-flow__controls-button{background:transparent!important;border:none!important;border-bottom:1px solid var(--border)!important;color:var(--text1)!important}
+.react-flow__controls-button:last-child{border-bottom:none!important}
+.react-flow__controls-button:hover{background:var(--bg3)!important;color:var(--text0)!important}
+.react-flow__controls-button svg{fill:currentColor!important}
+
+/* ── Property Panel ── */
+.panel-header{padding:14px 16px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.panel-title{font-family:var(--font-display);font-size:13px;font-weight:700;color:var(--text0)}
+.panel-close{background:none;border:none;color:var(--text2);cursor:pointer;font-size:16px;padding:2px 6px;border-radius:4px}
+.panel-close:hover{color:var(--text0);background:var(--bg3)}
+.panel-body{flex:1;overflow-y:auto;padding:16px}
+.panel-body::-webkit-scrollbar{width:3px}
+.panel-body::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px}
+.field-group{margin-bottom:16px}
+.field-label{font-size:10px;font-weight:600;letter-spacing:.1em;color:var(--text2);text-transform:uppercase;margin-bottom:6px;display:block}
+.field-input{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r8);padding:7px 10px;color:var(--text0);font-family:var(--font-mono);font-size:12px;outline:none;transition:border-color .15s}
+.field-input:focus{border-color:var(--accent)}
+.field-select{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r8);padding:7px 10px;color:var(--text0);font-family:var(--font-mono);font-size:12px;outline:none;cursor:pointer}
+.field-checkbox{display:flex;align-items:center;gap:8px;cursor:pointer}
+.field-checkbox input{accent-color:var(--accent)}
+.section-title{font-family:var(--font-display);font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--text2);text-transform:uppercase;margin:16px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+
+/* ── Log Panel ── */
+.log-panel{position:absolute;bottom:0;left:0;right:0;height:160px;background:var(--bg1);border-top:1px solid var(--border);z-index:15;display:flex;flex-direction:column}
+.log-panel.hidden{height:0;overflow:hidden}
+.log-header{padding:6px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0}
+.log-title{font-size:10px;font-weight:600;letter-spacing:.12em;color:var(--text2);text-transform:uppercase}
+.log-body{flex:1;overflow-y:auto;padding:8px 14px;font-size:11px;line-height:1.7}
+.log-body::-webkit-scrollbar{width:3px}
+.log-body::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px}
+.log-entry{display:flex;gap:8px;color:var(--text1)}
+.log-entry .ts{color:var(--text2);flex-shrink:0}
+.log-entry.ok .msg{color:var(--green)}
+.log-entry.err .msg{color:var(--red)}
+.log-entry.info .msg{color:var(--accent)}
+.log-entry.warn .msg{color:var(--yellow)}
+
+/* ── Toolbar ── */
+.canvas-toolbar{position:absolute;top:60px;left:50%;transform:translateX(-50%);display:flex;gap:6px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r12);padding:6px;z-index:15}
+
+/* ── Toast ── */
+.toast-container{position:absolute;top:60px;right:16px;z-index:100;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+.toast{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r8);padding:10px 14px;font-size:12px;color:var(--text0);display:flex;align-items:center;gap:8px;animation:slide-in .2s ease;pointer-events:all;max-width:280px}
+.toast.success{border-left:3px solid var(--green)}
+.toast.error{border-left:3px solid var(--red)}
+.toast.info{border-left:3px solid var(--accent)}
+@keyframes slide-in{from{transform:translateX(20px);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* ── Empty State ── */
+.empty-canvas{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;user-select:none}
+.empty-title{font-family:var(--font-display);font-size:22px;font-weight:800;color:var(--text2);letter-spacing:-.5px;margin-bottom:8px}
+.empty-sub{font-size:12px;color:var(--text2);line-height:1.6}
+.empty-grid{position:absolute;inset:0;background-image:radial-gradient(circle,var(--border) 1px,transparent 1px);background-size:28px 28px;opacity:.3;pointer-events:none}
+
+/* ── Badge ── */
+.port-type-badge{display:inline-flex;align-items:center;padding:1px 7px;border-radius:99px;font-size:9px;font-weight:600;letter-spacing:.05em}
+
+/* ── Scrollbar global ── */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react,typescript">
+const {
+  useState, useEffect, useCallback, useRef, useMemo
+} = React;
+
+const {
+  ReactFlow, ReactFlowProvider, MiniMap, Controls, Background,
+  BackgroundVariant, addEdge, useNodesState, useEdgesState,
+  Handle, Position, useReactFlow, Panel,
+  getBezierPath,
+} = window.ReactFlow;
+
+// ── Icons (inline SVG) ────────────────────────────────────────────────────────
+const ICONS = {
+  cloud:      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>,
+  database:   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
+  radio:      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>,
+  archive:    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>,
+  'user-check':<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></svg>,
+  network:    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="6" height="6"/><rect x="16" y="2" width="6" height="6"/><rect x="9" y="16" width="6" height="6"/><path d="M5 8v4c0 1 1 2 2 2h10c1 0 2-1 2-2V8"/><line x1="12" y1="14" x2="12" y2="16"/></svg>,
+  key:        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>,
+  search:     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
+  play:       <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>,
+  save:       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
+  trash:      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>,
+  terminal:   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>,
+  close:      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+  chevron:    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>,
+};
+
+// ── Node type definitions (fallback if backend offline) ───────────────────────
+const DEFAULT_NODE_TYPES_DATA = [
+  {type:"CloudRunNode",label:"Cloud Run",description:"Serverless container",color:"#6366f1",icon:"cloud",
+   inputs:[{name:"service_account",type:"service_account",required:true,color:"#a78bfa",label:"SA"},{name:"network",type:"network",required:false,color:"#34d399",label:"Net"},{name:"secret",type:"secret",multi:true,color:"#f472b6",label:"Sec"}],
+   outputs:[{name:"publishes_to",type:"topic",color:"#60a5fa",label:"Topic"},{name:"writes_to",type:"storage",color:"#fbbf24",label:"GCS"}]},
+  {type:"CloudSQLNode",label:"Cloud SQL",description:"Managed relational DB",color:"#f97316",icon:"database",
+   inputs:[{name:"service_account",type:"service_account",required:true,color:"#a78bfa",label:"SA"},{name:"network",type:"network",required:true,color:"#34d399",label:"Net"}],
+   outputs:[{name:"connection",type:"database",color:"#fb923c",label:"DB"}]},
+  {type:"PubSubNode",label:"Pub/Sub",description:"Async messaging bus",color:"#3b82f6",icon:"radio",
+   inputs:[{name:"topic_in",type:"topic",color:"#60a5fa",label:"Topic"}],
+   outputs:[{name:"topic_out",type:"topic",multi:true,color:"#60a5fa",label:"Topic"}]},
+  {type:"GCSBucketNode",label:"GCS Bucket",description:"Object storage",color:"#eab308",icon:"archive",
+   inputs:[{name:"service_account",type:"service_account",required:true,color:"#a78bfa",label:"SA"}],
+   outputs:[{name:"bucket",type:"storage",color:"#fbbf24",label:"GCS"}]},
+  {type:"ServiceAccountNode",label:"Service Account",description:"IAM identity",color:"#8b5cf6",icon:"user-check",
+   inputs:[],
+   outputs:[{name:"identity",type:"service_account",multi:true,color:"#a78bfa",label:"SA"}]},
+  {type:"VPCNode",label:"VPC / Subnet",description:"Virtual network",color:"#10b981",icon:"network",
+   inputs:[],
+   outputs:[{name:"subnet",type:"network",multi:true,color:"#34d399",label:"Net"}]},
+  {type:"SecretManagerNode",label:"Secret Manager",description:"Encrypted secrets",color:"#ec4899",icon:"key",
+   inputs:[{name:"service_account",type:"service_account",required:true,color:"#a78bfa",label:"SA"}],
+   outputs:[{name:"secret_ref",type:"secret",multi:true,color:"#f472b6",label:"Sec"}]},
+];
+
+// ── GCP Custom Node Component ─────────────────────────────────────────────────
+const GCPNodeComponent = ({ data, selected }) => {
+  const schema = data.schema;
+  if (!schema) return null;
+  const status = data.status || 'idle';
+
+  return (
+    <div
+      className={`gcp-node ${selected ? 'selected' : ''} status-${status}`}
+      style={{ '--node-color': schema.color }}
+    >
+      {/* Header */}
+      <div className="node-header">
+        <div className="node-header-icon" style={{ background: schema.color + '22', color: schema.color }}>
+          {ICONS[schema.icon] || ICONS.cloud}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="node-header-name">{data.label || schema.label}</div>
+          <div className="node-header-type">{schema.type.replace('Node', '')}</div>
+        </div>
+        <div className={`status-badge ${status}`} />
+      </div>
+
+      {/* Ports — inputs on left, outputs on right, each row is position:relative so Handle centers inside it */}
+      <div className="node-ports">
+        {schema.inputs.map((port) => (
+          <div key={`in-${port.name}`} className="port-row" style={{ position: 'relative' }}>
+            <Handle
+              type="target"
+              position={Position.Left}
+              id={port.name}
+              style={{ background: port.color, border: '2px solid #0d1117', position: 'absolute', left: -5, top: '50%', transform: 'translateY(-50%)' }}
+            />
+            <span className="port-label input" style={{ paddingLeft: 20 }}>
+              <span style={{ color: port.color, fontSize: 9, fontWeight: 700, marginRight: 4 }}>
+                {port.label}
+              </span>
+              {port.name.replace(/_/g, ' ')}
+              {port.required && <span style={{ color: '#ef4444', marginLeft: 2 }}>*</span>}
+            </span>
+          </div>
+        ))}
+
+        {schema.inputs.length > 0 && schema.outputs.length > 0 && (
+          <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+        )}
+
+        {schema.outputs.map((port) => (
+          <div key={`out-${port.name}`} className="port-row" style={{ position: 'relative' }}>
+            <span className="port-label output" style={{ textAlign: 'right', paddingRight: 20 }}>
+              {port.name.replace(/_/g, ' ')}
+              <span style={{ color: port.color, fontSize: 9, fontWeight: 700, marginLeft: 4 }}>
+                {port.label}
+              </span>
+            </span>
+            <Handle
+              type="source"
+              position={Position.Right}
+              id={port.name}
+              style={{ background: port.color, border: '2px solid #0d1117', position: 'absolute', right: -5, top: '50%', transform: 'translateY(-50%)' }}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ── Custom Edge ───────────────────────────────────────────────────────────────
+const GCPEdge = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data, style, markerEnd }) => {
+  const [edgePath] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
+  const color = data?.color || '#60a5fa';
+  return (
+    <path
+      id={id}
+      d={edgePath}
+      className="react-flow__edge-path"
+      style={{ stroke: color, strokeWidth: 1.5, strokeOpacity: 0.8, fill: 'none', ...style }}
+      markerEnd={markerEnd}
+    />
+  );
+};
+
+// ── Property Panel ────────────────────────────────────────────────────────────
+const PropertyPanel = ({ node, onClose, onChange }) => {
+  if (!node) return null;
+  const schema = node.data.schema;
+  const props = node.data.props || {};
+
+  const fields = {
+    CloudRunNode: [
+      { key: 'image', label: 'Container Image', type: 'text', placeholder: 'gcr.io/project/image:tag' },
+      { key: 'memory', label: 'Memory', type: 'select', options: ['256Mi','512Mi','1Gi','2Gi','4Gi','8Gi'] },
+      { key: 'cpu', label: 'CPU', type: 'select', options: ['1','2','4','8'] },
+      { key: 'min_instances', label: 'Min Instances', type: 'number' },
+      { key: 'max_instances', label: 'Max Instances', type: 'number' },
+      { key: 'port', label: 'Container Port', type: 'number' },
+    ],
+    CloudSQLNode: [
+      { key: 'database_version', label: 'Engine', type: 'select', options: ['POSTGRES_15','POSTGRES_14','MYSQL_8_0','SQLSERVER_2019_STANDARD'] },
+      { key: 'tier', label: 'Machine Tier', type: 'select', options: ['db-f1-micro','db-g1-small','db-n1-standard-1','db-n1-standard-2','db-n1-standard-4'] },
+      { key: 'region', label: 'Region', type: 'select', options: ['us-central1','us-east1','europe-west1','asia-east1'] },
+      { key: 'disk_size_gb', label: 'Disk (GB)', type: 'number' },
+      { key: 'ha', label: 'High Availability', type: 'checkbox' },
+    ],
+    PubSubNode: [
+      { key: 'ack_deadline_seconds', label: 'Ack Deadline (sec)', type: 'number' },
+      { key: 'message_retention_duration', label: 'Retention', type: 'text', placeholder: '604800s' },
+    ],
+    GCSBucketNode: [
+      { key: 'location', label: 'Location', type: 'select', options: ['US','EU','ASIA','us-central1','europe-west1'] },
+      { key: 'storage_class', label: 'Storage Class', type: 'select', options: ['STANDARD','NEARLINE','COLDLINE','ARCHIVE'] },
+      { key: 'versioning', label: 'Versioning', type: 'checkbox' },
+      { key: 'public_access', label: 'Public Access', type: 'checkbox' },
+    ],
+    ServiceAccountNode: [
+      { key: 'description_sa', label: 'Description', type: 'text', placeholder: 'Service account for...' },
+    ],
+    VPCNode: [
+      { key: 'subnet_cidr', label: 'Subnet CIDR', type: 'text', placeholder: '10.0.0.0/24' },
+      { key: 'region', label: 'Region', type: 'select', options: ['us-central1','us-east1','europe-west1','asia-east1'] },
+      { key: 'private_google_access', label: 'Private Google Access', type: 'checkbox' },
+    ],
+    SecretManagerNode: [
+      { key: 'replication', label: 'Replication', type: 'select', options: ['automatic','user-managed'] },
+      { key: 'rotation_days', label: 'Rotation (days, 0=off)', type: 'number' },
+    ],
+  };
+
+  const nodeFields = fields[schema?.type] || [];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div className="panel-header">
+        <div>
+          <div className="panel-title">{node.data.label || schema?.label}</div>
+          <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 2, fontFamily: 'var(--font-mono)' }}>
+            {schema?.type?.replace('Node', '')} · {node.id.slice(0, 8)}
+          </div>
+        </div>
+        <button className="panel-close" onClick={onClose}>{ICONS.close}</button>
+      </div>
+      <div className="panel-body">
+        <div className="field-group">
+          <label className="field-label">Label</label>
+          <input
+            className="field-input"
+            value={node.data.label || ''}
+            onChange={e => onChange(node.id, 'label', e.target.value)}
+            placeholder={schema?.label}
+          />
+        </div>
+
+        <div className="section-title">Configuration</div>
+
+        {nodeFields.map(f => (
+          <div key={f.key} className="field-group">
+            <label className="field-label">{f.label}</label>
+            {f.type === 'checkbox' ? (
+              <label className="field-checkbox">
+                <input
+                  type="checkbox"
+                  checked={props[f.key] ?? false}
+                  onChange={e => onChange(node.id, f.key, e.target.checked, true)}
+                />
+                <span style={{ fontSize: 12, color: 'var(--text1)' }}>Enabled</span>
+              </label>
+            ) : f.type === 'select' ? (
+              <select
+                className="field-select"
+                value={props[f.key] || ''}
+                onChange={e => onChange(node.id, f.key, e.target.value, true)}
+              >
+                <option value="">— select —</option>
+                {f.options.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            ) : (
+              <input
+                className="field-input"
+                type={f.type}
+                value={props[f.key] ?? ''}
+                placeholder={f.placeholder || ''}
+                onChange={e => onChange(node.id, f.key, f.type === 'number' ? +e.target.value : e.target.value, true)}
+              />
+            )}
+          </div>
+        ))}
+
+        <div className="section-title">Ports</div>
+        {schema?.inputs?.length > 0 && (
+          <>
+            <div style={{ fontSize: 10, color: 'var(--text2)', marginBottom: 6 }}>INPUTS</div>
+            {schema.inputs.map(p => (
+              <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: p.color, flexShrink: 0 }} />
+                <span style={{ fontSize: 11, color: 'var(--text1)', flex: 1 }}>{p.name.replace(/_/g,' ')}</span>
+                <span className="port-type-badge" style={{ background: p.color + '22', color: p.color }}>{p.label}</span>
+                {p.required && <span style={{ fontSize: 9, color: 'var(--red)' }}>req</span>}
+              </div>
+            ))}
+          </>
+        )}
+        {schema?.outputs?.length > 0 && (
+          <>
+            <div style={{ fontSize: 10, color: 'var(--text2)', margin: '10px 0 6px' }}>OUTPUTS</div>
+            {schema.outputs.map(p => (
+              <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: p.color, flexShrink: 0 }} />
+                <span style={{ fontSize: 11, color: 'var(--text1)', flex: 1 }}>{p.name.replace(/_/g,' ')}</span>
+                <span className="port-type-badge" style={{ background: p.color + '22', color: p.color }}>{p.label}</span>
+                {p.multi && <span style={{ fontSize: 9, color: 'var(--text2)' }}>multi</span>}
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ── Log Panel ─────────────────────────────────────────────────────────────────
+const LogPanel = ({ logs, visible, onToggle }) => (
+  <div className={`log-panel ${visible ? '' : 'hidden'}`}>
+    <div className="log-header">
+      <div className="log-title">Deploy Log</div>
+      <div style={{ flex: 1 }} />
+      <button className="btn btn-ghost" style={{ padding: '2px 8px', fontSize: 10 }} onClick={onToggle}>
+        {visible ? '▼ hide' : '▲ show'}
+      </button>
+    </div>
+    {visible && (
+      <div className="log-body" id="log-scroll">
+        {logs.length === 0 && <span style={{ color: 'var(--text2)' }}>No activity yet...</span>}
+        {logs.map((l, i) => (
+          <div key={i} className={`log-entry ${l.level}`}>
+            <span className="ts">{l.ts}</span>
+            <span className="msg">{l.msg}</span>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+);
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+const ToastContainer = ({ toasts }) => (
+  <div className="toast-container">
+    {toasts.map(t => (
+      <div key={t.id} className={`toast ${t.type}`}>
+        <span>{t.msg}</span>
+      </div>
+    ))}
+  </div>
+);
+
+// ── Main App ──────────────────────────────────────────────────────────────────
+const nodeTypes = { gcpNode: GCPNodeComponent };
+const edgeTypes = { gcpEdge: GCPEdge };
+
+function VCOApp() {
+  const [nodeTypesData, setNodeTypesData] = useState(DEFAULT_NODE_TYPES_DATA);
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [logs, setLogs] = useState([]);
+  const [logVisible, setLogVisible] = useState(false);
+  const [toasts, setToasts] = useState([]);
+  const [search, setSearch] = useState('');
+  const [isDeploying, setIsDeploying] = useState(false);
+  const [wsConnected, setWsConnected] = useState(false);
+  const wsRef = useRef(null);
+  const nodesRef = useRef(nodes);
+  useEffect(() => { nodesRef.current = nodes; }, [nodes]);
+  const reactFlowWrapper = useRef(null);
+  const { screenToFlowPosition } = useReactFlow();
+
+  // Load node types from backend (falls back to defaults)
+  useEffect(() => {
+    fetch('http://localhost:8000/api/node-types')
+      .then(r => r.json())
+      .then(data => { if (data?.length) setNodeTypesData(data); })
+      .catch(() => {});
+  }, []);
+
+  // WebSocket connection
+  useEffect(() => {
+    const connect = () => {
+      try {
+        const ws = new WebSocket('ws://localhost:8000/ws');
+        ws.onopen = () => { setWsConnected(true); addLog('WebSocket connected', 'ok'); };
+        ws.onclose = () => { setWsConnected(false); setTimeout(connect, 3000); };
+        ws.onmessage = e => handleWsMessage(JSON.parse(e.data));
+        wsRef.current = ws;
+      } catch {}
+    };
+    connect();
+    return () => wsRef.current?.close();
+  }, []);
+
+  const handleWsMessage = useCallback((msg) => {
+    if (msg.event === 'node_status') {
+      setNodes(nds => nds.map(n =>
+        n.id === msg.node_id ? { ...n, data: { ...n.data, status: msg.status } } : n
+      ));
+      addLog(`[${msg.index}/${msg.total}] ${msg.node_id} → ${msg.status}`, msg.status === 'deployed' ? 'ok' : 'err');
+    }
+    if (msg.event === 'deploy_complete') {
+      setIsDeploying(false);
+      addLog('Deploy complete', 'ok');
+      showToast('Deployment complete!', 'success');
+    }
+    if (msg.event === 'deploy_started') {
+      addLog(`Deploy started — ${msg.total} resources`, 'info');
+    }
+  }, []);
+
+  const addLog = (msg, level = 'info') => {
+    const ts = new Date().toLocaleTimeString('en-US', { hour12: false });
+    setLogs(l => [...l.slice(-199), { ts, msg, level }]);
+    setTimeout(() => {
+      const el = document.getElementById('log-scroll');
+      if (el) el.scrollTop = el.scrollHeight;
+    }, 50);
+  };
+
+  const showToast = (msg, type = 'info') => {
+    const id = Date.now();
+    setToasts(t => [...t, { id, msg, type }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3000);
+  };
+
+  // Drag from sidebar → drop on canvas
+  const onDragOver = useCallback(e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }, []);
+
+  const onDrop = useCallback(e => {
+    e.preventDefault();
+    const typeStr = e.dataTransfer.getData('application/vco-node');
+    if (!typeStr) return;
+    const schema = nodeTypesData.find(t => t.type === typeStr);
+    if (!schema) return;
+    const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    const id = `${typeStr}-${Date.now()}`;
+    setNodes(nds => [...nds, {
+      id,
+      type: 'gcpNode',
+      position,
+      data: { label: schema.label, schema, status: 'idle', props: {} },
+    }]);
+    addLog(`Added ${schema.label}`, 'info');
+  }, [nodeTypesData, screenToFlowPosition]);
+
+  // Edge connect with type validation
+  const onConnect = useCallback((params) => {
+    const currentNodes = nodesRef.current;
+    const sourceNode = currentNodes.find(n => n.id === params.source);
+    const targetNode = currentNodes.find(n => n.id === params.target);
+
+    // If nodes found, validate port types
+    if (sourceNode && targetNode) {
+      const sourcePort = sourceNode.data.schema?.outputs?.find(p => p.name === params.sourceHandle);
+      const targetPort = targetNode.data.schema?.inputs?.find(p => p.name === params.targetHandle);
+
+      if (sourcePort && targetPort && sourcePort.type !== targetPort.type) {
+        showToast(`Cannot connect ${sourcePort.type} → ${targetPort.type}`, 'error');
+        addLog(`Blocked: ${sourcePort.type} ≠ ${targetPort.type}`, 'err');
+        return;
+      }
+
+      const color = sourcePort?.color || '#60a5fa';
+      setEdges(eds => addEdge({
+        ...params,
+        type: 'gcpEdge',
+        animated: true,
+        data: { color },
+      }, eds));
+      addLog(`Connected ${sourceNode.data.label} → ${targetNode.data.label}${sourcePort ? ' [' + sourcePort.type + ']' : ''}`, 'ok');
+    } else {
+      // fallback: just connect
+      setEdges(eds => addEdge({ ...params, type: 'gcpEdge', animated: true, data: { color: '#60a5fa' } }, eds));
+    }
+  }, []);
+
+  // Node selection
+  const onNodeClick = useCallback((_, node) => setSelectedNode(node), []);
+  const onPaneClick = useCallback(() => setSelectedNode(null), []);
+
+  // Property change
+  const handlePropChange = useCallback((nodeId, key, value, isProp = false) => {
+    setNodes(nds => nds.map(n => {
+      if (n.id !== nodeId) return n;
+      if (isProp) return { ...n, data: { ...n.data, props: { ...n.data.props, [key]: value } } };
+      return { ...n, data: { ...n.data, [key]: value } };
+    }));
+    // Keep selectedNode in sync
+    setSelectedNode(prev => {
+      if (!prev || prev.id !== nodeId) return prev;
+      if (isProp) return { ...prev, data: { ...prev.data, props: { ...prev.data.props, [key]: value } } };
+      return { ...prev, data: { ...prev.data, [key]: value } };
+    });
+  }, []);
+
+  // Deploy
+  const handleDeploy = async () => {
+    if (nodes.length === 0) { showToast('Add some nodes first', 'error'); return; }
+    setIsDeploying(true);
+    setLogVisible(true);
+    setNodes(nds => nds.map(n => ({ ...n, data: { ...n.data, status: 'deploying' } })));
+    addLog('Initiating deployment...', 'warn');
+
+    const payload = {
+      nodes: nodes.map(n => ({ id: n.id, type: n.data.schema?.type, label: n.data.label, props: n.data.props || {} })),
+      edges: edges.map(e => ({ source: e.source, target: e.target, sourceHandle: e.sourceHandle, targetHandle: e.targetHandle })),
+    };
+
+    try {
+      await fetch('http://localhost:8000/api/deploy', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      });
+    } catch {
+      // Simulate locally if backend offline
+      for (let i = 0; i < nodes.length; i++) {
+        await new Promise(r => setTimeout(r, 700));
+        const node = nodes[i];
+        const status = 'deployed';
+        setNodes(nds => nds.map(n => n.id === node.id ? { ...n, data: { ...n.data, status } } : n));
+        addLog(`[${i+1}/${nodes.length}] ${node.data.label} → deployed`, 'ok');
+      }
+      setIsDeploying(false);
+      addLog('Deploy complete (local simulation)', 'ok');
+      showToast('Deployed (simulated)', 'success');
+    }
+  };
+
+  // Save
+  const handleSave = async () => {
+    const currentNodes = nodesRef.current;
+    const payload = {
+      nodes: currentNodes.map(n => ({
+        id: n.id,
+        type: n.data.schema?.type,
+        label: n.data.label,
+        props: n.data.props || {}
+      })),
+      edges: edges.map(e => ({
+        id: e.id,
+        source: e.source,
+        sourceHandle: e.sourceHandle,
+        target: e.target,
+        targetHandle: e.targetHandle,
+        portType: e.data?.portType || null,
+      })),
+    };
+    try {
+      await fetch('http://localhost:8000/api/graph', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      });
+      showToast('Saved to desired.yaml', 'success');
+      addLog('Graph saved to desired.yaml', 'ok');
+    } catch {
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+      a.download = 'desired.json'; a.click();
+      showToast('Exported as desired.json', 'info');
+    }
+  };
+
+  const handleClear = () => {
+    setNodes([]); setEdges([]); setSelectedNode(null);
+    addLog('Canvas cleared', 'warn');
+  };
+
+  const filteredTypes = useMemo(() =>
+    nodeTypesData.filter(t =>
+      t.label.toLowerCase().includes(search.toLowerCase()) ||
+      t.description.toLowerCase().includes(search.toLowerCase())
+    ), [nodeTypesData, search]);
+
+  return (
+    <div className="app">
+      {/* Sidebar */}
+      <div className="sidebar">
+        <div className="sidebar-header">
+          <div className="logo">
+            <div className="logo-dot"/>
+            <span>VCO</span>
+          </div>
+          <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 4, fontFamily: 'var(--font-mono)' }}>
+            GCP Cloud Orchestrator
+          </div>
+        </div>
+        <div className="sidebar-search">
+          <span className="search-icon">{ICONS.search}</span>
+          <input
+            placeholder="Search nodes..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="node-list">
+          {filteredTypes.map(schema => (
+            <div
+              key={schema.type}
+              className="node-item"
+              draggable
+              onDragStart={e => e.dataTransfer.setData('application/vco-node', schema.type)}
+            >
+              <div className="node-icon" style={{ background: schema.color + '22', color: schema.color }}>
+                {ICONS[schema.icon] || ICONS.cloud}
+              </div>
+              <div className="node-info">
+                <div className="node-name">{schema.label}</div>
+                <div className="node-desc">{schema.description}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        {/* Sidebar footer: port legend */}
+        <div style={{ padding: '12px 12px', borderTop: '1px solid var(--border)' }}>
+          <div style={{ fontSize: 9, letterSpacing: '.12em', color: 'var(--text2)', marginBottom: 8, fontWeight: 700, textTransform: 'uppercase' }}>Port Types</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+            {[
+              { label: 'SA', color: '#a78bfa' },
+              { label: 'Net', color: '#34d399' },
+              { label: 'GCS', color: '#fbbf24' },
+              { label: 'Secret', color: '#f472b6' },
+              { label: 'Topic', color: '#60a5fa' },
+              { label: 'DB', color: '#fb923c' },
+            ].map(p => (
+              <span key={p.label} className="port-type-badge" style={{ background: p.color + '22', color: p.color, padding: '2px 8px' }}>
+                {p.label}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Canvas */}
+      <div className="canvas-wrap" ref={reactFlowWrapper}>
+        {/* Topbar */}
+        <div className="topbar">
+          <div style={{ width: 260 }} />
+          <div className="topbar-spacer"/>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: wsConnected ? 'var(--green)' : 'var(--text2)', boxShadow: wsConnected ? '0 0 6px var(--green)' : 'none' }} />
+            <span style={{ fontSize: 10, color: wsConnected ? 'var(--green)' : 'var(--text2)' }}>
+              {wsConnected ? 'live' : 'offline'}
+            </span>
+          </div>
+          <button className="btn btn-ghost" onClick={handleClear}>{ICONS.trash} Clear</button>
+          <button className="btn btn-ghost" onClick={handleSave}>{ICONS.save} Save</button>
+          <button
+            className="btn btn-deploy"
+            onClick={handleDeploy}
+            disabled={isDeploying}
+          >
+            {ICONS.play} {isDeploying ? 'Deploying...' : 'Deploy'}
+          </button>
+          <button
+            className="btn btn-ghost"
+            onClick={() => setLogVisible(v => !v)}
+            style={{ marginLeft: 4 }}
+          >
+            {ICONS.terminal} Log
+          </button>
+        </div>
+
+        {/* ReactFlow Canvas */}
+        <div style={{ position: 'absolute', inset: 0, top: 48, bottom: logVisible ? 160 : 0 }}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onNodeClick={onNodeClick}
+            onPaneClick={onPaneClick}
+            onDrop={onDrop}
+            onDragOver={onDragOver}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            fitView
+            deleteKeyCode={['Backspace','Delete']}
+            defaultEdgeOptions={{ type: 'gcpEdge', animated: true }}
+          >
+            <Background variant="dots" gap={28} size={1} color="var(--border)" />
+            <Controls style={{ bottom: 16, left: 16 }} />
+            <MiniMap
+              nodeColor={n => n.data.schema?.color || '#1e293b'}
+              maskColor="rgba(8,11,18,0.7)"
+              style={{ bottom: 16, right: selectedNode ? 296 : 16 }}
+            />
+          </ReactFlow>
+
+          {/* Empty state */}
+          {nodes.length === 0 && (
+            <div className="empty-canvas" style={{ pointerEvents: 'none' }}>
+              <div className="empty-title">Drop nodes to start</div>
+              <div className="empty-sub">
+                Drag resources from the sidebar<br/>
+                Connect ports to define relationships<br/>
+                Hit Deploy to provision on GCP
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Log */}
+        <LogPanel logs={logs} visible={logVisible} onToggle={() => setLogVisible(v => !v)} />
+
+        {/* Toasts */}
+        <ToastContainer toasts={toasts} />
+      </div>
+
+      {/* Right property panel */}
+      <div className={`panel-right ${selectedNode ? '' : 'collapsed'}`}>
+        {selectedNode && (
+          <PropertyPanel
+            node={selectedNode}
+            onClose={() => setSelectedNode(null)}
+            onChange={handlePropChange}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <ReactFlowProvider>
+      <VCOApp />
+    </ReactFlowProvider>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

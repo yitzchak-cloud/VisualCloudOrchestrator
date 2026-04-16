@@ -4,10 +4,12 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Visual Cloud Orchestrator</title>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<script src="https://unpkg.com/@xyflow/react@12/dist/umd/index.js"></script>
+<script src="https://unpkg.com/reactflow@11/dist/umd/index.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/reactflow@11/dist/style.css"/>
+<link rel="stylesheet" href="https://unpkg.com/@xyflow/react@12/dist/style.css"/>
 <link rel="stylesheet" href="https://unpkg.com/@xyflow/react@12/dist/style.css"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
@@ -228,7 +230,7 @@ const {
   BackgroundVariant, addEdge, useNodesState, useEdgesState,
   Handle, Position, useReactFlow, Panel,
   getBezierPath, EdgeLabelRenderer, BaseEdge,
-} = window.ReactFlow || {};
+} = window.ReactFlow;
 
 // ── Icons (inline SVG) ────────────────────────────────────────────────────────
 const ICONS = {
