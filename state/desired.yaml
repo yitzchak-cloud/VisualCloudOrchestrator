@@ -1,0 +1,19 @@
+edges: []
+nodes:
+- deployed: true
+  id: PubsubNode-1776421252361
+  label: Pubsub
+  position:
+    x: 462.03400737812626
+    y: 284.87359065437334
+  props: {}
+  status: deployed
+- deployed: true
+  id: CloudSQLNode-1776421271139
+  label: CloudSQL
+  position:
+    x: 478
+    y: 269
+  props: {}
+  status: deployed
+  type: CloudSQLNode
