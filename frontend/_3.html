@@ -440,7 +440,6 @@ html,body,#root{height:100%;width:100%;overflow:hidden;background:var(--bg0);col
 .vpc-group-body{
   padding:12px;min-height:140px;
   display:flex;flex-direction:column;gap:4px;
-  overflow-y:auto;
 }
 .vpc-group-empty{
   flex:1;display:flex;align-items:center;justify-content:center;
@@ -583,9 +582,6 @@ const DEFAULT_NODE_TYPES_DATA = [
   {type:"VPCNode",label:"VPC / Subnet",description:"Virtual private network",color:"#10b981",icon:"network",category:"Networking",
    inputs:[],
    outputs:[{name:"subnet",type:"network",multi:true,color:"#34d399",label:"Net"}]},
-  {type:"GroupBoxNode",label:"Visual Group",description:"Visual container for grouping nodes on the canvas",color:"#8b5cf6",icon:"layers",category:"Grouping",
-   inputs:[],
-   outputs:[]},
   {type:"LoadBalancerNode",label:"Load Balancer",description:"HTTP(S) / TCP / UDP load balancer",color:"#06b6d4",icon:"globe",category:"Networking",
    inputs:[
      {name:"network", type:"network",required:true, multi_in:false,color:"#34d399",label:"Net"},
@@ -1033,36 +1029,6 @@ const VPCGroupNode = ({ data, selected, id }) => {
 
   const children = (data.children || []);
 
-  // Auto-resize based on children
-  React.useEffect(() => {
-    if (children.length === 0) return;
-
-    const nodes = getNodes();
-    const childNodes = nodes.filter(n => children.some(c => c.id === n.id));
-
-    if (childNodes.length === 0) return;
-
-    // Calculate bounding box of children
-    const minX = Math.min(...childNodes.map(n => n.position.x));
-    const maxX = Math.max(...childNodes.map(n => n.position.x + (n.width || 200)));
-    const minY = Math.min(...childNodes.map(n => n.position.y));
-    const maxY = Math.max(...childNodes.map(n => n.position.y + (n.height || 100)));
-
-    const padding = 40;
-    const newWidth = Math.max(300, maxX - minX + padding * 2);
-    const newHeight = Math.max(200, maxY - minY + padding * 2 + 60); // +60 for header
-
-    // Only update if significantly different to avoid loops
-    const currentWidth = data.width || 300;
-    const currentHeight = data.height || 200;
-
-    if (Math.abs(newWidth - currentWidth) > 20 || Math.abs(newHeight - currentHeight) > 20) {
-      setNodes(nds => nds.map(n =>
-        n.id === id ? { ...n, data: { ...n.data, width: newWidth, height: newHeight } } : n
-      ));
-    }
-  }, [children, getNodes, setNodes, id, data.width, data.height]);
-
   const handleDragOver = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1089,60 +1055,36 @@ const VPCGroupNode = ({ data, selected, id }) => {
     }
   };
 
-  const isVisual = data.groupType === 'visual';
   return (
     <div
       className={`vpc-group-node${selected ? ' selected' : ''}${dragOver ? ' drag-over' : ''}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      style={{ width: data.width || 300, height: data.height || 200 }}
     >
-      <NodeResizer
-        color={isVisual ? "#8b5cf6" : "#10b981"}
-        isVisible={selected}
-        minWidth={200}
-        minHeight={150}
-        onResizeEnd={(event, params) => {
-          const { width, height } = params;
-          setNodes(nds => nds.map(n =>
-            n.id === id ? { ...n, data: { ...n.data, width, height } } : n
-          ));
-        }}
-      />
-      {!isVisual && (
-        <>
-          <Handle type="target" position={Position.Left} id="network_in"
-            style={{ background: '#10b981', border: '2px solid #0d1117', top: 28 }} />
-          <Handle type="source" position={Position.Right} id="subnet"
-            style={{ background: '#34d399', border: '2px solid #0d1117', top: 28 }} />
-        </>
-      )}
+      <Handle type="target" position={Position.Left} id="network_in"
+        style={{ background: '#10b981', border: '2px solid #0d1117', top: 28 }} />
+      <Handle type="source" position={Position.Right} id="subnet"
+        style={{ background: '#34d399', border: '2px solid #0d1117', top: 28 }} />
 
       <div className="vpc-group-header" style={{ cursor: 'default' }}>
-        <div className="vpc-group-icon" style={{ background: isVisual ? 'rgba(139,92,246,0.15)' : 'rgba(16,185,129,0.15)', color: isVisual ? '#8b5cf6' : '#10b981' }}>
-          {isVisual ? (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 6h16v12H4z"/><path d="M8 10h8"/><path d="M8 14h8"/>
-            </svg>
-          ) : (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="2" width="6" height="6"/><rect x="16" y="2" width="6" height="6"/>
-              <rect x="9" y="16" width="6" height="6"/>
-              <path d="M5 8v4c0 1 1 2 2 2h10c1 0 2-1 2-2V8"/><line x1="12" y1="14" x2="12" y2="16"/>
-            </svg>
-          )}
+        <div className="vpc-group-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="2" width="6" height="6"/><rect x="16" y="2" width="6" height="6"/>
+            <rect x="9" y="16" width="6" height="6"/>
+            <path d="M5 8v4c0 1 1 2 2 2h10c1 0 2-1 2-2V8"/><line x1="12" y1="14" x2="12" y2="16"/>
+          </svg>
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="vpc-group-title">{data.label || (isVisual ? 'Visual Group' : 'VPC Network')}</div>
-          <div className="vpc-group-subtitle">{isVisual ? 'visual container' : 'vpc group'}</div>
+          <div className="vpc-group-title">{data.label || 'VPC Network'}</div>
+          <div className="vpc-group-subtitle">vpc group</div>
         </div>
-        {!isVisual && data.props?.subnet_cidr && (
+        {data.props?.subnet_cidr && (
           <div className="vpc-group-cidr">{data.props.subnet_cidr}</div>
         )}
       </div>
 
-      <div className="vpc-group-body" style={{ minHeight: Math.max(140, children.length * 40 + 60), height: (data.height || 200) - 60 }}>
+      <div className="vpc-group-body" style={{ minHeight: Math.max(140, children.length * 40 + 60) }}>
         {children.length === 0 ? (
           <div className="vpc-group-empty">
             Drop Cloud Run, VM,<br/>or SQL nodes here<br/>to attach to this VPC
@@ -1165,18 +1107,17 @@ const VPCGroupNode = ({ data, selected, id }) => {
 const PropertyPanel = ({ node, onClose, onChange }) => {
   if (!node) return null;
 
-  // VPC Group / Visual Group panel
-  if (node.type === 'vpcGroup' || node.type === 'groupBox') {
+  // VPC Group panel
+  if (node.type === 'vpcGroup') {
     const props = node.data.props || {};
     const children = node.data.children || [];
-    const isVisualGroup = node.type === 'groupBox';
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <div className="panel-header">
           <div>
-            <div className="panel-title" style={{ color: isVisualGroup ? '#c4b5fd' : '#a7f3d0' }}>{node.data.label || (isVisualGroup ? 'Visual Group' : 'VPC Group')}</div>
+            <div className="panel-title" style={{ color: '#a7f3d0' }}>{node.data.label || 'VPC Group'}</div>
             <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 2, fontFamily: 'var(--font-mono)' }}>
-              {isVisualGroup ? 'Visual Group' : 'VPC Group'} · {node.id.slice(0, 8)}
+              VPC Group · {node.id.slice(0, 8)}
             </div>
           </div>
           <button className="panel-close" onClick={onClose}>{ICONS.close}</button>
@@ -1184,33 +1125,24 @@ const PropertyPanel = ({ node, onClose, onChange }) => {
         <div className="panel-body">
           <div className="field-group">
             <label className="field-label">Label</label>
-            <input className="field-input" value={node.data.label || ''} onChange={e => onChange(node.id, 'label', e.target.value)} placeholder={isVisualGroup ? 'Visual Group' : 'VPC Network'} />
+            <input className="field-input" value={node.data.label || ''} onChange={e => onChange(node.id, 'label', e.target.value)} placeholder="VPC Network" />
           </div>
-          {isVisualGroup ? (
-            <div className="field-group">
-              <label className="field-label">Description</label>
-              <input className="field-input" value={node.data.description || ''} onChange={e => onChange(node.id, 'description', e.target.value)} placeholder="e.g. Private Zone" />
-            </div>
-          ) : (
-            <>
-              <div className="section-title">Network Config</div>
-              <div className="field-group">
-                <label className="field-label">Subnet CIDR</label>
-                <input className="field-input" value={props.subnet_cidr || ''} onChange={e => onChange(node.id, 'subnet_cidr', e.target.value, true)} placeholder="10.0.0.0/24" />
-              </div>
-              <div className="field-group">
-                <label className="field-label">Region</label>
-                <select className="field-select" value={props.region || ''} onChange={e => onChange(node.id, 'region', e.target.value, true)}>
-                  <option value="">— select —</option>
-                  {['us-central1','us-east1','europe-west1','asia-east1'].map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
-              </div>
-            </>
-          )}
-          <div className="section-title">Contained Nodes ({children.length})</div>
+          <div className="section-title">Network Config</div>
+          <div className="field-group">
+            <label className="field-label">Subnet CIDR</label>
+            <input className="field-input" value={props.subnet_cidr || ''} onChange={e => onChange(node.id, 'subnet_cidr', e.target.value, true)} placeholder="10.0.0.0/24" />
+          </div>
+          <div className="field-group">
+            <label className="field-label">Region</label>
+            <select className="field-select" value={props.region || ''} onChange={e => onChange(node.id, 'region', e.target.value, true)}>
+              <option value="">— select —</option>
+              {['us-central1','us-east1','europe-west1','asia-east1'].map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </div>
+          <div className="section-title">Attached Resources ({children.length})</div>
           {children.length === 0 ? (
             <div style={{ fontSize: 11, color: 'var(--text2)', padding: '12px 0', lineHeight: 1.6 }}>
-              No nodes inside yet.<br/>Drag nodes into the box on the canvas.
+              No resources attached yet.<br/>Drag nodes into the VPC group on the canvas.
             </div>
           ) : children.map(c => (
             <div key={c.id} className="vpc-child-badge" style={{ marginBottom: 6 }}>
@@ -1537,7 +1469,7 @@ const InfoModal = ({ type, onClose }) => {
 
 
 // ── Main App ──────────────────────────────────────────────────────────────────
-const nodeTypes = { gcpNode: GCPNodeComponent, vpcGroup: VPCGroupNode, groupBox: VPCGroupNode };
+const nodeTypes = { gcpNode: GCPNodeComponent, vpcGroup: VPCGroupNode };
 const edgeTypes = { gcpEdge: GCPEdge };
 
 function VCOApp() {
@@ -1721,23 +1653,21 @@ function VCOApp() {
 
     const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
 
-    // ── VPC Group / Visual Group Node ──
-    if (typeStr === '__VPC_GROUP__' || typeStr === '__GROUP_BOX__') {
-      const isVisualGroup = typeStr === '__GROUP_BOX__';
-      const id = `${isVisualGroup ? 'GroupBox' : 'VPCGroup'}-${Date.now()}`;
+    // ── VPC Group Node ──
+    if (typeStr === '__VPC_GROUP__') {
+      const id = `VPCGroup-${Date.now()}`;
       setNodes(nds => [...nds, {
         id,
-        type: isVisualGroup ? 'groupBox' : 'vpcGroup',
+        type: 'vpcGroup',
         position,
         style: { width: 300, minHeight: 200 },
         data: {
-          label: isVisualGroup ? 'Visual Group' : 'VPC Network',
-          groupType: isVisualGroup ? 'visual' : 'vpc',
+          label: 'VPC Network',
           children: [],
-          props: isVisualGroup ? {} : { subnet_cidr: '', region: 'us-central1' },
-          onDropIntoVPC: (groupId, dropEvt) => {
+          props: { subnet_cidr: '', region: 'us-central1' },
+          onDropIntoVPC: (vpcId, dropEvt) => {
             const typeStr2 = dropEvt.dataTransfer.getData('application/vco-node');
-            if (!typeStr2 || typeStr2 === '__VPC_GROUP__' || typeStr2 === '__GROUP_BOX__') return;
+            if (!typeStr2 || typeStr2 === '__VPC_GROUP__') return;
             const schema2 = nodeTypesData.find(t => t.type === typeStr2);
             if (!schema2) return;
             const pos2 = screenToFlowPosition({ x: dropEvt.clientX, y: dropEvt.clientY });
@@ -1748,20 +1678,21 @@ function VCOApp() {
                 type: 'gcpNode',
                 position: pos2,
                 data: { label: schema2.label, schema: schema2, status: 'idle', props: {} },
-                parentNode: groupId,
+                parentNode: vpcId,
                 extent: 'parent',
               };
+              // update VPC node children list
               return [...nds.map(n => {
-                if (n.id !== groupId) return n;
+                if (n.id !== vpcId) return n;
                 const existing = n.data.children || [];
                 return { ...n, data: { ...n.data, children: [...existing, { id: childId, label: schema2.label, type: schema2.type }] } };
               }), childNode];
             });
-            addLog(`Attached ${schema2.label} → ${isVisualGroup ? 'Visual Group' : 'VPC Group'}`, 'info');
+            addLog(`Attached ${schema2.label} → VPC Group`, 'info');
           },
         },
       }]);
-      addLog(`Added ${isVisualGroup ? 'Visual Group' : 'VPC Group'}`, 'info');
+      addLog('Added VPC Group', 'info');
       return;
     }
 
@@ -1961,22 +1892,6 @@ function VCOApp() {
               <div className="node-desc">Drop nodes inside to attach to VPC</div>
             </div>
           </div>
-          <div
-            className="node-item"
-            style={{ borderColor: 'rgba(139,92,246,0.28)', background: 'rgba(139,92,246,0.08)', marginBottom: 8 }}
-            draggable
-            onDragStart={e => e.dataTransfer.setData('application/vco-node', '__GROUP_BOX__')}
-          >
-            <div className="node-icon" style={{ background: 'rgba(139,92,246,0.15)', color: '#8b5cf6' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 6h16v12H4z"/><path d="M8 10h8"/><path d="M8 14h8"/>
-              </svg>
-            </div>
-            <div className="node-info">
-              <div className="node-name" style={{ color: '#c4b5fd' }}>Visual Group</div>
-              <div className="node-desc">Drop nodes inside to create a visual container</div>
-            </div>
-          </div>
 
           {/* Category accordion */}
           <CategoryList filteredTypes={filteredTypes} />
@@ -2009,16 +1924,13 @@ function VCOApp() {
             <button
               id="topbar-menu-button"
               className="topbar-menu-button"
-              onClick={e => {
-                e.stopPropagation();
-                setMenuOpen(open => !open);
-              }}
+              onClick={() => setMenuOpen(open => !open)}
               type="button"
             >
               ☰ Menu
             </button>
             {menuOpen && (
-              <div id="topbar-menu-panel" className="topbar-menu-panel" onClick={e => e.stopPropagation()}>
+              <div id="topbar-menu-panel" className="topbar-menu-panel">
                 <div className="topbar-menu-item" onClick={() => { fitView(); setMenuOpen(false); }}>
                   <span>Center View</span>
                   <span style={{ color: 'var(--text2)' }}>focus</span>

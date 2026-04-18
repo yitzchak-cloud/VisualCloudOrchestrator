@@ -19,7 +19,7 @@ from pydantic import BaseModel
 from nodes import (
     CloudRunNode, CloudSQLNode, PubsubNode,
     GCSBucketNode, ServiceAccountNode, VirtualPrivateCloudNode, SecretManagerNode,
-    SubscriptionNode
+    SubscriptionNode, GroupBoxNode
 )
 
 # ── Registry ──────────────────────────────────────────────────────────────────
@@ -27,7 +27,8 @@ from nodes import (
 NODE_REGISTRY: dict[str, type] = {
     cls.__name__: cls for cls in [
         CloudRunNode, CloudSQLNode, PubsubNode,
-        GCSBucketNode, ServiceAccountNode, VirtualPrivateCloudNode, SecretManagerNode, SubscriptionNode
+        GCSBucketNode, ServiceAccountNode, VirtualPrivateCloudNode, SecretManagerNode, SubscriptionNode,
+        GroupBoxNode
     ]
 }
 

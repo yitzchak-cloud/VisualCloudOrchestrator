@@ -252,6 +252,18 @@ class VirtualPrivateCloudNode(GCPNode):
 
 
 @dataclass
+class GroupBoxNode(GCPNode):
+    title: str = "Visual Group"
+
+    inputs: ClassVar = []
+    outputs: ClassVar = []
+    node_color:  ClassVar = "#8b5cf6"
+    icon:        ClassVar = "layers"
+    category:    ClassVar = "Grouping"
+    description: ClassVar = "Visual container for grouping nodes on the canvas"
+
+
+@dataclass
 class LoadBalancerNode(GCPNode):
     lb_type:     str  = "EXTERNAL"   # EXTERNAL | INTERNAL
     protocol:    str  = "HTTPS"      # HTTP | HTTPS | TCP | UDP
