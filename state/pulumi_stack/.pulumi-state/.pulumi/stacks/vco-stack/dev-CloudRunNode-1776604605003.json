@@ -4,7 +4,7 @@
         "stack": "organization/vco-stack/dev-CloudRunNode-1776604605003",
         "latest": {
             "manifest": {
-                "time": "2026-04-20T14:30:22.6320483+03:00",
+                "time": "2026-04-20T17:25:41.5638431+03:00",
                 "magic": "85aa01bfd48b0131d9e9ebcc56b2a88faa9b8a580f90f11350be5550cbaaf581",
                 "version": "v3.231.0"
             },

@@ -4,7 +4,7 @@
         "stack": "organization/vco-stack/dev-CloudRunNode-1776604537206",
         "latest": {
             "manifest": {
-                "time": "2026-04-20T14:30:13.2069212+03:00",
+                "time": "2026-04-20T15:38:40.6526856+03:00",
                 "magic": "85aa01bfd48b0131d9e9ebcc56b2a88faa9b8a580f90f11350be5550cbaaf581",
                 "version": "v3.231.0"
             },
@@ -361,7 +361,7 @@
                         "effectiveAnnotations": {},
                         "effectiveLabels": {
                             "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-                            "ciphertext": "v1:5F/3Wbgkb9wH5YWM:yG7ztb4SaV5UV95sX9/9ZzmGjcLv/4orUU6t9KR8OcsTjmB5VZC+PqPjES37VMRfZ8s="
+                            "ciphertext": "v1:+pTMmT01O9N0KaK0:1E0fj8SDNIG1Z7wK6O2IbrIjoRu/hSlF7CSz77PtH4A9NReXR3eB4KuMlpN6i9yZLlg="
                         },
                         "etag": "\"CIiZmM8GEJDRn5wB/cHJvamVjdHMvaHJ6LWdlby1kaWctcmVzLWVuZG9yLTEvbG9jYXRpb25zL21lLXdlc3QxL3NlcnZpY2VzL2Nsb3VkcnVu\"",
                         "expireTime": "",
@@ -382,7 +382,7 @@
                         "project": "hrz-geo-dig-res-endor-1",
                         "pulumiLabels": {
                             "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-                            "ciphertext": "v1:Prgc4ool0yjba8fq:aHdwCaXs4DuDjj/0AyMuZI980QtRBQHknTRdduCQAeJ0y+icxZVUkjtj4IzM95wHMKQ="
+                            "ciphertext": "v1:X8E3+RCThQnE1/k2:bS4OdMRzeqp4GBa72wabFcBJOHjvMInflibU/bjvtanL88vgd2I72gmLXWz+pHsl768="
                         },
                         "reconciling": false,
                         "scaling": {

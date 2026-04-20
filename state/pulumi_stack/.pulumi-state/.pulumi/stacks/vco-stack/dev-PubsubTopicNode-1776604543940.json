@@ -4,7 +4,7 @@
         "stack": "organization/vco-stack/dev-PubsubTopicNode-1776604543940",
         "latest": {
             "manifest": {
-                "time": "2026-04-20T14:30:17.8711062+03:00",
+                "time": "2026-04-20T17:19:22.4292772+03:00",
                 "magic": "85aa01bfd48b0131d9e9ebcc56b2a88faa9b8a580f90f11350be5550cbaaf581",
                 "version": "v3.231.0"
             },
@@ -101,7 +101,7 @@
                         },
                         "effectiveLabels": {
                             "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-                            "ciphertext": "v1:fSorlZqnOcl+E+0k:uwQOMreGFo9Q+kk8+z8iff5Cw+1bvtRWfbcUNh3tJMe5iFQC2B5F5vuTYrFYtJtW+zg="
+                            "ciphertext": "v1:GyUzFiNjhzQOzHLw:3I3NOu1gofh8WiIy05VH9YKgRlqfvgw9Kj8tpjNAvRw6UnpOvCzTi/T9CA+mwd2OhF0="
                         },
                         "id": "projects/hrz-geo-dig-res-endor-1/topics/pubsubtopic",
                         "ingestionDataSourceSettings": null,
@@ -119,7 +119,7 @@
                         "project": "hrz-geo-dig-res-endor-1",
                         "pulumiLabels": {
                             "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-                            "ciphertext": "v1:LdIXacp/vqqHZacz:vaz1v43kZzqZJCSpu7/i6vs2YGfTOi+5dgjkhqDMGcDXZ6nsoXaH1/gCtS45Cj2cDRI="
+                            "ciphertext": "v1:ygKddSEeu7Aknf7j:SfGfXpowxCei8SeeD1/twVqbcOiMMcQM1X1QDk6iTa72yLkP9x4eS4bo25UkeDm3vXY="
                         },
                         "schemaSettings": null,
                         "tags": null

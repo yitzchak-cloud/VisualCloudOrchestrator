@@ -23,7 +23,7 @@ import pkgutil
 import inspect
 import nodes
 from base_node import GCPNode
-from pulumi_synth import synthesize_and_deploy, synthesize_only
+from pulumi_synth import synthesize_and_deploy, synthesize_only, read_actual_state
 
 def discover_nodes() -> dict[str, type]:
     registry = {}
@@ -38,9 +38,8 @@ def discover_nodes() -> dict[str, type]:
 NODE_REGISTRY = discover_nodes()
 print(f"Loaded {len(NODE_REGISTRY)} nodes: {list(NODE_REGISTRY.keys())}")
 
-STATE_FILE  = Path("state/desired.yaml")
-ACTUAL_FILE = Path("state/actual.yaml")
-STACK_DIR   = Path("state/pulumi_stack")   # ← persistent stack dir (reused across deploys)
+STATE_FILE = Path("state/desired.yaml")
+STACK_DIR  = Path("state/pulumi_stack")
 STATE_FILE.parent.mkdir(exist_ok=True)
 
 # ── App ───────────────────────────────────────────────────────────────────────
@@ -125,13 +124,17 @@ def get_state():
 
 @app.post("/api/graph")
 async def save_graph(payload: GraphPayload):
-    actual = _load_actual()
-    actual_ids: set[str] = set(actual.get("node_ids", []))
+    # Read deployed status directly from Pulumi state
+    actual       = read_actual_state(str(STACK_DIR))
+    actual_ids   = set(actual.get("node_ids", []))
+    actual_nodes = actual.get("nodes", {})
 
     nodes_with_status = []
     for n in payload.nodes:
-        n_copy = dict(n)
+        n_copy   = dict(n)
+        node_info = actual_nodes.get(n["id"], {})
         n_copy["deployed"] = n["id"] in actual_ids
+        n_copy["status"]   = node_info.get("status", "unknown") if n["id"] in actual_ids else "pending"
         nodes_with_status.append(n_copy)
 
     state = {"nodes": nodes_with_status, "edges": payload.edges}
@@ -223,16 +226,8 @@ async def deploy(payload: DeployPayload):
     if result["status"] in ("ok", "partial"):
         outputs = result.get("outputs", {})
 
-        # ── Update actual state ───────────────────────────────────────────
-        _save_actual({
-            "node_ids":   [n["id"] for n in payload.nodes],
-            "node_props": {n["id"]: n.get("props", {}) for n in payload.nodes},
-            "cr_urls":    {
-                k: v for k, v in outputs.items() if k.endswith("_url")
-            },
-        })
-
         # ── Broadcast outputs (e.g. CR URLs) ─────────────────────────────
+        # No actual.yaml — Pulumi state IS the source of truth
         if outputs:
             await manager.broadcast({
                 "event":   "deploy_outputs",
@@ -259,17 +254,10 @@ async def deploy(payload: DeployPayload):
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _load_actual() -> dict:
-    if ACTUAL_FILE.exists():
-        with open(ACTUAL_FILE) as f:
-            return yaml.safe_load(f) or {}
-    return {}
-
-
-def _save_actual(state: dict):
-    ACTUAL_FILE.parent.mkdir(exist_ok=True)
-    with open(ACTUAL_FILE, "w") as f:
-        yaml.dump(state, f, default_flow_style=False, allow_unicode=True)
+@app.get("/api/actual-state")
+def get_actual_state():
+    """Return the real deployed state read directly from Pulumi stacks."""
+    return read_actual_state(str(STACK_DIR))
 
 
 @app.get("/api/logs/{node_id}")

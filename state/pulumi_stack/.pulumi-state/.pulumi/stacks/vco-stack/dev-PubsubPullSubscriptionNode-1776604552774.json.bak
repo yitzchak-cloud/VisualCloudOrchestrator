@@ -4,7 +4,7 @@
         "stack": "organization/vco-stack/dev-PubsubPullSubscriptionNode-1776604552774",
         "latest": {
             "manifest": {
-                "time": "2026-04-20T14:25:14.3662623+03:00",
+                "time": "2026-04-20T16:24:13.8099779+03:00",
                 "magic": "85aa01bfd48b0131d9e9ebcc56b2a88faa9b8a580f90f11350be5550cbaaf581",
                 "version": "v3.231.0"
             },
@@ -118,7 +118,7 @@
                         "deadLetterPolicy": null,
                         "effectiveLabels": {
                             "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-                            "ciphertext": "v1:89gHoU/eu/a4XWyn:PIJ6EQIO3bl4zdGCsKTuprC99+y9EtqM+HL2ZFnvsFb5AiWsFn8duzbF0W/SslUp87g="
+                            "ciphertext": "v1:L526dSzKZ9/+u/n3:/YF3AASBKDPz3RLZrw3OEK3a6TTb/jVAJ28VvsytM0J1lM6hzMDd+Ne8xUGb/PPGwwo="
                         },
                         "enableExactlyOnceDelivery": false,
                         "enableMessageOrdering": false,
@@ -134,7 +134,7 @@
                         "project": "hrz-geo-dig-res-endor-1",
                         "pulumiLabels": {
                             "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-                            "ciphertext": "v1:/m36hFqDFHSLVJDn:I+7Dpaw2MVPKhCmkb6z6mn+pUyP+b1kb7tt2EQXPo8ZJbDRiGVXXJ3ynMy1cNhts6mY="
+                            "ciphertext": "v1:ElQpEH1gJnIAyfCY:9uIIEdJ5Ar2oQST8uCt4rehDJxBoE9w+dQv26gv1WX3D2dIREkCsuAr+wTvEZ8385wk="
                         },
                         "pushConfig": null,
                         "retainAckedMessages": false,

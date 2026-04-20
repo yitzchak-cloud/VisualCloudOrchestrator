@@ -5,12 +5,6 @@ edges:
   sourceHandle: publishes_to
   target: PubsubTopicNode-1776604543940
   targetHandle: publishers
-- color: '#ec4899'
-  id: reactflow__edge-PubsubPullSubscriptionNode-1776604552774messages-CloudRunNode-1776604537206MESSAGE
-  source: PubsubPullSubscriptionNode-1776604552774
-  sourceHandle: messages
-  target: CloudRunNode-1776604537206
-  targetHandle: MESSAGE
 - color: '#1523bd'
   id: reactflow__edge-PubsubTopicNode-1776604543940subscriptions-PubsubPullSubscriptionNode-1776604552774topic_link
   source: PubsubTopicNode-1776604543940
@@ -29,15 +23,27 @@ edges:
   sourceHandle: messages
   target: CloudRunNode-1776604605003
   targetHandle: MESSAGE
+- color: '#f472b6'
+  id: reactflow__edge-SecretManagerNode-1776689120586secret_ref-CloudRunNode-1776604605003secret
+  source: SecretManagerNode-1776689120586
+  sourceHandle: secret_ref
+  target: CloudRunNode-1776604605003
+  targetHandle: secret
+- color: '#f472b6'
+  id: reactflow__edge-SecretManagerNode-1776689118869secret_ref-CloudRunNode-1776604605003secret
+  source: SecretManagerNode-1776689118869
+  sourceHandle: secret_ref
+  target: CloudRunNode-1776604605003
+  targetHandle: secret
 nodes:
-- deployed: true
+- deployed: false
   id: SchemaNode-1776597424391
   label: Schema
   position:
     x: 281.5
     y: 162
   props: {}
-  status: working
+  status: pending
 - deployed: true
   id: CloudRunNode-1776604530728
   label: CloudRun
@@ -47,15 +53,6 @@ nodes:
   props:
     region: me-west1
   status: failed
-  type: CloudRunNode
-- deployed: true
-  id: CloudRunNode-1776604537206
-  label: CloudRun
-  position:
-    x: 969.6031731907465
-    y: -26.335166886580254
-  props: {}
-  status: deployed
   type: CloudRunNode
 - deployed: true
   id: PubsubTopicNode-1776604543940
@@ -94,3 +91,21 @@ nodes:
   props: {}
   status: deployed
   type: PubsubPushSubscriptionNode
+- deployed: false
+  id: SecretManagerNode-1776689118869
+  label: SecretManager
+  position:
+    x: 643.0853927385965
+    y: 665.9512845212114
+  props: {}
+  status: pending
+  type: SecretManagerNode
+- deployed: false
+  id: SecretManagerNode-1776689120586
+  label: SecretManager
+  position:
+    x: 673.4740882587271
+    y: 846.495887317282
+  props: {}
+  status: pending
+  type: SecretManagerNode

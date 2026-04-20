@@ -271,7 +271,7 @@ def _program_cloud_run(
                     envs=envs or None,
                 )],
                 vpc_access=gcp.cloudrunv2.ServiceTemplateVpcAccessArgs(
-                    egress="PRIVATE_RANGES_ONLY",
+                    egress="ALL_TRAFFIC",
                     network_interfaces=[
                         gcp.cloudrunv2.ServiceTemplateVpcAccessNetworkInterfaceArgs(
                             network=props.get(
@@ -375,6 +375,18 @@ def _run_node_stack(
     )
     stack.set_config("gcp:project", auto.ConfigValue(value=project))
     stack.set_config("gcp:region",  auto.ConfigValue(value=region))
+
+    # ── Preview first — skip up() if nothing changed ──────────────────────
+    from pulumi.automation.events import OpType
+    preview = stack.preview(color="never")
+    change_ops = {op for op, count in preview.change_summary.items() if count > 0}
+    no_change_ops = {OpType.SAME}
+    has_changes = bool(change_ops - no_change_ops)
+
+    if not has_changes:
+        # Nothing to do — return current outputs without running up()
+        on_output("  (no changes)")
+        return {"__no_changes__": True, **{k: v.value for k, v in stack.outputs().items()}}
 
     result = stack.up(on_output=on_output, color="never", continue_on_error=True)
     return {k: v.value for k, v in result.outputs.items()}
@@ -620,3 +632,108 @@ async def synthesize_only(
         "deployment_order": [_node_label(nodes, nid) for nid in order],
         "resolved_graph":   slim,
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 8.  Read actual state from Pulumi stacks
+#     Replaces actual.yaml — Pulumi is the single source of truth.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def read_actual_state(
+    work_dir: str,
+    stack:    str = "dev",
+) -> dict:
+    """
+    Walk every per-node stack directory under work_dir, read its Pulumi
+    outputs and last update summary, and return a unified state dict:
+
+    {
+      "node_ids":  ["CloudRunNode-123", ...],       # all deployed node IDs
+      "nodes": {
+        "CloudRunNode-123": {
+          "status":  "deployed" | "failed" | "unknown",
+          "outputs": {"uri": "https://...", "name": "...", ...},
+          "last_updated": "2024-01-01T12:00:00",
+        },
+        ...
+      }
+    }
+    """
+    stack_dir = Path(work_dir)
+    if not stack_dir.exists():
+        return {"node_ids": [], "nodes": {}}
+
+    state_dir  = (stack_dir / ".pulumi-state").resolve()
+    pulumi_home = str((stack_dir / ".pulumi-home").resolve())
+    backend_url = os.environ.get(
+        "PULUMI_BACKEND_URL",
+        "file://" + state_dir.as_posix(),
+    )
+
+    if not state_dir.exists():
+        return {"node_ids": [], "nodes": {}}
+
+    shared_env = {
+        "PULUMI_BACKEND_URL":       backend_url,
+        "PULUMI_CONFIG_PASSPHRASE": os.environ.get("PULUMI_CONFIG_PASSPHRASE", ""),
+        "PULUMI_SKIP_UPDATE_CHECK": "1",
+        "PULUMI_ACCESS_TOKEN":      "",
+        "PULUMI_HOME":              pulumi_home,
+    }
+
+    result: dict = {"node_ids": [], "nodes": {}}
+
+    # Each subdirectory whose name matches a node stack is a candidate
+    for node_dir in sorted(stack_dir.iterdir()):
+        if not node_dir.is_dir():
+            continue
+        if node_dir.name.startswith("."):
+            continue
+
+        safe_id    = node_dir.name                          # e.g. "CloudRunNode-1776604537206"
+        full_name  = f"{stack}-{safe_id}"
+        node_id    = safe_id.replace("-", "-", 1)           # keep original dashes
+
+        try:
+            cmd = _get_pulumi_command(stack_dir)
+
+            stack_obj = auto.create_or_select_stack(
+                stack_name=full_name,
+                project_name="vco-stack",
+                program=lambda: None,   # dummy — we only read state
+                opts=auto.LocalWorkspaceOptions(
+                    work_dir=str(node_dir),
+                    pulumi_home=pulumi_home,
+                    pulumi_command=cmd,
+                    env_vars=shared_env,
+                ),
+            )
+
+            # Stack outputs (uri, name, id…)
+            outputs = {k: v.value for k, v in stack_obj.outputs().items()}
+
+            # Last update summary
+            history = stack_obj.history(page_size=1)
+            last    = history[0] if history else None
+            status  = "unknown"
+            last_updated = None
+
+            if last:
+                last_updated = last.end_time.isoformat() if last.end_time else None
+                if last.result == "succeeded":
+                    status = "deployed"
+                elif last.result == "failed":
+                    status = "failed"
+
+            result["node_ids"].append(node_id)
+            result["nodes"][node_id] = {
+                "status":       status,
+                "outputs":      outputs,
+                "last_updated": last_updated,
+            }
+
+        except Exception:
+            # Stack dir exists but no stack yet (e.g. never deployed)
+            continue
+
+    return result
