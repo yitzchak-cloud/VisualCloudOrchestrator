@@ -150,6 +150,26 @@ def build_dag(nodes: list[dict], ctx: dict[str, Any]) -> list[str]:
 # 3.  Helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Pulumi CLI — auto-download if not found on PATH
+# ─────────────────────────────────────────────────────────────────────────────
+
+_pulumi_command: "auto.PulumiCommand | None" = None
+
+def _get_pulumi_command(work_dir: Path) -> "auto.PulumiCommand":
+    """
+    Return a PulumiCommand, downloading the CLI automatically if needed.
+    The binary is cached under work_dir/.pulumi-cli so it's only downloaded once.
+    """
+    global _pulumi_command
+    if _pulumi_command is not None:
+        return _pulumi_command
+    cli_root = work_dir / ".pulumi-cli"
+    cli_root.mkdir(parents=True, exist_ok=True)
+    _pulumi_command = auto.PulumiCommand.install(root=str(cli_root))
+    return _pulumi_command
+
+
 def _node_label(nodes: list[dict], node_id: str) -> str:
     for n in nodes:
         if n["id"] == node_id:
@@ -163,16 +183,21 @@ def _resource_name(node: dict) -> str:
     return props.get("name") or re.sub(r"[^a-z0-9-]", "-", label.lower()).strip("-")
 
 
-def _make_workspace_opts(work_dir: Path) -> auto.LocalWorkspaceOptions:
+def _make_workspace_opts(
+    work_dir: Path,
+    pulumi_command: "auto.PulumiCommand | None" = None,
+    backend_url: str | None = None,
+    pulumi_home: str | None = None,
+) -> auto.LocalWorkspaceOptions:
     return auto.LocalWorkspaceOptions(
         work_dir=str(work_dir),
+        pulumi_home=pulumi_home,
+        pulumi_command=pulumi_command,
         env_vars={
-            "PULUMI_BACKEND_URL": os.environ.get(
-                "PULUMI_BACKEND_URL",
-                f"file://{work_dir / '.pulumi-state'}",
-            ),
+            "PULUMI_BACKEND_URL":       backend_url or "",
             "PULUMI_CONFIG_PASSPHRASE": os.environ.get("PULUMI_CONFIG_PASSPHRASE", ""),
-            "PULUMI_SKIP_UPDATE_CHECK":  "1",
+            "PULUMI_SKIP_UPDATE_CHECK": "1",
+            "PULUMI_ACCESS_TOKEN":      "",
         },
     )
 
@@ -235,11 +260,31 @@ def _program_cloud_run(
             name=_resource_name(node),
             location=region,
             project=project,
+            # ── Org Policy compliance ──────────────────────────────────────
+            # ingress: internal only (no public traffic)
+            # vpc-access-egress: all-traffic (required by org policy)
+            # invoker: IAM-authenticated only (no allUsers)
+            ingress="INGRESS_TRAFFIC_INTERNAL_ONLY",
             template=gcp.cloudrunv2.ServiceTemplateArgs(
                 containers=[gcp.cloudrunv2.ServiceTemplateContainerArgs(
                     image=props.get("image", "gcr.io/cloudrun/hello"),
                     envs=envs or None,
                 )],
+                vpc_access=gcp.cloudrunv2.ServiceTemplateVpcAccessArgs(
+                    egress="PRIVATE_RANGES_ONLY",
+                    network_interfaces=[
+                        gcp.cloudrunv2.ServiceTemplateVpcAccessNetworkInterfaceArgs(
+                            network=props.get(
+                                "vpc_network",
+                                "projects/hrz-endor-net-0/global/networks/endor-0",
+                            ),
+                            subnetwork=props.get(
+                                "vpc_subnetwork",
+                                "projects/hrz-endor-net-0/regions/me-west1/subnetworks/endor-1-subnet",
+                            ),
+                        )
+                    ],
+                ),
             ),
         )
         pulumi.export("uri",  svc.uri)
@@ -301,34 +346,37 @@ def _program_push_subscription(
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _run_node_stack(
-    node_id:    str,
-    program:    Callable[[], None],
-    stack_name: str,
-    work_dir:   Path,
-    project:    str,
-    region:     str,
-    on_output:  Callable[[str], None],
+    node_id:        str,
+    program:        Callable[[], None],
+    stack_name:     str,
+    work_dir:       Path,
+    project:        str,
+    region:         str,
+    on_output:      Callable[[str], None],
+    pulumi_command: "auto.PulumiCommand | None" = None,
+    backend_url:    str = "",
+    pulumi_home:    str = "",
 ) -> dict:
     """
-    Create-or-select a Pulumi stack named  <stack_name>-<node_id>,
-    run `up`, and return the stack outputs dict.
-    Each node gets its own isolated stack so state is per-resource.
+    Create-or-select a Pulumi stack named  <stack_name>-<node_id>.
+    All nodes share the same backend_url and pulumi_home so state is
+    stored in one place and login happens only once.
     """
-    safe_id    = re.sub(r"[^a-zA-Z0-9_]", "-", node_id)
-    full_name  = f"{stack_name}-{safe_id}"
-    node_dir   = work_dir / safe_id
+    safe_id   = re.sub(r"[^a-zA-Z0-9_]", "-", node_id)
+    full_name = f"{stack_name}-{safe_id}"
+    node_dir  = work_dir / safe_id
     node_dir.mkdir(parents=True, exist_ok=True)
 
     stack = auto.create_or_select_stack(
         stack_name=full_name,
         project_name="vco-stack",
         program=program,
-        opts=_make_workspace_opts(node_dir),
+        opts=_make_workspace_opts(node_dir, pulumi_command, backend_url, pulumi_home),
     )
     stack.set_config("gcp:project", auto.ConfigValue(value=project))
     stack.set_config("gcp:region",  auto.ConfigValue(value=region))
 
-    result = stack.up(on_output=on_output, color="never")
+    result = stack.up(on_output=on_output, color="never", continue_on_error=True)
     return {k: v.value for k, v in result.outputs.items()}
 
 
@@ -385,15 +433,37 @@ async def synthesize_and_deploy(
     await _log("Phase 2 — Installing Pulumi GCP plugin…", "info")
     loop = asyncio.get_event_loop()
 
-    def _install_plugin():
-        ws_opts = _make_workspace_opts(stack_dir)
+    def _install_plugin() -> tuple:
+        cmd = _get_pulumi_command(stack_dir)
+
+        # One shared backend and home for ALL node stacks
+        state_dir   = (stack_dir / ".pulumi-state").resolve()
+        b_url       = os.environ.get("PULUMI_BACKEND_URL", "file://" + state_dir.as_posix())
+        p_home      = str((stack_dir / ".pulumi-home").resolve())
+        state_dir.mkdir(parents=True, exist_ok=True)
+        (stack_dir / ".pulumi-home").mkdir(parents=True, exist_ok=True)
+
+        shared_env = {
+            "PULUMI_BACKEND_URL":       b_url,
+            "PULUMI_CONFIG_PASSPHRASE": os.environ.get("PULUMI_CONFIG_PASSPHRASE", ""),
+            "PULUMI_SKIP_UPDATE_CHECK": "1",
+            "PULUMI_ACCESS_TOKEN":      "",
+            "PULUMI_HOME":              p_home,
+        }
+
+        # Explicit login to local backend — must happen before any stack op
+        cmd.run(["login", b_url], cwd=str(stack_dir), additional_env=shared_env)
+
         ws = auto.LocalWorkspace(
             work_dir=str(stack_dir),
-            env_vars=ws_opts.env_vars,
+            pulumi_home=p_home,
+            env_vars=shared_env,
+            pulumi_command=cmd,
         )
         ws.install_plugin("gcp", "v7")
+        return cmd, b_url, p_home
 
-    await loop.run_in_executor(None, _install_plugin)
+    pulumi_cmd, backend_url, pulumi_home = await loop.run_in_executor(None, _install_plugin)
 
     # ── Phase 3: deploy node by node ─────────────────────────────────────
     await _log("Phase 3 — Deploying resources…", "info")
@@ -403,6 +473,7 @@ async def synthesize_and_deploy(
     all_node_outputs: dict[str, Any]  = {}   # flat key→value for final result
 
     total = len(order)
+    failed_nodes: list[str] = []
 
     for index, nid in enumerate(order, start=1):
         node  = by_id[nid]
@@ -491,6 +562,9 @@ async def synthesize_and_deploy(
                 lambda p=program, n=nid: _run_node_stack(
                     n, p, stack, stack_dir, project, region,
                     make_on_output(n, label),
+                    pulumi_cmd,
+                    backend_url,
+                    pulumi_home,
                 ),
             )
             deployed_outputs[nid] = outputs
@@ -502,14 +576,19 @@ async def synthesize_and_deploy(
 
         except auto.CommandError as exc:
             await _log(f"[{index}/{total}] ✗ {label} FAILED:\n{exc}", "error", nid)
-            if log:
-                await _log("__node_failed__", "internal", nid)
-            return {
-                "status":  "error",
-                "phase":   f"node:{nid}",
-                "output":  str(exc),
-                "outputs": all_node_outputs,
-            }
+            await _log("__node_failed__", "internal", nid)
+            failed_nodes.append(nid)
+            # Do NOT return — continue deploying the remaining nodes
+            continue
+
+    if failed_nodes:
+        failed_labels = [_node_label(nodes, n) for n in failed_nodes]
+        await _log(f"Deploy finished with {len(failed_nodes)} error(s): {', '.join(failed_labels)}", "warn")
+        return {
+            "status":  "partial",
+            "failed":  failed_nodes,
+            "outputs": all_node_outputs,
+        }
 
     await _log(f"All {total} resources deployed ✓", "ok")
     return {"status": "ok", "outputs": all_node_outputs}

@@ -1,0 +1,52 @@
+{
+    "version": 3,
+    "checkpoint": {
+        "stack": "organization/vco-stack/dev-CloudRunNode-1776604530728",
+        "latest": {
+            "manifest": {
+                "time": "2026-04-20T14:09:28.5669679+03:00",
+                "magic": "85aa01bfd48b0131d9e9ebcc56b2a88faa9b8a580f90f11350be5550cbaaf581",
+                "version": "v3.231.0"
+            },
+            "secrets_providers": {
+                "type": "passphrase",
+                "state": {
+                    "salt": "v1:6txhHqxLMS8=:v1:9umkLQFhEu1c6rUJ:I0SapXx3VY2mjsoH60q2pUCjxZtYHg=="
+                }
+            },
+            "resources": [
+                {
+                    "urn": "urn:pulumi:dev-CloudRunNode-1776604530728::vco-stack::pulumi:pulumi:Stack::vco-stack-dev-CloudRunNode-1776604530728",
+                    "custom": false,
+                    "type": "pulumi:pulumi:Stack",
+                    "outputs": {
+                        "id": "04da6b54-80e4-46f7-96ec-b56ff0331ba9",
+                        "name": "cloudrun"
+                    },
+                    "created": "2026-04-20T11:09:24.921507Z",
+                    "modified": "2026-04-20T11:09:24.921507Z"
+                },
+                {
+                    "urn": "urn:pulumi:dev-CloudRunNode-1776604530728::vco-stack::pulumi:providers:gcp::default_9_20_0",
+                    "custom": true,
+                    "id": "fab57e20-536a-43e9-8247-97f3acab9de4",
+                    "type": "pulumi:providers:gcp",
+                    "inputs": {
+                        "__internal": {},
+                        "project": "hrz-geo-dig-res-endor-1",
+                        "region": "me-west1",
+                        "version": "9.20.0"
+                    },
+                    "outputs": {
+                        "project": "hrz-geo-dig-res-endor-1",
+                        "region": "me-west1",
+                        "version": "9.20.0"
+                    },
+                    "created": "2026-04-20T11:09:27.5598591Z",
+                    "modified": "2026-04-20T11:09:27.5598591Z"
+                }
+            ],
+            "metadata": {}
+        }
+    }
+}

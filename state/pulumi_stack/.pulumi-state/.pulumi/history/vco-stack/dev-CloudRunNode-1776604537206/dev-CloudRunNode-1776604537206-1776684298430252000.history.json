@@ -1,0 +1,52 @@
+{
+    "kind": "update",
+    "startTime": 1776684295,
+    "message": "Add GCP Node classes for Compute, Data, Storage, Security, Networking, and Messaging",
+    "environment": {
+        "exec.kind": "auto.inline",
+        "git.author": "yitzchakdamen",
+        "git.author.email": "yitzchakdamen@gmail.com",
+        "git.committer": "yitzchakdamen",
+        "git.committer.email": "yitzchakdamen@gmail.com",
+        "git.dirty": "true",
+        "git.head": "5bfd975e544178a9bb83a1e433d9e0cc94efc2bc",
+        "git.headName": "refs/heads/main",
+        "pulumi.arch": "amd64",
+        "pulumi.env.PULUMI_ACCESS_TOKEN": "set",
+        "pulumi.env.PULUMI_AUTOMATION_API": "set",
+        "pulumi.env.PULUMI_BACKEND_URL": "set",
+        "pulumi.env.PULUMI_CONFIG_PASSPHRASE": "set",
+        "pulumi.env.PULUMI_DEBUG_COMMANDS": "true",
+        "pulumi.env.PULUMI_HOME": "set",
+        "pulumi.env.PULUMI_SKIP_UPDATE_CHECK": "true",
+        "pulumi.flag.client": "set",
+        "pulumi.flag.color": "set",
+        "pulumi.flag.continue-on-error": "true",
+        "pulumi.flag.exec-kind": "set",
+        "pulumi.flag.non-interactive": "true",
+        "pulumi.flag.skip-preview": "true",
+        "pulumi.flag.stack": "set",
+        "pulumi.flag.yes": "true",
+        "pulumi.os": "windows",
+        "pulumi.version": "v3.231.0",
+        "runtime.executable": "C:\\Users\\isaac\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
+        "runtime.name": "client",
+        "runtime.version": "3.13.3",
+        "stack.environments": "[]",
+        "updatePlan": "false",
+        "vcs.kind": "github.com",
+        "vcs.owner": "yitzchak-cloud",
+        "vcs.repo": "VisualCloudOrchestrator",
+        "vcs.root": "state/pulumi_stack/CloudRunNode-1776604537206"
+    },
+    "config": {
+        "gcp:project": "hrz-geo-dig-res-endor-1",
+        "gcp:region": "me-west1"
+    },
+    "version": 0,
+    "result": "succeeded",
+    "endTime": 1776684298,
+    "resourceChanges": {
+        "same": 2
+    }
+}

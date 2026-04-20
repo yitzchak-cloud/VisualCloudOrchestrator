@@ -10,6 +10,7 @@ from port_types import PortType
 class CloudRunNode(GCPNode):
     image:         str  = ""
     memory:        str  = "512Mi"
+    region:        str  = "me-west1"
     cpu:           str  = "1"
     min_instances: int  = 0
     max_instances: int  = 10
@@ -24,7 +25,7 @@ class CloudRunNode(GCPNode):
         {"key": "min_instances", "label": "Min Instances",   "type": "number", "default": 0},
         {"key": "max_instances", "label": "Max Instances",   "type": "number", "default": 10},
         {"key": "port",          "label": "Port",            "type": "number", "default": 8080},
-        {"key": "port",          "label": "Port",            "type": "number", "default": 8080},
+        {"key": "region",        "label": "Region",          "type": "select", "options": ["me-west1","us-central1","us-east1"], "default": "me-west1"},
         {"key": "service_url",   "label": "Service URL",     "type": "text",   "default": "", "placeholder": "https://my-service.run.app"},
     ]
     url_field: ClassVar = "service_url"   # ← השדה שמכיל את ה־URL

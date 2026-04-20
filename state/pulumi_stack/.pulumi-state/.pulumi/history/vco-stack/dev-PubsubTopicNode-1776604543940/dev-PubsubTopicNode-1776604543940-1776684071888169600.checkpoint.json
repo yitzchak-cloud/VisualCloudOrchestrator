@@ -1,0 +1,145 @@
+{
+    "version": 3,
+    "checkpoint": {
+        "stack": "organization/vco-stack/dev-PubsubTopicNode-1776604543940",
+        "latest": {
+            "manifest": {
+                "time": "2026-04-20T14:21:11.8810397+03:00",
+                "magic": "85aa01bfd48b0131d9e9ebcc56b2a88faa9b8a580f90f11350be5550cbaaf581",
+                "version": "v3.231.0"
+            },
+            "secrets_providers": {
+                "type": "passphrase",
+                "state": {
+                    "salt": "v1:09lJDk5TGAo=:v1:+hOqUsiF5OmL5dWz:ooFwDPN9iwE0gv2H1e81JQ5S5GqG+A=="
+                }
+            },
+            "resources": [
+                {
+                    "urn": "urn:pulumi:dev-PubsubTopicNode-1776604543940::vco-stack::pulumi:pulumi:Stack::vco-stack-dev-PubsubTopicNode-1776604543940",
+                    "custom": false,
+                    "type": "pulumi:pulumi:Stack",
+                    "outputs": {
+                        "id": "projects/hrz-geo-dig-res-endor-1/topics/pubsubtopic",
+                        "name": "pubsubtopic"
+                    },
+                    "created": "2026-04-20T11:09:10.2574372Z",
+                    "modified": "2026-04-20T11:09:10.2574372Z"
+                },
+                {
+                    "urn": "urn:pulumi:dev-PubsubTopicNode-1776604543940::vco-stack::pulumi:providers:gcp::default_9_20_0",
+                    "custom": true,
+                    "id": "1af38dec-bfed-416f-8626-59808f7f88d3",
+                    "type": "pulumi:providers:gcp",
+                    "inputs": {
+                        "__internal": {},
+                        "project": "hrz-geo-dig-res-endor-1",
+                        "region": "me-west1",
+                        "version": "9.20.0"
+                    },
+                    "outputs": {
+                        "project": "hrz-geo-dig-res-endor-1",
+                        "region": "me-west1",
+                        "version": "9.20.0"
+                    },
+                    "created": "2026-04-20T11:09:12.3504696Z",
+                    "modified": "2026-04-20T11:09:12.3504696Z"
+                },
+                {
+                    "urn": "urn:pulumi:dev-PubsubTopicNode-1776604543940::vco-stack::gcp:pubsub/topic:Topic::PubsubTopicNode-1776604543940",
+                    "custom": true,
+                    "id": "projects/hrz-geo-dig-res-endor-1/topics/pubsubtopic",
+                    "type": "gcp:pubsub/topic:Topic",
+                    "inputs": {
+                        "__defaults": [],
+                        "messageRetentionDuration": "604800s",
+                        "name": "pubsubtopic",
+                        "project": "hrz-geo-dig-res-endor-1"
+                    },
+                    "outputs": {
+                        "__meta": "{\"e2bfb730-ecaa-11e6-8f88-34363bc7c4c0\":{\"create\":1200000000000,\"delete\":1200000000000,\"update\":1200000000000}}",
+                        "__pulumi_raw_state_delta": {
+                            "obj": {
+                                "ps": {
+                                    "effectiveLabels": {
+                                        "map": {}
+                                    },
+                                    "ingestionDataSourceSettings": {
+                                        "plu": {
+                                            "i": {}
+                                        }
+                                    },
+                                    "messageStoragePolicy": {
+                                        "plu": {
+                                            "i": {
+                                                "obj": {
+                                                    "ps": {
+                                                        "allowedPersistenceRegions": {
+                                                            "arr": {}
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "messageTransforms": {
+                                        "arr": {}
+                                    },
+                                    "pulumiLabels": {
+                                        "map": {}
+                                    },
+                                    "schemaSettings": {
+                                        "plu": {
+                                            "i": {}
+                                        }
+                                    }
+                                },
+                                "renamed": {
+                                    "pulumiLabels": "terraform_labels"
+                                }
+                            }
+                        },
+                        "effectiveLabels": {
+                            "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                            "ciphertext": "v1:McPSM5OOBxdTBYhX:7WnhPXbxNyWwTzpX8zNmDcaDn4bLBH35zF+3KtEcm1yNBBr/dSjMWcsyAgUXzTAW4mA="
+                        },
+                        "id": "projects/hrz-geo-dig-res-endor-1/topics/pubsubtopic",
+                        "ingestionDataSourceSettings": null,
+                        "kmsKeyName": "",
+                        "labels": null,
+                        "messageRetentionDuration": "604800s",
+                        "messageStoragePolicy": {
+                            "allowedPersistenceRegions": [
+                                "me-west1"
+                            ],
+                            "enforceInTransit": true
+                        },
+                        "messageTransforms": [],
+                        "name": "pubsubtopic",
+                        "project": "hrz-geo-dig-res-endor-1",
+                        "pulumiLabels": {
+                            "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                            "ciphertext": "v1:zfW8ehZ9/GJX/Uit:LyI3sSX+6ySnD0u0jhwACyRUW4QI8A187UHKw1Tc2RwM42axSUp/qhunG9HHkW9aXWU="
+                        },
+                        "schemaSettings": null,
+                        "tags": null
+                    },
+                    "parent": "urn:pulumi:dev-PubsubTopicNode-1776604543940::vco-stack::pulumi:pulumi:Stack::vco-stack-dev-PubsubTopicNode-1776604543940",
+                    "provider": "urn:pulumi:dev-PubsubTopicNode-1776604543940::vco-stack::pulumi:providers:gcp::default_9_20_0::1af38dec-bfed-416f-8626-59808f7f88d3",
+                    "propertyDependencies": {
+                        "messageRetentionDuration": [],
+                        "name": [],
+                        "project": []
+                    },
+                    "additionalSecretOutputs": [
+                        "effectiveLabels",
+                        "pulumiLabels"
+                    ],
+                    "created": "2026-04-20T11:09:18.4954576Z",
+                    "modified": "2026-04-20T11:09:18.4954576Z"
+                }
+            ],
+            "metadata": {}
+        }
+    }
+}

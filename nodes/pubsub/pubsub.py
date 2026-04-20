@@ -254,7 +254,7 @@ class PubsubTopicNode(GCPNode):
         Port("subscriptions", PortType.SUBSCRIPTION, multi=True),
     ]
     node_color:  ClassVar = "#3b82f6"
-    icon:        ClassVar = "radio"
+    icon:        ClassVar = "pubsub"
     category:    ClassVar = "Messaging"
     description: ClassVar = "Pub/Sub Topic - The core messaging hub"
 
@@ -289,7 +289,7 @@ class PubsubPullSubscriptionNode(GCPNode):
     ] # Pull בד"כ נצרך ע"י Worker חיצוני
     
     node_color:  ClassVar = "#ec485b"
-    icon:        ClassVar = "inbox"
+    icon:        ClassVar = "pubsub"
     category:    ClassVar = "Messaging"
     description: ClassVar = "Standard Pull Subscription"
 
@@ -319,7 +319,7 @@ class PubsubPushSubscriptionNode(GCPNode):
     ] 
     
     node_color:  ClassVar = "#ef4444"
-    icon:        ClassVar = "send"
+    icon:        ClassVar = "pubsub"
     category:    ClassVar = "Messaging"
     description: ClassVar = "Push Subscription to Webhook/Service"
 
@@ -345,7 +345,7 @@ class PubsubBigQuerySubscriptionNode(GCPNode):
         Port("bq_table", PortType.DATABASE),
     ]
     node_color:  ClassVar = "#3b82f6"
-    icon:        ClassVar = "table"
+    icon:        ClassVar = "pubsub"
     category:    ClassVar = "Messaging"
     description: ClassVar = "BigQuery Push Subscription"
 
@@ -374,6 +374,6 @@ class PubsubCloudStorageSubscriptionNode(GCPNode):
         Port("gcs_bucket", PortType.STORAGE),
     ]
     node_color:  ClassVar = "#eab308"
-    icon:        ClassVar = "archive"
+    icon:        ClassVar = "pubsub"
     category:    ClassVar = "Messaging"
     description: ClassVar = "Cloud Storage Push Subscription"

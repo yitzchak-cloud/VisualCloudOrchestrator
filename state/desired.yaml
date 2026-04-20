@@ -30,29 +30,30 @@ edges:
   target: CloudRunNode-1776604605003
   targetHandle: MESSAGE
 nodes:
-- deployed: false
+- deployed: true
   id: SchemaNode-1776597424391
   label: Schema
   position:
     x: 281.5
     y: 162
   props: {}
-  status: failed
+  status: working
 - deployed: true
   id: CloudRunNode-1776604530728
   label: CloudRun
   position:
     x: -201.95894425324957
     y: 74.98737836648814
-  props: {}
+  props:
+    region: me-west1
   status: failed
   type: CloudRunNode
 - deployed: true
   id: CloudRunNode-1776604537206
   label: CloudRun
   position:
-    x: 965.6446494584277
-    y: 56.79383149211202
+    x: 969.6031731907465
+    y: -26.335166886580254
   props: {}
   status: deployed
   type: CloudRunNode
@@ -60,8 +61,8 @@ nodes:
   id: PubsubTopicNode-1776604543940
   label: PubsubTopic
   position:
-    x: 121.17658345773236
-    y: 158.351626514101
+    x: 144.26797189625802
+    y: 157.69187255871455
   props: {}
   status: deployed
   type: PubsubTopicNode
@@ -69,8 +70,8 @@ nodes:
   id: PubsubPullSubscriptionNode-1776604552774
   label: PubsubPullSubscription
   position:
-    x: 531.8309271936511
-    y: 14.102790581547278
+    x: 530.0898260670589
+    y: 14.102790581547282
   props: {}
   status: deployed
   type: PubsubPullSubscriptionNode
@@ -82,7 +83,7 @@ nodes:
     y: 315.59585307120904
   props:
     service_url: ''
-  status: deployed
+  status: failed
   type: CloudRunNode
 - deployed: true
   id: PubsubPushSubscriptionNode-1776604613549

@@ -249,11 +249,26 @@ html,body,#root{height:100%;width:100%;overflow:hidden;background:var(--bg0);col
 .section-title{font-family:var(--font-display);font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--text2);text-transform:uppercase;margin:16px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--border)}
 
 /* ── Log Panel ── */
-.log-panel{position:absolute;bottom:0;left:0;right:0;height:160px;background:var(--bg1);border-top:1px solid var(--border);z-index:15;display:flex;flex-direction:column}
-.log-panel.hidden{height:0;overflow:hidden}
-.log-header{padding:6px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0}
+.log-panel{position:absolute;bottom:0;left:0;right:0;height:160px;background:var(--bg1);border-top:1px solid var(--border);z-index:15;display:flex;flex-direction:column;min-height:36px;max-height:80vh}
+.log-panel.hidden{height:36px!important;overflow:hidden}
+.log-panel.hidden .log-body,.log-panel.hidden .log-toolbar{display:none}
+.log-resize-handle{position:absolute;top:-4px;left:0;right:0;height:8px;cursor:ns-resize;z-index:20;display:flex;align-items:center;justify-content:center}
+.log-resize-handle::after{content:'';width:40px;height:3px;border-radius:99px;background:var(--border2);transition:background .15s}
+.log-resize-handle:hover::after{background:var(--accent)}
+.log-header{padding:5px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0;height:36px}
 .log-title{font-size:10px;font-weight:600;letter-spacing:.12em;color:var(--text2);text-transform:uppercase}
-.log-body{flex:1;overflow-y:auto;padding:8px 14px;font-size:11px;line-height:1.7}
+.log-toolbar{padding:5px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;flex-shrink:0;background:var(--bg2)}
+.log-filter-btn{padding:2px 8px;border-radius:99px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:9px;font-family:var(--font-mono);cursor:pointer;font-weight:600;letter-spacing:.05em;transition:all .12s}
+.log-filter-btn:hover{border-color:var(--border2);color:var(--text1)}
+.log-filter-btn.active-ok{background:rgba(16,185,129,0.15);border-color:#10b981;color:#10b981}
+.log-filter-btn.active-err{background:rgba(239,68,68,0.15);border-color:#ef4444;color:#ef4444}
+.log-filter-btn.active-info{background:rgba(59,130,246,0.15);border-color:#3b82f6;color:#3b82f6}
+.log-filter-btn.active-warn{background:rgba(245,158,11,0.15);border-color:#f59e0b;color:#f59e0b}
+.log-filter-btn.active-all{background:var(--bg3);border-color:var(--border2);color:var(--text0)}
+.log-search{background:var(--bg1);border:1px solid var(--border);border-radius:var(--r8);padding:3px 8px;color:var(--text0);font-family:var(--font-mono);font-size:10px;outline:none;width:130px;transition:border-color .15s}
+.log-search:focus{border-color:var(--accent)}
+.log-search::placeholder{color:var(--text2)}
+.log-body{flex:1;overflow-y:auto;padding:6px 14px;font-size:11px;line-height:1.7}
 .log-body::-webkit-scrollbar{width:3px}
 .log-body::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px}
 .log-entry{display:flex;gap:8px;color:var(--text1)}
@@ -1348,32 +1363,161 @@ const PropertyPanel = ({ node, onClose, onChange }) => {
 };
 
 // ── Log Panel ─────────────────────────────────────────────────────────────────
-const LogPanel = ({ logs, visible, onToggle }) => {
+const LogPanel = ({ logs, visible, onToggle, onClear, panelH, onResize }) => {
   const levelConfig = {
     ok:   { color: 'var(--green)',  label: 'OK',   bg: 'rgba(16,185,129,0.08)'  },
     err:  { color: 'var(--red)',    label: 'ERR',  bg: 'rgba(239,68,68,0.08)'   },
     info: { color: 'var(--accent)', label: 'INFO', bg: 'rgba(59,130,246,0.08)'  },
     warn: { color: 'var(--yellow)', label: 'WARN', bg: 'rgba(245,158,11,0.08)'  },
   };
+  const panelRef = useRef(null);
+  const bodyRef = useRef(null);
+  const dragRef = useRef({ dragging: false, startY: 0, startH: 0 });
+  const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [autoScroll, setAutoScroll] = useState(true);
+  const [copied, setCopied] = useState(false);
+
+  // auto-scroll when new logs arrive
+  useEffect(() => {
+    if (autoScroll && bodyRef.current && visible) {
+      bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
+    }
+  }, [logs, autoScroll, visible]);
+
+  // resize drag
+  const onResizeMouseDown = (e) => {
+    e.preventDefault();
+    dragRef.current = { dragging: true, startY: e.clientY, startH: panelH };
+    const onMove = (ev) => {
+      if (!dragRef.current.dragging) return;
+      const delta = dragRef.current.startY - ev.clientY;
+      const newH = Math.max(36, Math.min(window.innerHeight * 0.8, dragRef.current.startH + delta));
+      onResize(newH);
+    };
+    const onUp = () => {
+      dragRef.current.dragging = false;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  // open in separate window
+  const openPopout = () => {
+    const filtered = getFiltered();
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Deploy Log</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#080b12;color:#f0f6ff;font-family:'JetBrains Mono',monospace;font-size:11px;padding:12px}
+h2{font-size:13px;font-weight:700;margin-bottom:10px;color:#94a3b8;letter-spacing:.1em;text-transform:uppercase}
+.entry{display:flex;gap:10px;padding:3px 6px;border-radius:4px;margin-bottom:1px}
+.entry:nth-child(even){background:rgba(255,255,255,0.03)}
+.ts{color:#4a6080;min-width:65px;flex-shrink:0}
+.badge{font-size:9px;font-weight:700;padding:1px 5px;border-radius:99px;min-width:30px;text-align:center;flex-shrink:0}
+.ok .badge{background:rgba(16,185,129,.15);color:#10b981}
+.err .badge{background:rgba(239,68,68,.15);color:#ef4444}
+.info .badge{background:rgba(59,130,246,.15);color:#3b82f6}
+.warn .badge{background:rgba(245,158,11,.15);color:#f59e0b}
+.ok .msg{color:#10b981}.err .msg{color:#ef4444}.info .msg{color:#3b82f6}.warn .msg{color:#f59e0b}
+</style></head><body>
+<h2>Deploy Log — ${filtered.length} entries</h2>
+${filtered.map((l,i) => `<div class="entry ${l.level||'info'}"><span class="ts">${l.ts}</span><span class="badge">${(l.level||'info').toUpperCase().slice(0,4)}</span><span class="msg">${l.msg}</span></div>`).join('')}
+</body></html>`;
+    const w = window.open('', '_blank', 'width=800,height=600,menubar=no,toolbar=no');
+    if (w) { w.document.write(html); w.document.close(); }
+  };
+
+  const copyAll = () => {
+    const text = getFiltered().map(l => `[${l.ts}] [${(l.level||'info').toUpperCase()}] ${l.msg}`).join('\n');
+    navigator.clipboard?.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
+  };
+
+  const getFiltered = () => {
+    let result = logs;
+    if (filter !== 'all') result = result.filter(l => l.level === filter);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(l => l.msg?.toLowerCase().includes(q));
+    }
+    return result;
+  };
+
+  const filtered = getFiltered();
+  const errCount = logs.filter(l => l.level === 'err').length;
+  const warnCount = logs.filter(l => l.level === 'warn').length;
+
   return (
-    <div className={`log-panel ${visible ? '' : 'hidden'}`}>
+    <div
+      ref={panelRef}
+      className={`log-panel ${visible ? '' : 'hidden'}`}
+      style={{ height: visible ? panelH : 36 }}
+    >
+      {/* Resize handle */}
+      {visible && <div className="log-resize-handle" onMouseDown={onResizeMouseDown} />}
+
+      {/* Header */}
       <div className="log-header">
-        <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)', boxShadow: '0 0 6px var(--green)', flexShrink: 0 }} />
+        <div style={{ width: 6, height: 6, borderRadius: '50%', background: errCount > 0 ? 'var(--red)' : 'var(--green)', boxShadow: `0 0 6px ${errCount > 0 ? 'var(--red)' : 'var(--green)'}`, flexShrink: 0 }} />
         <div className="log-title">Deploy Log</div>
+        {errCount > 0 && <span style={{ fontSize: 9, fontWeight: 700, background: 'rgba(239,68,68,0.15)', color: 'var(--red)', borderRadius: 99, padding: '1px 6px' }}>{errCount} ERR</span>}
+        {warnCount > 0 && <span style={{ fontSize: 9, fontWeight: 700, background: 'rgba(245,158,11,0.15)', color: 'var(--yellow)', borderRadius: 99, padding: '1px 6px' }}>{warnCount} WARN</span>}
         <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 10, color: 'var(--text2)', fontFamily: 'var(--font-mono)' }}>
-          {logs.length} entries
-        </span>
-        <button className="btn btn-ghost" style={{ padding: '2px 8px', fontSize: 10, marginLeft: 8 }} onClick={onToggle}>
+        <span style={{ fontSize: 10, color: 'var(--text2)', fontFamily: 'var(--font-mono)' }}>{filtered.length}/{logs.length}</span>
+        {/* auto-scroll toggle */}
+        <button title="Auto-scroll" onClick={() => setAutoScroll(v => !v)}
+          style={{ background: autoScroll ? 'rgba(59,130,246,0.15)' : 'transparent', border: '1px solid ' + (autoScroll ? 'var(--accent)' : 'var(--border)'), borderRadius: 6, color: autoScroll ? 'var(--accent)' : 'var(--text2)', cursor: 'pointer', padding: '2px 6px', fontSize: 10, fontFamily: 'var(--font-mono)', marginLeft: 4 }}>
+          ↓
+        </button>
+        {/* popout */}
+        <button title="Open in window" onClick={openPopout}
+          style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text2)', cursor: 'pointer', padding: '2px 6px', fontSize: 10, lineHeight: 1 }}>
+          ⬡
+        </button>
+        {/* copy */}
+        <button title="Copy all" onClick={copyAll}
+          style={{ background: copied ? 'rgba(16,185,129,0.15)' : 'transparent', border: '1px solid ' + (copied ? 'var(--green)' : 'var(--border)'), borderRadius: 6, color: copied ? 'var(--green)' : 'var(--text2)', cursor: 'pointer', padding: '2px 6px', fontSize: 10 }}>
+          {copied ? '✓' : '⎘'}
+        </button>
+        {/* clear */}
+        <button title="Clear logs" onClick={onClear}
+          style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text2)', cursor: 'pointer', padding: '2px 6px', fontSize: 10 }}>
+          ✕
+        </button>
+        {/* toggle */}
+        <button className="btn btn-ghost" style={{ padding: '2px 8px', fontSize: 10 }} onClick={onToggle}>
           {visible ? '▼' : '▲'}
         </button>
       </div>
+
+      {/* Toolbar: filter + search */}
       {visible && (
-        <div className="log-body" id="log-scroll">
-          {logs.length === 0 && (
-            <div style={{ color: 'var(--text2)', fontStyle: 'italic', padding: '4px 0' }}>— No activity yet —</div>
+        <div className="log-toolbar">
+          {['all','ok','info','warn','err'].map(f => (
+            <button key={f} className={`log-filter-btn ${filter === f ? 'active-'+f : ''}`} onClick={() => setFilter(f)}>
+              {f.toUpperCase()}
+            </button>
+          ))}
+          <div style={{ flex: 1 }} />
+          <input
+            className="log-search"
+            placeholder="🔍 search…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+      )}
+
+      {/* Log body */}
+      {visible && (
+        <div className="log-body" id="log-scroll" ref={bodyRef}>
+          {filtered.length === 0 && (
+            <div style={{ color: 'var(--text2)', fontStyle: 'italic', padding: '4px 0' }}>
+              {logs.length === 0 ? '— No activity yet —' : '— No matching entries —'}
+            </div>
           )}
-          {logs.map((l, i) => {
+          {filtered.map((l, i) => {
             const cfg = levelConfig[l.level] || levelConfig.info;
             return (
               <div key={i} style={{
@@ -1382,18 +1526,13 @@ const LogPanel = ({ logs, visible, onToggle }) => {
                 background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)',
                 marginBottom: 1,
               }}>
-                {/* timestamp */}
                 <span style={{ fontSize: 10, color: 'var(--text2)', fontFamily: 'var(--font-mono)', flexShrink: 0, minWidth: 70 }}>{l.ts}</span>
-                {/* level badge */}
                 <span style={{
                   fontSize: 9, fontWeight: 700, letterSpacing: '.06em',
                   padding: '1px 6px', borderRadius: 99,
                   background: cfg.bg, color: cfg.color,
                   minWidth: 32, textAlign: 'center', flexShrink: 0,
-                }}>
-                  {cfg.label}
-                </span>
-                {/* message */}
+                }}>{cfg.label}</span>
                 <span style={{ fontSize: 11, color: cfg.color, fontFamily: 'var(--font-mono)', flex: 1 }}>{l.msg}</span>
               </div>
             );
@@ -1498,6 +1637,7 @@ function VCOApp() {
   const [selectedNode, setSelectedNode] = useState(null);
   const [logs, setLogs] = useState([]);
   const [logVisible, setLogVisible] = useState(false);
+  const [logPanelH, setLogPanelH] = useState(160);
   const [toasts, setToasts] = useState([]);
   const [search, setSearch] = useState('');
   const [isDeploying, setIsDeploying] = useState(false);
@@ -1745,7 +1885,7 @@ function VCOApp() {
 
   const addLog = (msg, level = 'info') => {
     const ts = new Date().toLocaleTimeString('en-US', { hour12: false });
-    setLogs(l => [...l.slice(-199), { ts, msg, level }]);
+    setLogs(l => [...l.slice(-499), { ts, msg, level }]);
     setTimeout(() => {
       const el = document.getElementById('log-scroll');
       if (el) el.scrollTop = el.scrollHeight;
@@ -2170,7 +2310,7 @@ function VCOApp() {
         </div>
 
         {/* ReactFlow Canvas */}
-        <div style={{ position: 'absolute', inset: 0, top: 48, bottom: logVisible ? 160 : 0 }}>
+        <div style={{ position: 'absolute', inset: 0, top: 48, bottom: logVisible ? logPanelH : 36 }}>
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -2285,7 +2425,7 @@ function VCOApp() {
         )}
 
         {/* Log */}
-        <LogPanel logs={logs} visible={logVisible} onToggle={() => setLogVisible(v => !v)} />
+        <LogPanel logs={logs} visible={logVisible} onToggle={() => setLogVisible(v => !v)} onClear={() => setLogs([])} panelH={logPanelH} onResize={setLogPanelH} />
         {nodeLogsModal && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', zIndex:3000, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)' }}
           onClick={() => { nodeLogsEsRef.current?.close(); nodeLogsEsRef.current=null; setNodeLogsModal(null); }}>

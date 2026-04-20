@@ -1,0 +1,4 @@
+encryptionsalt: v1:3WL65alPQ0s=:v1:W7jXGuUvx6jGh9CQ:c34H4i9Kog3aMEX5eApV6y31cf6NeA==
+config:
+  gcp:project: hrz-geo-dig-res-endor-1
+  gcp:region: me-west1

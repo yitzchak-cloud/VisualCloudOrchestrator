@@ -1,0 +1,525 @@
+{
+    "version": 3,
+    "checkpoint": {
+        "stack": "organization/vco-stack/dev-CloudRunNode-1776604537206",
+        "latest": {
+            "manifest": {
+                "time": "2026-04-20T14:30:13.2069212+03:00",
+                "magic": "85aa01bfd48b0131d9e9ebcc56b2a88faa9b8a580f90f11350be5550cbaaf581",
+                "version": "v3.231.0"
+            },
+            "secrets_providers": {
+                "type": "passphrase",
+                "state": {
+                    "salt": "v1:RgfcYq9R3Hs=:v1:YZYdTtXgD0aG0lbM:9zFTABZTj3Fgc7ml+CqtNzyM1I46+g=="
+                }
+            },
+            "resources": [
+                {
+                    "urn": "urn:pulumi:dev-CloudRunNode-1776604537206::vco-stack::pulumi:pulumi:Stack::vco-stack-dev-CloudRunNode-1776604537206",
+                    "custom": false,
+                    "type": "pulumi:pulumi:Stack",
+                    "outputs": {
+                        "id": "projects/hrz-geo-dig-res-endor-1/locations/me-west1/services/cloudrun",
+                        "name": "cloudrun",
+                        "uri": "https://cloudrun-qvbyjvkbxa-zf.a.run.app"
+                    },
+                    "created": "2026-04-20T10:56:22.6920323Z",
+                    "modified": "2026-04-20T10:56:22.6920323Z"
+                },
+                {
+                    "urn": "urn:pulumi:dev-CloudRunNode-1776604537206::vco-stack::pulumi:providers:gcp::default_9_20_0",
+                    "custom": true,
+                    "id": "87a2043a-5fe3-4195-970f-1c9b4d93225f",
+                    "type": "pulumi:providers:gcp",
+                    "inputs": {
+                        "__internal": {},
+                        "project": "hrz-geo-dig-res-endor-1",
+                        "region": "me-west1",
+                        "version": "9.20.0"
+                    },
+                    "outputs": {
+                        "project": "hrz-geo-dig-res-endor-1",
+                        "region": "me-west1",
+                        "version": "9.20.0"
+                    },
+                    "created": "2026-04-20T10:58:02.2400157Z",
+                    "modified": "2026-04-20T10:58:02.2400157Z"
+                },
+                {
+                    "urn": "urn:pulumi:dev-CloudRunNode-1776604537206::vco-stack::gcp:cloudrunv2/service:Service::CloudRunNode-1776604537206",
+                    "custom": true,
+                    "id": "projects/hrz-geo-dig-res-endor-1/locations/me-west1/services/cloudrun",
+                    "type": "gcp:cloudrunv2/service:Service",
+                    "inputs": {
+                        "__defaults": [
+                            "deletionProtection"
+                        ],
+                        "deletionProtection": true,
+                        "ingress": "INGRESS_TRAFFIC_INTERNAL_ONLY",
+                        "location": "me-west1",
+                        "name": "cloudrun",
+                        "project": "hrz-geo-dig-res-endor-1",
+                        "template": {
+                            "__defaults": [],
+                            "containers": [
+                                {
+                                    "__defaults": [],
+                                    "envs": [
+                                        {
+                                            "__defaults": [],
+                                            "name": "PUBSUB_SUBSCRIPTION_PUBSUBPULLSUBSCRIPTION",
+                                            "value": "pubsubpullsubscription"
+                                        }
+                                    ],
+                                    "image": "gcr.io/cloudrun/hello"
+                                }
+                            ],
+                            "vpcAccess": {
+                                "__defaults": [],
+                                "egress": "PRIVATE_RANGES_ONLY",
+                                "networkInterfaces": [
+                                    {
+                                        "__defaults": [],
+                                        "network": "projects/hrz-endor-net-0/global/networks/endor-0",
+                                        "subnetwork": "projects/hrz-endor-net-0/regions/me-west1/subnetworks/endor-1-subnet"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "outputs": {
+                        "__meta": "{\"e2bfb730-ecaa-11e6-8f88-34363bc7c4c0\":{\"create\":1200000000000,\"delete\":1200000000000,\"update\":1200000000000}}",
+                        "__pulumi_raw_state_delta": {
+                            "obj": {
+                                "ps": {
+                                    "binaryAuthorization": {
+                                        "plu": {
+                                            "i": {}
+                                        }
+                                    },
+                                    "buildConfig": {
+                                        "plu": {
+                                            "i": {}
+                                        }
+                                    },
+                                    "conditions": {
+                                        "arr": {
+                                            "el": {
+                                                "0": {
+                                                    "obj": {}
+                                                },
+                                                "1": {
+                                                    "obj": {}
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "effectiveAnnotations": {
+                                        "map": {}
+                                    },
+                                    "effectiveLabels": {
+                                        "map": {}
+                                    },
+                                    "multiRegionSettings": {
+                                        "plu": {
+                                            "i": {}
+                                        }
+                                    },
+                                    "pulumiLabels": {
+                                        "map": {}
+                                    },
+                                    "scaling": {
+                                        "plu": {
+                                            "i": {
+                                                "obj": {}
+                                            }
+                                        }
+                                    },
+                                    "template": {
+                                        "plu": {
+                                            "i": {
+                                                "obj": {
+                                                    "ps": {
+                                                        "containers": {
+                                                            "arr": {
+                                                                "el": {
+                                                                    "0": {
+                                                                        "obj": {
+                                                                            "ps": {
+                                                                                "buildInfos": {
+                                                                                    "arr": {}
+                                                                                },
+                                                                                "envs": {
+                                                                                    "arr": {
+                                                                                        "el": {
+                                                                                            "0": {
+                                                                                                "obj": {
+                                                                                                    "ps": {
+                                                                                                        "valueSource": {
+                                                                                                            "plu": {
+                                                                                                                "i": {}
+                                                                                                            }
+                                                                                                        }
+                                                                                                    }
+                                                                                                }
+                                                                                            }
+                                                                                        }
+                                                                                    }
+                                                                                },
+                                                                                "livenessProbe": {
+                                                                                    "plu": {
+                                                                                        "i": {}
+                                                                                    }
+                                                                                },
+                                                                                "ports": {
+                                                                                    "plu": {
+                                                                                        "i": {
+                                                                                            "obj": {}
+                                                                                        }
+                                                                                    }
+                                                                                },
+                                                                                "readinessProbe": {
+                                                                                    "plu": {
+                                                                                        "i": {}
+                                                                                    }
+                                                                                },
+                                                                                "resources": {
+                                                                                    "plu": {
+                                                                                        "i": {
+                                                                                            "obj": {
+                                                                                                "ps": {
+                                                                                                    "limits": {
+                                                                                                        "map": {}
+                                                                                                    }
+                                                                                                }
+                                                                                            }
+                                                                                        }
+                                                                                    }
+                                                                                },
+                                                                                "sourceCode": {
+                                                                                    "plu": {
+                                                                                        "i": {}
+                                                                                    }
+                                                                                },
+                                                                                "startupProbe": {
+                                                                                    "plu": {
+                                                                                        "i": {
+                                                                                            "obj": {
+                                                                                                "ps": {
+                                                                                                    "grpc": {
+                                                                                                        "plu": {
+                                                                                                            "i": {}
+                                                                                                        }
+                                                                                                    },
+                                                                                                    "httpGet": {
+                                                                                                        "plu": {
+                                                                                                            "i": {}
+                                                                                                        }
+                                                                                                    },
+                                                                                                    "tcpSocket": {
+                                                                                                        "plu": {
+                                                                                                            "i": {
+                                                                                                                "obj": {}
+                                                                                                            }
+                                                                                                        }
+                                                                                                    }
+                                                                                                }
+                                                                                            }
+                                                                                        }
+                                                                                    }
+                                                                                },
+                                                                                "volumeMounts": {
+                                                                                    "arr": {}
+                                                                                }
+                                                                            },
+                                                                            "renamed": {
+                                                                                "buildInfos": "build_info",
+                                                                                "commands": "command",
+                                                                                "dependsOns": "depends_on",
+                                                                                "envs": "env"
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        },
+                                                        "nodeSelector": {
+                                                            "plu": {
+                                                                "i": {}
+                                                            }
+                                                        },
+                                                        "scaling": {
+                                                            "plu": {
+                                                                "i": {}
+                                                            }
+                                                        },
+                                                        "serviceMesh": {
+                                                            "plu": {
+                                                                "i": {}
+                                                            }
+                                                        },
+                                                        "volumes": {
+                                                            "arr": {}
+                                                        },
+                                                        "vpcAccess": {
+                                                            "plu": {
+                                                                "i": {
+                                                                    "obj": {
+                                                                        "ps": {
+                                                                            "networkInterfaces": {
+                                                                                "arr": {
+                                                                                    "el": {
+                                                                                        "0": {
+                                                                                            "obj": {}
+                                                                                        }
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "terminalConditions": {
+                                        "arr": {
+                                            "el": {
+                                                "0": {
+                                                    "obj": {}
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "trafficStatuses": {
+                                        "arr": {
+                                            "el": {
+                                                "0": {
+                                                    "obj": {}
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "traffics": {
+                                        "arr": {
+                                            "el": {
+                                                "0": {
+                                                    "obj": {}
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "urls": {
+                                        "arr": {}
+                                    }
+                                },
+                                "renamed": {
+                                    "pulumiLabels": "terraform_labels",
+                                    "terminalConditions": "terminal_condition",
+                                    "traffics": "traffic"
+                                }
+                            }
+                        },
+                        "annotations": null,
+                        "binaryAuthorization": null,
+                        "buildConfig": null,
+                        "client": "",
+                        "clientVersion": "",
+                        "conditions": [
+                            {
+                                "executionReason": "",
+                                "lastTransitionTime": "2026-04-20T11:22:56.420168Z",
+                                "message": "",
+                                "reason": "",
+                                "revisionReason": "",
+                                "severity": "",
+                                "state": "CONDITION_SUCCEEDED",
+                                "type": "RoutesReady"
+                            },
+                            {
+                                "executionReason": "",
+                                "lastTransitionTime": "2026-04-20T11:22:55.230021Z",
+                                "message": "",
+                                "reason": "",
+                                "revisionReason": "",
+                                "severity": "",
+                                "state": "CONDITION_SUCCEEDED",
+                                "type": "ConfigurationsReady"
+                            }
+                        ],
+                        "createTime": "2026-04-20T11:22:48.327674Z",
+                        "creator": "ydamen46@horizon285.com",
+                        "customAudiences": null,
+                        "defaultUriDisabled": false,
+                        "deleteTime": "",
+                        "deletionProtection": true,
+                        "description": "",
+                        "effectiveAnnotations": {},
+                        "effectiveLabels": {
+                            "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                            "ciphertext": "v1:5F/3Wbgkb9wH5YWM:yG7ztb4SaV5UV95sX9/9ZzmGjcLv/4orUU6t9KR8OcsTjmB5VZC+PqPjES37VMRfZ8s="
+                        },
+                        "etag": "\"CIiZmM8GEJDRn5wB/cHJvamVjdHMvaHJ6LWdlby1kaWctcmVzLWVuZG9yLTEvbG9jYXRpb25zL21lLXdlc3QxL3NlcnZpY2VzL2Nsb3VkcnVu\"",
+                        "expireTime": "",
+                        "generation": "1",
+                        "iapEnabled": false,
+                        "id": "projects/hrz-geo-dig-res-endor-1/locations/me-west1/services/cloudrun",
+                        "ingress": "INGRESS_TRAFFIC_INTERNAL_ONLY",
+                        "invokerIamDisabled": false,
+                        "labels": null,
+                        "lastModifier": "ydamen46@horizon285.com",
+                        "latestCreatedRevision": "projects/hrz-geo-dig-res-endor-1/locations/me-west1/services/cloudrun/revisions/cloudrun-00001-mkk",
+                        "latestReadyRevision": "projects/hrz-geo-dig-res-endor-1/locations/me-west1/services/cloudrun/revisions/cloudrun-00001-mkk",
+                        "launchStage": "GA",
+                        "location": "me-west1",
+                        "multiRegionSettings": null,
+                        "name": "cloudrun",
+                        "observedGeneration": "1",
+                        "project": "hrz-geo-dig-res-endor-1",
+                        "pulumiLabels": {
+                            "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                            "ciphertext": "v1:Prgc4ool0yjba8fq:aHdwCaXs4DuDjj/0AyMuZI980QtRBQHknTRdduCQAeJ0y+icxZVUkjtj4IzM95wHMKQ="
+                        },
+                        "reconciling": false,
+                        "scaling": {
+                            "manualInstanceCount": 0,
+                            "maxInstanceCount": 10,
+                            "minInstanceCount": 0,
+                            "scalingMode": ""
+                        },
+                        "template": {
+                            "annotations": null,
+                            "containers": [
+                                {
+                                    "args": null,
+                                    "baseImageUri": "",
+                                    "buildInfos": [],
+                                    "commands": null,
+                                    "dependsOns": null,
+                                    "envs": [
+                                        {
+                                            "name": "PUBSUB_SUBSCRIPTION_PUBSUBPULLSUBSCRIPTION",
+                                            "value": "pubsubpullsubscription",
+                                            "valueSource": null
+                                        }
+                                    ],
+                                    "image": "gcr.io/cloudrun/hello",
+                                    "livenessProbe": null,
+                                    "name": "",
+                                    "ports": {
+                                        "containerPort": 8080,
+                                        "name": "http1"
+                                    },
+                                    "readinessProbe": null,
+                                    "resources": {
+                                        "cpuIdle": true,
+                                        "limits": {
+                                            "cpu": "1000m",
+                                            "memory": "512Mi"
+                                        },
+                                        "startupCpuBoost": false
+                                    },
+                                    "sourceCode": null,
+                                    "startupProbe": {
+                                        "failureThreshold": 1,
+                                        "grpc": null,
+                                        "httpGet": null,
+                                        "initialDelaySeconds": 0,
+                                        "periodSeconds": 240,
+                                        "tcpSocket": {
+                                            "port": 8080
+                                        },
+                                        "timeoutSeconds": 240
+                                    },
+                                    "volumeMounts": [],
+                                    "workingDir": ""
+                                }
+                            ],
+                            "encryptionKey": "",
+                            "executionEnvironment": "",
+                            "gpuZonalRedundancyDisabled": false,
+                            "healthCheckDisabled": false,
+                            "labels": null,
+                            "maxInstanceRequestConcurrency": 80,
+                            "nodeSelector": null,
+                            "revision": "",
+                            "scaling": null,
+                            "serviceAccount": "1011149884622-compute@developer.gserviceaccount.com",
+                            "serviceMesh": null,
+                            "sessionAffinity": false,
+                            "timeout": "300s",
+                            "volumes": [],
+                            "vpcAccess": {
+                                "connector": "",
+                                "egress": "PRIVATE_RANGES_ONLY",
+                                "networkInterfaces": [
+                                    {
+                                        "network": "projects/hrz-endor-net-0/global/networks/endor-0",
+                                        "subnetwork": "projects/hrz-endor-net-0/regions/me-west1/subnetworks/endor-1-subnet",
+                                        "tags": null
+                                    }
+                                ]
+                            }
+                        },
+                        "terminalConditions": [
+                            {
+                                "executionReason": "",
+                                "lastTransitionTime": "2026-04-20T11:22:56.447902Z",
+                                "message": "",
+                                "reason": "",
+                                "revisionReason": "",
+                                "severity": "",
+                                "state": "CONDITION_SUCCEEDED",
+                                "type": "Ready"
+                            }
+                        ],
+                        "trafficStatuses": [
+                            {
+                                "percent": 100,
+                                "revision": "",
+                                "tag": "",
+                                "type": "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST",
+                                "uri": ""
+                            }
+                        ],
+                        "traffics": [
+                            {
+                                "percent": 100,
+                                "revision": "",
+                                "tag": "",
+                                "type": "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST"
+                            }
+                        ],
+                        "uid": "ed306526-ad71-4daf-be81-50dcafd3deca",
+                        "updateTime": "2026-04-20T11:22:48.327674Z",
+                        "uri": "https://cloudrun-qvbyjvkbxa-zf.a.run.app",
+                        "urls": [
+                            "https://cloudrun-1011149884622.me-west1.run.app",
+                            "https://cloudrun-qvbyjvkbxa-zf.a.run.app"
+                        ]
+                    },
+                    "parent": "urn:pulumi:dev-CloudRunNode-1776604537206::vco-stack::pulumi:pulumi:Stack::vco-stack-dev-CloudRunNode-1776604537206",
+                    "provider": "urn:pulumi:dev-CloudRunNode-1776604537206::vco-stack::pulumi:providers:gcp::default_9_20_0::87a2043a-5fe3-4195-970f-1c9b4d93225f",
+                    "propertyDependencies": {
+                        "ingress": [],
+                        "location": [],
+                        "name": [],
+                        "project": [],
+                        "template": []
+                    },
+                    "additionalSecretOutputs": [
+                        "effectiveLabels",
+                        "pulumiLabels"
+                    ],
+                    "created": "2026-04-20T11:22:59.3916743Z",
+                    "modified": "2026-04-20T11:22:59.3916743Z"
+                }
+            ],
+            "metadata": {}
+        }
+    }
+}
