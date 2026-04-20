@@ -24,6 +24,8 @@ class GCPNode:
     icon:        ClassVar[str]        = "box"
     category:    ClassVar[str]        = "General"
     description: ClassVar[str]        = ""
+    params_schema: ClassVar[list[dict]] = []  
+    url_field:     ClassVar[str | None] = None   # ← כל נוד מגדיר בעצמו
 
     @classmethod
     def ui_schema(cls) -> dict:
@@ -34,6 +36,8 @@ class GCPNode:
             "color":       cls.node_color,
             "icon":        cls.icon,
             "category":    cls.category,
+            "params_schema": cls.params_schema,
+            "url_field":   cls.url_field,
             "inputs": [
                 {
                     "name":     p.name,
@@ -64,4 +68,5 @@ class GCPNode:
             "node_id":  self.node_id,
             "label":    self.label,
             "category": self.__class__.category,
+            "params_schema": self.__class__.params_schema,
         }

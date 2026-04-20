@@ -13,247 +13,532 @@
 <link rel="stylesheet" href="https://unpkg.com/@xyflow/react@12/dist/style.css"/>
 <link rel="stylesheet" href="https://unpkg.com/@xyflow/react@12/dist/style.css"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
 :root{
-  --bg0:#080b12;
-  --bg1:#0d1117;
-  --bg2:#111827;
-  --bg3:#1a2235;
-  --bg4:#1e2d42;
-  --border:#1e3a5f;
-  --border2:#243b55;
-  --text0:#f0f6ff;
-  --text1:#94a3b8;
-  --text2:#4a6080;
-  --accent:#3b82f6;
-  --accent2:#6366f1;
-  --green:#10b981;
-  --red:#ef4444;
-  --yellow:#f59e0b;
-  --shadow:rgba(0,0,0,0.4);
-  --font-mono:'JetBrains Mono',monospace;
-  --font-display:'Syne',sans-serif;
-  --r4:4px;--r8:8px;--r12:12px;--r16:16px;
+  /* ── GCP-inspired dark palette ── */
+  --bg0:#060a10;
+  --bg1:#0a0f1a;
+  --bg2:#0e1525;
+  --bg3:#131d30;
+  --bg4:#192338;
+  --border:#1a2e4a;
+  --border2:#1e3a5c;
+  --border3:#2a4a70;
+  --text0:#e8f0fe;
+  --text1:#8aa3c8;
+  --text2:#3d5a80;
+  --accent:#4285f4;      /* Google Blue */
+  --accent2:#1669f5;
+  --accent-glow:rgba(66,133,244,0.25);
+  --green:#34a853;       /* Google Green */
+  --green2:#1e8e3e;
+  --red:#ea4335;         /* Google Red */
+  --yellow:#fbbc04;      /* Google Yellow */
+  --orange:#fa7b17;
+  --teal:#00bcd4;
+  --purple:#ab47bc;
+  --shadow:rgba(0,0,0,0.5);
+  --shadow2:rgba(0,0,0,0.7);
+  --font-mono:'IBM Plex Mono',monospace;
+  --font-ui:'IBM Plex Sans','Inter',sans-serif;
+  --font-display:'IBM Plex Sans',sans-serif;
+  --r4:4px;--r6:6px;--r8:8px;--r12:12px;--r16:16px;
+  --topbar-h:52px;
+  --sidebar-w:268px;
 }
 [data-theme="light"]{
-  --bg0:#f0f4f8;
+  --bg0:#f1f3f4;
   --bg1:#ffffff;
-  --bg2:#f8fafc;
-  --bg3:#e2e8f0;
-  --bg4:#cbd5e1;
-  --border:#c7d7e8;
-  --border2:#b0c4d8;
-  --text0:#0f172a;
-  --text1:#475569;
-  --text2:#94a3b8;
-  --accent:#2563eb;
-  --accent2:#4f46e5;
-  --green:#059669;
-  --red:#dc2626;
-  --yellow:#d97706;
-  --shadow:rgba(0,0,0,0.12);
+  --bg2:#f8f9fa;
+  --bg3:#e8eaed;
+  --bg4:#dadce0;
+  --border:#dadce0;
+  --border2:#bdc1c6;
+  --border3:#9aa0a6;
+  --text0:#202124;
+  --text1:#5f6368;
+  --text2:#9aa0a6;
+  --accent:#1a73e8;
+  --accent2:#1557b0;
+  --accent-glow:rgba(26,115,232,0.15);
+  --green:#188038;
+  --green2:#137333;
+  --red:#c5221f;
+  --yellow:#e37400;
+  --shadow:rgba(60,64,67,0.15);
+  --shadow2:rgba(60,64,67,0.3);
 }
-[data-theme="light"] .react-flow__background{background:var(--bg0)!important}
-[data-theme="light"] .react-flow__background pattern circle{fill:var(--border2)!important;opacity:.6}
-[data-theme="light"] .react-flow__minimap{background:var(--bg2)!important;border-color:var(--border)!important}
-[data-theme="light"] .react-flow__minimap-mask{fill:var(--bg3)!important;opacity:.6!important}
-[data-theme="light"] .react-flow__controls{background:var(--bg1)!important;border-color:var(--border)!important;box-shadow:0 2px 8px var(--shadow)!important}
-[data-theme="light"] .react-flow__controls-button{color:var(--text1)!important;border-bottom-color:var(--border)!important}
-[data-theme="light"] .react-flow__controls-button:hover{background:var(--bg3)!important}
-[data-theme="light"] .react-flow__handle{border-color:var(--bg1)!important}
-[data-theme="light"] .field-input,[data-theme="light"] .field-select{background:var(--bg1);color:var(--text0);border-color:var(--border)}
-[data-theme="light"] .node-header{border-bottom-color:var(--border)}
-[data-theme="light"] .gcp-node{box-shadow:0 2px 8px var(--shadow)}
 
-html,body,#root{height:100%;width:100%;overflow:hidden;background:var(--bg0);color:var(--text0);font-family:var(--font-mono);transition:background .2s,color .2s}
+html,body,#root{
+  height:100%;width:100%;overflow:hidden;
+  background:var(--bg0);color:var(--text0);
+  font-family:var(--font-ui);
+  transition:background .2s,color .2s;
+  -webkit-font-smoothing:antialiased;
+}
 
 /* ── Layout ── */
 .app{display:flex;height:100vh;width:100vw;overflow:hidden}
-.sidebar{width:260px;min-width:260px;background:var(--bg1);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:10}
+.sidebar{
+  width:var(--sidebar-w);min-width:var(--sidebar-w);
+  background:var(--bg1);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;z-index:10;
+  box-shadow:2px 0 8px rgba(0,0,0,0.2);
+}
 .canvas-wrap{flex:1;position:relative;background:var(--bg0)}
-.panel-right{width:280px;min-width:280px;background:var(--bg1);border-left:1px solid var(--border);display:flex;flex-direction:column;transition:width .2s;z-index:10}
+.panel-right{
+  width:288px;min-width:288px;
+  background:var(--bg1);border-left:1px solid var(--border);
+  display:flex;flex-direction:column;
+  transition:width .2s;z-index:10;
+  box-shadow:-2px 0 8px rgba(0,0,0,0.2);
+}
 .panel-right.collapsed{width:0;min-width:0;overflow:hidden}
 
-/* ── Topbar ── */
-.topbar{height:48px;background:var(--bg1);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:12px;position:absolute;top:0;left:0;right:0;z-index:20}
-.logo{font-family:var(--font-display);font-weight:800;font-size:15px;letter-spacing:-.5px;color:var(--text0);display:flex;align-items:center;gap:8px}
-.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+/* ── Topbar — GCP Console style ── */
+.topbar{
+  height:var(--topbar-h);
+  background:var(--bg1);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;
+  padding:0 12px 0 0;
+  gap:8px;
+  position:absolute;top:0;left:0;right:0;z-index:20;
+}
+/* Left blue accent bar on topbar — GCP signature */
+.topbar::before{
+  content:'';
+  position:absolute;
+  bottom:-1px;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--accent),var(--teal),var(--green));
+  opacity:.7;
+}
+.logo{
+  width:var(--sidebar-w);
+  min-width:var(--sidebar-w);
+  display:flex;align-items:center;gap:10px;
+  padding:0 16px;
+  border-right:1px solid var(--border);
+  height:100%;
+  flex-shrink:0;
+}
+.logo-icon{
+  width:28px;height:28px;border-radius:6px;
+  background:linear-gradient(135deg,var(--accent),var(--teal));
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 2px 8px rgba(66,133,244,0.4);
+  flex-shrink:0;
+}
+.logo-text{
+  display:flex;flex-direction:column;min-width:0;
+}
+.logo-title{
+  font-family:var(--font-display);font-weight:700;font-size:13px;
+  letter-spacing:-.2px;color:var(--text0);line-height:1.2;
+}
+.logo-sub{font-size:9px;color:var(--text2);font-family:var(--font-mono);letter-spacing:.06em;margin-top:1px}
+.topbar-divider{width:1px;height:24px;background:var(--border);margin:0 4px;flex-shrink:0}
 .topbar-spacer{flex:1}
-.topbar-menu{position:relative;display:flex;align-items:center}
-.topbar-menu-button{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;border:1px solid var(--border2);background:var(--bg2);color:var(--text1);cursor:pointer;font-family:var(--font-mono);font-size:11px;transition:all .15s}
-.topbar-menu-button:hover{background:var(--bg3);color:var(--text0)}
-.topbar-menu-panel{position:absolute;top:calc(100% + 6px);left:0;min-width:180px;background:var(--bg1);border:1px solid var(--border);border-radius:var(--r12);box-shadow:0 16px 40px rgba(0,0,0,.3);overflow:hidden;z-index:40}
-.topbar-menu-item{display:flex;align-items:center;gap:10px;padding:10px 12px;color:var(--text1);font-size:12px;cursor:pointer;transition:all .12s}
-.topbar-menu-item:hover{background:var(--bg3);color:var(--text0)}
-.topbar-menu-item span{flex:1}
-.topbar-menu-divider{height:1px;background:var(--border);margin:4px 0}
-.btn{display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:var(--r8);border:none;cursor:pointer;font-family:var(--font-mono);font-size:12px;font-weight:500;transition:all .15s}
-.btn-ghost{background:transparent;color:var(--text1);border:1px solid var(--border2)}
-.btn-ghost:hover{background:var(--bg3);color:var(--text0);border-color:var(--border)}
-.btn-primary{background:var(--accent);color:#fff}
-.btn-primary:hover{background:#2563eb;box-shadow:0 0 16px rgba(59,130,246,.4)}
-.btn-deploy{background:linear-gradient(135deg,#10b981,#059669);color:#fff}
-.btn-deploy:hover{box-shadow:0 0 16px rgba(16,185,129,.4)}
-.btn-danger{background:var(--red);color:#fff}
 
+/* ── Topbar breadcrumb ── */
+.topbar-breadcrumb{
+  display:flex;align-items:center;gap:6px;
+  font-size:12px;color:var(--text1);
+  font-family:var(--font-ui);
+}
+.topbar-breadcrumb-sep{color:var(--text2);font-size:14px}
+.topbar-breadcrumb-active{color:var(--text0);font-weight:600}
+
+/* ── Topbar buttons ── */
+.btn{
+  display:flex;align-items:center;gap:6px;
+  padding:0 14px;height:32px;
+  border-radius:var(--r6);border:1px solid transparent;
+  cursor:pointer;font-family:var(--font-ui);
+  font-size:12px;font-weight:500;
+  transition:all .15s;white-space:nowrap;
+}
+.btn-ghost{
+  background:transparent;color:var(--text1);
+  border-color:var(--border2);
+}
+.btn-ghost:hover{background:var(--bg3);color:var(--text0);border-color:var(--border3)}
+.btn-primary{
+  background:var(--accent);color:#fff;border-color:transparent;
+  box-shadow:0 1px 3px rgba(66,133,244,0.4);
+}
+.btn-primary:hover{background:var(--accent2);box-shadow:0 2px 8px rgba(66,133,244,0.5)}
+.btn-deploy{
+  background:var(--green);color:#fff;border-color:transparent;
+  box-shadow:0 1px 3px rgba(52,168,83,0.4);
+  font-weight:600;
+}
+.btn-deploy:hover:not(:disabled){background:var(--green2);box-shadow:0 2px 8px rgba(52,168,83,0.5)}
+.btn-deploy:disabled{opacity:.5;cursor:not-allowed}
+.btn-danger{background:var(--red);color:#fff;border-color:transparent}
+.btn-icon{
+  width:32px;height:32px;padding:0;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:var(--r6);border:1px solid var(--border2);
+  background:transparent;color:var(--text1);cursor:pointer;
+  transition:all .15s;
+}
+.btn-icon:hover{background:var(--bg3);color:var(--text0);border-color:var(--border3)}
+.btn-icon.active{background:var(--accent-glow);color:var(--accent);border-color:var(--accent)44}
+
+/* ── Menu ── */
+.topbar-menu{position:relative;display:flex;align-items:center}
+.topbar-menu-button{
+  display:flex;align-items:center;gap:6px;
+  padding:0 12px;height:32px;
+  border-radius:var(--r6);border:1px solid var(--border2);
+  background:var(--bg2);color:var(--text1);
+  cursor:pointer;font-family:var(--font-ui);font-size:12px;
+  font-weight:500;transition:all .15s;
+}
+.topbar-menu-button:hover{background:var(--bg3);color:var(--text0);border-color:var(--border3)}
+.topbar-menu-panel{
+  position:absolute;top:calc(100% + 6px);left:0;min-width:200px;
+  background:var(--bg1);border:1px solid var(--border2);
+  border-radius:var(--r12);
+  box-shadow:0 8px 24px var(--shadow),0 2px 6px rgba(0,0,0,0.2);
+  overflow:hidden;z-index:40;
+  animation:fade-in .12s ease;
+}
+.topbar-menu-item{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 14px;color:var(--text1);font-size:12px;
+  cursor:pointer;transition:all .1s;font-family:var(--font-ui);
+}
+.topbar-menu-item:hover{background:var(--accent-glow);color:var(--text0)}
+.topbar-menu-item svg{flex-shrink:0;opacity:.7}
+.topbar-menu-item:hover svg{opacity:1}
+.topbar-menu-item span{flex:1}
+.topbar-menu-item .kbd{
+  font-size:9px;color:var(--text2);background:var(--bg3);
+  border:1px solid var(--border2);border-radius:3px;
+  padding:1px 5px;font-family:var(--font-mono);
+}
+.topbar-menu-divider{height:1px;background:var(--border);margin:4px 8px}
+
+/* ── WS status pill ── */
+.ws-pill{
+  display:flex;align-items:center;gap:5px;
+  padding:0 10px;height:24px;border-radius:99px;
+  border:1px solid var(--border);background:var(--bg2);
+  font-size:10px;font-family:var(--font-mono);font-weight:500;
+  color:var(--text2);transition:all .3s;
+}
+.ws-pill.connected{
+  border-color:rgba(52,168,83,0.4);
+  background:rgba(52,168,83,0.08);
+  color:var(--green);
+}
+.ws-dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+.ws-pill.connected .ws-dot{animation:pulse-dot 2s ease-in-out infinite}
+
+/* ── Deploy progress bar ── */
+.deploy-progress{
+  position:absolute;bottom:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--accent),var(--teal),var(--green));
+  animation:progress-bar 1.5s ease-in-out infinite;
+  transform-origin:left;
+}
+@keyframes progress-bar{
+  0%{transform:scaleX(0);opacity:1}
+  60%{transform:scaleX(.9);opacity:1}
+  100%{transform:scaleX(1);opacity:0}
+}
 
 /* ── Sidebar ── */
-.sidebar-header{padding:14px 16px 10px;border-bottom:1px solid var(--border)}
-.sidebar-title{font-family:var(--font-display);font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--text2);text-transform:uppercase}
-.sidebar-search{margin:10px 12px;position:relative}
-.sidebar-search input{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r8);padding:7px 10px 7px 30px;color:var(--text0);font-family:var(--font-mono);font-size:12px;outline:none}
-.sidebar-search input:focus{border-color:var(--accent)}
+.sidebar-header{
+  padding:12px 14px 10px;
+  border-bottom:1px solid var(--border);
+  background:var(--bg1);
+}
+.sidebar-title{
+  font-family:var(--font-ui);font-size:10px;font-weight:700;
+  letter-spacing:.1em;color:var(--text2);text-transform:uppercase;
+  margin-bottom:2px;
+}
+.sidebar-search{
+  margin:8px 10px;position:relative;
+}
+.sidebar-search input{
+  width:100%;
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:var(--r8);
+  padding:7px 10px 7px 32px;
+  color:var(--text0);
+  font-family:var(--font-mono);font-size:11px;
+  outline:none;transition:border-color .15s,box-shadow .15s;
+}
+.sidebar-search input:focus{
+  border-color:var(--accent);
+  box-shadow:0 0 0 2px var(--accent-glow);
+}
 .sidebar-search input::placeholder{color:var(--text2)}
-.search-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text2);font-size:13px}
-.node-list{flex:1;overflow-y:auto;padding:8px}
-.node-list::-webkit-scrollbar{width:3px}
+.search-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text2)}
+.node-list{flex:1;overflow-y:auto;padding:6px 8px}
+.node-list::-webkit-scrollbar{width:4px}
 .node-list::-webkit-scrollbar-track{background:transparent}
 .node-list::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px}
 
+/* ── Node items in sidebar ── */
 .node-item{
-  display:flex;align-items:center;gap:10px;
-  padding:10px 12px;border-radius:var(--r8);
-  cursor:grab;user-select:none;margin-bottom:4px;
+  display:flex;align-items:center;gap:9px;
+  padding:8px 10px;border-radius:var(--r8);
+  cursor:grab;user-select:none;margin-bottom:3px;
   border:1px solid transparent;
-  transition:all .15s;
+  transition:all .12s;
+  background:transparent;
+  position:relative;overflow:hidden;
+}
+.node-item::before{
+  content:'';position:absolute;left:0;top:0;bottom:0;width:2px;
+  background:var(--accent);opacity:0;transition:opacity .12s;
+  border-radius:0 2px 2px 0;
+}
+.node-item:hover{
+  border-color:var(--border);
   background:var(--bg2);
 }
-.node-item:hover{border-color:var(--border);background:var(--bg3);transform:translateX(2px)}
-.node-item:active{cursor:grabbing;opacity:.8}
-.node-icon{width:32px;height:32px;border-radius:var(--r8);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.node-item:hover::before{opacity:1}
+.node-item:active{cursor:grabbing;transform:scale(.97)}
+.node-icon{
+  width:30px;height:30px;border-radius:var(--r6);
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;flex-shrink:0;
+}
 .node-info{flex:1;min-width:0}
-.node-name{font-size:12px;font-weight:600;color:var(--text0);font-family:var(--font-display)}
-.node-desc{font-size:10px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.node-name{font-size:11px;font-weight:600;color:var(--text0);font-family:var(--font-ui);line-height:1.3}
+.node-desc{font-size:9px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--font-mono)}
 
 /* ── Canvas ── */
-.canvas-wrap .react-flow{top:48px !important}
+.canvas-wrap .react-flow{top:var(--topbar-h) !important}
 .react-flow__background{background:var(--bg0) !important}
-.react-flow__background pattern circle{fill:var(--border) !important}
+.react-flow__background pattern circle{fill:var(--border) !important;opacity:.6}
 
-/* ── Custom Nodes ── */
+/* ── Grid overlay (subtle GCP-style) ── */
+.canvas-wrap::after{
+  content:'';
+  position:absolute;inset:0;top:var(--topbar-h);
+  background-image:
+    linear-gradient(var(--border) 1px,transparent 1px),
+    linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:40px 40px;
+  opacity:.04;
+  pointer-events:none;z-index:0;
+}
+
+/* ── Custom Nodes — GCP card style ── */
 .gcp-node{
   background:var(--bg2);
   border:1px solid var(--border2);
   border-radius:var(--r12);
-  min-width:200px;
+  min-width:210px;
   overflow:hidden;
-  transition:border-color .15s,box-shadow .15s;
+  transition:border-color .15s,box-shadow .15s,transform .1s;
   position:relative;
+  /* Subtle glass effect */
+  backdrop-filter:blur(8px);
 }
 .gcp-node::before{
-  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
   background:var(--node-color,var(--accent));
   border-radius:var(--r12) var(--r12) 0 0;
+  transition:background .3s;
 }
-.gcp-node:hover{border-color:var(--node-color,var(--accent));box-shadow:0 0 0 1px var(--node-color,var(--accent))33,0 8px 32px rgba(0,0,0,.4)}
-.gcp-node.selected{border-color:var(--node-color,var(--accent));box-shadow:0 0 0 2px var(--node-color,var(--accent))66,0 8px 32px rgba(0,0,0,.5)}
+/* Subtle inner glow on the top strip */
+.gcp-node::after{
+  content:'';position:absolute;top:0;left:0;right:0;height:40px;
+  background:linear-gradient(180deg,var(--node-color-alpha,rgba(66,133,244,0.06)) 0%,transparent 100%);
+  pointer-events:none;
+}
+.gcp-node:hover{
+  border-color:var(--node-color,var(--accent));
+  box-shadow:0 0 0 1px var(--node-color,var(--accent))33,0 4px 24px rgba(0,0,0,.4),0 1px 4px rgba(0,0,0,.3);
+  transform:translateY(-1px);
+}
+.gcp-node.selected{
+  border-color:var(--node-color,var(--accent));
+  box-shadow:0 0 0 2px var(--node-color,var(--accent))55,0 8px 32px rgba(0,0,0,.5);
+}
 .gcp-node.status-deployed::before{background:var(--green)}
 .gcp-node.status-error::before{background:var(--red)}
+.gcp-node.status-failed::before{background:var(--red);animation:pulse-bar .8s ease-in-out infinite}
+.gcp-node.status-deploying::before{background:var(--yellow);animation:pulse-bar 1s ease-in-out infinite}
+.gcp-node.status-working::before{background:#fff;animation:pulse-bar .4s ease-in-out infinite}
+.gcp-node.status-working{box-shadow:0 0 0 2px rgba(255,255,255,0.5),0 0 20px rgba(255,255,255,0.15) !important}
+@keyframes pulse-bar{0%,100%{opacity:1}50%{opacity:.25}}
 
-/* צהוב — בתור → עובדים על זה בקרוב */
-.gcp-node.status-deploying::before { background: var(--yellow); animation: pulse-bar 1s ease-in-out infinite }
-.status-badge.deploying { background: var(--yellow); animation: pulse-dot 1s ease-in-out infinite }
-
-/* לבן — עובדים על זה עכשיו ממש */
-.gcp-node.status-working::before { background: #fff; animation: pulse-bar 0.4s ease-in-out infinite }
-.gcp-node.status-working { box-shadow: 0 0 0 2px rgba(255,255,255,0.8), 0 0 24px rgba(255,255,255,0.3) !important }
-.status-badge.working { background: #fff; box-shadow: 0 0 10px #fff; animation: pulse-dot 0.4s ease-in-out infinite }
-
-.gcp-node.status-failed::before { background: var(--red); animation: pulse-bar 0.4s ease-in-out infinite; }
-.status-badge.failed { background: var(--red); box-shadow: 0 0 6px var(--red); animation: pulse-dot 0.4s ease-in-out infinite; }
-@keyframes pulse-bar{0%,100%{opacity:1}50%{opacity:.3}}
-
-.node-header{padding:10px 12px 8px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)}
-.node-header-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
-.node-header-name{font-family:var(--font-display);font-size:13px;font-weight:700;color:var(--text0);flex:1}
-.node-header-type{font-size:9px;font-weight:600;letter-spacing:.1em;color:var(--text2);text-transform:uppercase;margin-top:1px}
-.status-badge{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-.status-badge.idle{background:var(--text2)}
-.status-badge.deployed{background:var(--green);box-shadow:0 0 6px var(--green)}
-.status-badge.deploying{background:var(--yellow);animation:pulse-dot 1s ease-in-out infinite}
-.status-badge.error{background:var(--red);box-shadow:0 0 6px var(--red)}
-.node-missing-required::after {
-  content: '!';
-  position: absolute;
-  top: -4px; right: -4px;
-  width: 14px; height: 14px;
-  background: var(--yellow);
-  color: #000;
-  font-size: 9px; font-weight: 900;
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  line-height: 14px; text-align: center;
+/* ── Node header ── */
+.node-header{
+  padding:10px 12px 8px;
+  display:flex;align-items:center;gap:8px;
+  border-bottom:1px solid var(--border);
+  position:relative;z-index:1;
 }
-@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.7)}}
+.node-header-icon{
+  width:28px;height:28px;border-radius:var(--r6);
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;flex-shrink:0;
+}
+.node-header-name{
+  font-family:var(--font-ui);font-size:12px;font-weight:600;
+  color:var(--text0);flex:1;line-height:1.3;
+}
+.node-header-type{
+  font-size:8px;font-weight:600;letter-spacing:.12em;
+  color:var(--text2);text-transform:uppercase;
+  margin-top:2px;font-family:var(--font-mono);
+}
 
-.node-ports{padding:8px 0}
-.port-row{display:flex;align-items:center;padding:3px 0;position:relative;height:26px}
-.port-label{font-size:10px;color:var(--text1);padding:0 10px;flex:1}
+/* ── Status badge ── */
+.status-badge{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.status-badge.idle{background:var(--border3)}
+.status-badge.deployed{background:var(--green);box-shadow:0 0 5px var(--green)}
+.status-badge.deploying{background:var(--yellow);animation:pulse-dot 1s ease-in-out infinite}
+.status-badge.working{background:#fff;box-shadow:0 0 8px #fff;animation:pulse-dot .4s ease-in-out infinite}
+.status-badge.failed{background:var(--red);box-shadow:0 0 5px var(--red);animation:pulse-dot .6s ease-in-out infinite}
+.status-badge.error{background:var(--red);box-shadow:0 0 5px var(--red)}
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.6)}}
+
+/* ── Ports ── */
+.node-ports{padding:6px 0;position:relative;z-index:1}
+.port-row{display:flex;align-items:center;padding:2px 0;position:relative;height:24px}
+.port-label{font-size:9.5px;color:var(--text1);padding:0 10px;flex:1;font-family:var(--font-mono)}
 .port-label.input{padding-left:20px}
 .port-label.output{padding-right:20px;text-align:right}
 
-/* ── Custom Handles ── */
+/* ── Handles ── */
 .react-flow__handle{
   width:10px!important;height:10px!important;
   border-radius:50%!important;
   border:2px solid var(--bg2)!important;
   transition:transform .15s,box-shadow .15s!important;
 }
-.react-flow__handle:hover{transform:scale(1.4)!important;box-shadow:0 0 0 3px rgba(255,255,255,.1)!important}
+.react-flow__handle:hover{transform:scale(1.5)!important;box-shadow:0 0 0 3px rgba(255,255,255,.12)!important}
 .react-flow__handle-left{left:-5px!important}
 .react-flow__handle-right{right:-5px!important}
-
-.react-flow__handle-connecting {
-  transform: scale(1.6) !important;
-  box-shadow: 0 0 0 4px rgba(255,255,255,0.15) !important;
-}
-.react-flow__handle-valid {
-  box-shadow: 0 0 0 4px rgba(16,185,129,0.4) !important;
-}
+.react-flow__handle-connecting{transform:scale(1.6)!important;box-shadow:0 0 0 4px rgba(66,133,244,0.25)!important}
+.react-flow__handle-valid{box-shadow:0 0 0 4px rgba(52,168,83,0.4)!important}
+.react-flow__handle[data-multiin="true"]{box-shadow:0 0 0 2px rgba(52,211,153,0.5)!important}
 
 /* ── Edges ── */
 .react-flow__edge-path{stroke-width:1.5!important}
-.react-flow__edge.animated .react-flow__edge-path{stroke-dasharray:5 3}
 .react-flow__edge.invalid .react-flow__edge-path{stroke:var(--red)!important;stroke-dasharray:4 3}
-.react-flow__connection-line{stroke:var(--text1)!important;stroke-width:1.5!important;stroke-dasharray:5 3!important}
+.react-flow__connection-line{stroke:var(--accent)!important;stroke-width:1.5!important;stroke-dasharray:5 3!important}
 
 /* ── MiniMap ── */
-.react-flow__minimap{background:var(--bg2)!important;border:1px solid var(--border)!important;border-radius:var(--r8)!important}
-.react-flow__minimap-mask{fill:var(--bg1)!important;opacity:.7!important}
+.react-flow__minimap{
+  background:var(--bg2)!important;
+  border:1px solid var(--border)!important;
+  border-radius:var(--r8)!important;
+  box-shadow:0 4px 16px var(--shadow)!important;
+}
+.react-flow__minimap-mask{fill:var(--bg0)!important;opacity:.8!important}
 
 /* ── Controls ── */
-.react-flow__controls{background:var(--bg2)!important;border:1px solid var(--border)!important;border-radius:var(--r8)!important}
-.react-flow__controls-button{background:transparent!important;border:none!important;border-bottom:1px solid var(--border)!important;color:var(--text1)!important}
+.react-flow__controls{
+  background:var(--bg2)!important;
+  border:1px solid var(--border)!important;
+  border-radius:var(--r8)!important;
+  box-shadow:0 2px 8px var(--shadow)!important;
+  overflow:hidden;
+}
+.react-flow__controls-button{
+  background:transparent!important;border:none!important;
+  border-bottom:1px solid var(--border)!important;
+  color:var(--text1)!important;transition:all .12s!important;
+}
 .react-flow__controls-button:last-child{border-bottom:none!important}
 .react-flow__controls-button:hover{background:var(--bg3)!important;color:var(--text0)!important}
 .react-flow__controls-button svg{fill:currentColor!important}
 
 /* ── Property Panel ── */
-.panel-header{padding:14px 16px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
-.panel-title{font-family:var(--font-display);font-size:13px;font-weight:700;color:var(--text0)}
-.panel-close{background:none;border:none;color:var(--text2);cursor:pointer;font-size:16px;padding:2px 6px;border-radius:4px}
-.panel-close:hover{color:var(--text0);background:var(--bg3)}
-.panel-body{flex:1;overflow-y:auto;padding:16px}
+.panel-header{
+  padding:14px 16px 12px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--bg2);
+}
+.panel-title{font-family:var(--font-ui);font-size:13px;font-weight:700;color:var(--text0)}
+.panel-close{
+  width:26px;height:26px;border-radius:var(--r6);
+  background:none;border:1px solid transparent;
+  color:var(--text2);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .12s;
+}
+.panel-close:hover{color:var(--text0);background:var(--bg3);border-color:var(--border2)}
+.panel-body{flex:1;overflow-y:auto;padding:14px}
 .panel-body::-webkit-scrollbar{width:3px}
 .panel-body::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px}
-.field-group{margin-bottom:16px}
-.field-label{font-size:10px;font-weight:600;letter-spacing:.1em;color:var(--text2);text-transform:uppercase;margin-bottom:6px;display:block}
-.field-input{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r8);padding:7px 10px;color:var(--text0);font-family:var(--font-mono);font-size:12px;outline:none;transition:border-color .15s}
-.field-input:focus{border-color:var(--accent)}
-.field-select{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r8);padding:7px 10px;color:var(--text0);font-family:var(--font-mono);font-size:12px;outline:none;cursor:pointer}
+.field-group{margin-bottom:14px}
+.field-label{
+  font-size:9.5px;font-weight:700;letter-spacing:.1em;
+  color:var(--text2);text-transform:uppercase;
+  margin-bottom:5px;display:block;font-family:var(--font-ui);
+}
+.field-input{
+  width:100%;background:var(--bg0);
+  border:1px solid var(--border);border-radius:var(--r6);
+  padding:7px 10px;color:var(--text0);
+  font-family:var(--font-mono);font-size:11px;
+  outline:none;transition:border-color .15s,box-shadow .15s;
+}
+.field-input:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-glow)}
+.field-select{
+  width:100%;background:var(--bg0);
+  border:1px solid var(--border);border-radius:var(--r6);
+  padding:7px 10px;color:var(--text0);
+  font-family:var(--font-mono);font-size:11px;
+  outline:none;cursor:pointer;transition:border-color .15s;
+}
+.field-select:focus{border-color:var(--accent)}
 .field-checkbox{display:flex;align-items:center;gap:8px;cursor:pointer}
-.field-checkbox input{accent-color:var(--accent)}
-.section-title{font-family:var(--font-display);font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--text2);text-transform:uppercase;margin:16px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.field-checkbox input{accent-color:var(--accent);width:13px;height:13px}
+.section-title{
+  font-family:var(--font-ui);font-size:9.5px;font-weight:700;
+  letter-spacing:.1em;color:var(--accent);text-transform:uppercase;
+  margin:16px 0 8px;padding:0 0 6px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:6px;
+}
+.section-title::before{
+  content:'';width:3px;height:10px;border-radius:2px;
+  background:var(--accent);display:inline-block;
+}
 
-/* ── Log Panel ── */
-.log-panel{position:absolute;bottom:0;left:0;right:0;height:160px;background:var(--bg1);border-top:1px solid var(--border);z-index:15;display:flex;flex-direction:column}
+/* ── Log Panel — terminal aesthetic ── */
+.log-panel{
+  position:absolute;bottom:0;left:0;right:0;
+  height:172px;
+  background:var(--bg0);
+  border-top:1px solid var(--border);
+  z-index:15;display:flex;flex-direction:column;
+  font-family:var(--font-mono);
+}
+.log-panel::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,var(--accent),var(--teal));
+  opacity:.5;
+}
 .log-panel.hidden{height:0;overflow:hidden}
-.log-header{padding:6px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0}
-.log-title{font-size:10px;font-weight:600;letter-spacing:.12em;color:var(--text2);text-transform:uppercase}
-.log-body{flex:1;overflow-y:auto;padding:8px 14px;font-size:11px;line-height:1.7}
+.log-header{
+  padding:5px 12px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:8px;
+  flex-shrink:0;background:var(--bg1);
+}
+.log-title{font-size:9.5px;font-weight:700;letter-spacing:.12em;color:var(--text2);text-transform:uppercase;font-family:var(--font-ui)}
+.log-body{flex:1;overflow-y:auto;padding:4px 0;font-size:10.5px;line-height:1.65}
 .log-body::-webkit-scrollbar{width:3px}
 .log-body::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px}
 .log-entry{display:flex;gap:8px;color:var(--text1)}
@@ -263,83 +548,110 @@ html,body,#root{height:100%;width:100%;overflow:hidden;background:var(--bg0);col
 .log-entry.info .msg{color:var(--accent)}
 .log-entry.warn .msg{color:var(--yellow)}
 
-/* ── Toolbar ── */
-.canvas-toolbar{position:absolute;top:60px;left:50%;transform:translateX(-50%);display:flex;gap:6px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r12);padding:6px;z-index:15}
+/* ── Canvas Toolbar — floating pill ── */
+.canvas-toolbar{
+  position:absolute;top:64px;left:50%;transform:translateX(-50%);
+  display:flex;gap:4px;
+  background:var(--bg1);
+  border:1px solid var(--border2);
+  border-radius:var(--r12);
+  padding:5px;z-index:15;
+  box-shadow:0 4px 16px var(--shadow);
+}
 
-/* ── Toast ── */
-.toast-container{position:absolute;top:60px;right:16px;z-index:100;display:flex;flex-direction:column;gap:6px;pointer-events:none}
-.toast{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r8);padding:10px 14px;font-size:12px;color:var(--text0);display:flex;align-items:center;gap:8px;animation:slide-in .2s ease;pointer-events:all;max-width:280px}
-.toast.success{border-left:3px solid var(--green)}
-.toast.error{border-left:3px solid var(--red)}
-.toast.info{border-left:3px solid var(--accent)}
-@keyframes slide-in{from{transform:translateX(20px);opacity:0}to{transform:translateX(0);opacity:1}}
+/* ── Toast — GCP snackbar style ── */
+.toast-container{
+  position:absolute;bottom:24px;left:50%;transform:translateX(-50%);
+  z-index:100;display:flex;flex-direction:column;gap:6px;
+  pointer-events:none;align-items:center;
+}
+.toast{
+  background:var(--bg3);
+  border:1px solid var(--border2);
+  border-radius:var(--r8);
+  padding:10px 16px;
+  font-size:12px;color:var(--text0);
+  display:flex;align-items:center;gap:10px;
+  animation:slide-up .2s ease;
+  pointer-events:all;max-width:320px;
+  box-shadow:0 4px 16px var(--shadow);
+  font-family:var(--font-ui);
+}
+.toast::before{
+  content:'';width:4px;height:4px;border-radius:50%;flex-shrink:0;
+}
+.toast.success::before{background:var(--green);box-shadow:0 0 6px var(--green)}
+.toast.error::before{background:var(--red);box-shadow:0 0 6px var(--red)}
+.toast.info::before{background:var(--accent);box-shadow:0 0 6px var(--accent)}
+@keyframes slide-up{from{transform:translateY(10px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 
-/* ── Empty State ── */
-.empty-canvas{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;user-select:none}
-.empty-title{font-family:var(--font-display);font-size:22px;font-weight:800;color:var(--text2);letter-spacing:-.5px;margin-bottom:8px}
-.empty-sub{font-size:12px;color:var(--text2);line-height:1.6}
-.empty-grid{position:absolute;inset:0;background-image:radial-gradient(circle,var(--border) 1px,transparent 1px);background-size:28px 28px;opacity:.3;pointer-events:none}
+/* ── Empty state ── */
+.empty-canvas{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  text-align:center;pointer-events:none;user-select:none;
+}
+.empty-title{
+  font-family:var(--font-display);font-size:20px;font-weight:700;
+  color:var(--text2);letter-spacing:-.3px;margin-bottom:10px;
+}
+.empty-sub{font-size:11px;color:var(--text2);line-height:1.8;font-family:var(--font-mono)}
+.empty-grid{
+  position:absolute;inset:0;
+  background-image:radial-gradient(circle,var(--border) 1px,transparent 1px);
+  background-size:28px 28px;opacity:.25;pointer-events:none;
+}
 
 /* ── Badge ── */
-.port-type-badge{display:inline-flex;align-items:center;padding:1px 7px;border-radius:99px;font-size:9px;font-weight:600;letter-spacing:.05em}
+.port-type-badge{
+  display:inline-flex;align-items:center;
+  padding:1px 6px;border-radius:99px;
+  font-size:8.5px;font-weight:700;letter-spacing:.05em;
+  font-family:var(--font-mono);
+}
 
 /* ── Node Toolbar ── */
 .react-flow__node-toolbar{
-  display:flex!important;gap:3px!important;
+  display:flex!important;gap:2px!important;
   background:var(--bg1)!important;
-  border:1px solid var(--border)!important;
+  border:1px solid var(--border2)!important;
   border-radius:var(--r8)!important;
-  padding:4px!important;
-  box-shadow:0 4px 16px var(--shadow)!important;
+  padding:3px!important;
+  box-shadow:0 4px 16px var(--shadow2)!important;
 }
 .node-toolbar-btn{
-  width:26px;height:26px;border-radius:6px;
+  width:26px;height:26px;border-radius:var(--r6);
   border:none;background:transparent;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
-  color:var(--text1);transition:all .12s;font-size:11px;
+  color:var(--text1);transition:all .1s;
 }
 .node-toolbar-btn:hover{background:var(--bg3);color:var(--text0)}
-.node-toolbar-btn.danger:hover{background:#ef444422;color:var(--red)}
-.node-toolbar-btn.success:hover{background:#10b98122;color:var(--green)}
-.node-toolbar-divider{width:1px;background:var(--border);margin:2px 1px;align-self:stretch}
-
-/* ── Edge Toolbar (floating on selected edge) ── */
-.edge-btn{
-  position:absolute;
-  display:flex;align-items:center;gap:3px;
-  background:var(--bg1);border:1px solid var(--border);
-  border-radius:var(--r8);padding:3px 6px;
-  box-shadow:0 4px 12px var(--shadow);
-  font-size:10px;font-family:var(--font-mono);color:var(--text1);
-  cursor:pointer;white-space:nowrap;z-index:50;
-  transition:all .12s;
-}
-.edge-btn:hover{background:var(--bg3);color:var(--text0)}
-.edge-btn.del:hover{background:#ef444420;color:var(--red)}
-.edge-btn-row{display:flex;gap:4px}
+.node-toolbar-btn.danger:hover{background:rgba(234,67,53,.15);color:var(--red)}
+.node-toolbar-btn.success:hover{background:rgba(52,168,83,.15);color:var(--green)}
+.node-toolbar-divider{width:1px;background:var(--border);margin:2px 0;align-self:stretch}
 
 /* ── Context Menu ── */
 .ctx-menu{
   position:fixed;
   background:var(--bg1);border:1px solid var(--border2);
-  border-radius:var(--r12);padding:6px;
-  box-shadow:0 8px 32px var(--shadow);
-  z-index:1000;min-width:160px;
+  border-radius:var(--r12);padding:5px;
+  box-shadow:0 8px 32px var(--shadow2);
+  z-index:1000;min-width:170px;
   animation:fade-in .1s ease;
 }
-@keyframes fade-in{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+@keyframes fade-in{from{opacity:0;transform:scale(.95) translateY(-4px)}to{opacity:1;transform:scale(1) translateY(0)}}
 .ctx-item{
   display:flex;align-items:center;gap:8px;
-  padding:7px 10px;border-radius:var(--r8);
+  padding:7px 10px;border-radius:var(--r6);
   cursor:pointer;font-size:11px;color:var(--text1);
-  transition:all .1s;
+  transition:all .1s;font-family:var(--font-ui);
 }
-.ctx-item:hover{background:var(--bg3);color:var(--text0)}
-.ctx-item.danger:hover{background:#ef444418;color:var(--red)}
-.ctx-item.sep{height:1px;background:var(--border);margin:4px 0;padding:0;cursor:default}
+.ctx-item:hover{background:var(--accent-glow);color:var(--text0)}
+.ctx-item.danger:hover{background:rgba(234,67,53,.12);color:var(--red)}
+.ctx-item.sep{height:1px;background:var(--border);margin:3px 0;padding:0;cursor:default}
 .ctx-item.sep:hover{background:var(--border)}
 
-/* ── Node Collapse ── */
+/* ── Collapse btn ── */
 .node-collapsed .node-ports{display:none}
 .node-collapsed .node-header{border-bottom:none}
 .collapse-btn{
@@ -351,123 +663,98 @@ html,body,#root{height:100%;width:100%;overflow:hidden;background:var(--bg0);col
 .collapse-btn:hover{color:var(--text0);background:var(--bg3)}
 
 /* ── Category accordion ── */
-.cat-header{transition:background .15s,border-color .15s}
+.cat-header{transition:background .15s}
 .cat-header:hover{opacity:.9}
-.node-item.indented{margin-left:8px}
 
-/* ── multi_in handle glow ── */
-.react-flow__handle[data-multiin="true"]{
-  box-shadow:0 0 0 2px rgba(52,211,153,0.45)!important;
-}
-
-/* ── Scrollbar global ── */
-::-webkit-scrollbar{width:5px;height:5px;
-  background:var(--bg1);border:1px solid var(--border);
-  border-radius:6px;padding:1px 7px;
-  font-size:9px;font-family:var(--font-mono);color:var(--text1);
-  pointer-events:all;cursor:pointer;
-}
-
-/* ── Theme Toggle ── */
-.theme-toggle{
-  display:flex;align-items:center;gap:6px;
-  background:var(--bg2);border:1px solid var(--border2);
-  border-radius:99px;padding:3px 10px;
-  cursor:pointer;font-size:11px;color:var(--text1);
-  transition:all .15s;
-}
-.theme-toggle:hover{color:var(--text0);border-color:var(--border)}
-
-/* ── Edge Style Pill ── */
-.edge-style-selector{
-  display:flex;gap:3px;
+/* ── Edge label ── */
+.edge-label-wrapper{
   background:var(--bg2);border:1px solid var(--border);
-  border-radius:var(--r8);padding:3px;
+  border-radius:4px;padding:1px 6px;
+  font-size:9px;color:var(--text1);font-family:var(--font-mono);
 }
-.edge-style-btn{
-  padding:3px 8px;border-radius:6px;border:none;
-  background:transparent;color:var(--text1);font-size:10px;
-  font-family:var(--font-mono);cursor:pointer;transition:all .12s;
-}
-.edge-style-btn.active{background:var(--accent);color:#fff}
-.edge-style-btn:not(.active):hover{background:var(--bg3);color:var(--text0)}
 
-/* ── Node Color Picker ── */
-.color-swatch-row{display:flex;gap:5px;flex-wrap:wrap;margin-top:4px}
-.color-swatch{width:18px;height:18px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform .1s,border-color .1s}
-.color-swatch:hover,.color-swatch.active{transform:scale(1.2);border-color:var(--text0)}
-
-/* ── Resizer handles ── */
+/* ── Resizer ── */
 .react-flow__resize-control.handle{
-  width:8px!important;height:8px!important;
+  width:7px!important;height:7px!important;
   background:var(--accent)!important;
-  border:2px solid var(--bg1)!important;
+  border:2px solid var(--bg0)!important;
   border-radius:2px!important;
 }
 
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px}
 
-/* ── VPC Group Node ── */
+/* ── VPC Group ── */
 .vpc-group-node{
-  border:2px dashed #10b981;
+  border:1.5px dashed rgba(52,168,83,0.5);
   border-radius:16px;
-  background:rgba(16,185,129,0.04);
-  position:relative;
-  min-width:280px;
-  min-height:200px;
+  background:rgba(52,168,83,0.03);
+  position:relative;min-width:280px;min-height:200px;
   transition:border-color .2s,background .2s;
 }
 .vpc-group-node.drag-over{
-  border-color:#34d399;
-  background:rgba(16,185,129,0.10);
-  box-shadow:0 0 0 3px rgba(16,185,129,0.2);
+  border-color:var(--green);
+  background:rgba(52,168,83,0.08);
+  box-shadow:0 0 0 3px rgba(52,168,83,0.15);
 }
 .vpc-group-node.selected{
-  border-color:#34d399;
-  box-shadow:0 0 0 2px rgba(16,185,129,0.35);
+  border-color:var(--green);
+  box-shadow:0 0 0 2px rgba(52,168,83,0.3);
 }
 .vpc-group-header{
   display:flex;align-items:center;gap:8px;
   padding:10px 14px 8px;
-  border-bottom:1px dashed rgba(16,185,129,0.3);
-  cursor:move;
+  border-bottom:1px dashed rgba(52,168,83,0.25);
 }
 .vpc-group-icon{
-  width:28px;height:28px;border-radius:8px;
-  background:rgba(16,185,129,0.15);color:#10b981;
-  display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;
+  width:26px;height:26px;border-radius:6px;
+  background:rgba(52,168,83,0.12);color:var(--green);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
 }
-.vpc-group-title{
-  font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#e2f8f0;flex:1;
-}
-.vpc-group-subtitle{
-  font-size:9px;color:#10b981;letter-spacing:.1em;text-transform:uppercase;
-}
-.vpc-group-cidr{
-  font-size:10px;color:#34d399;font-family:'JetBrains Mono',monospace;
-  background:rgba(16,185,129,0.1);padding:1px 7px;border-radius:99px;
-}
-.vpc-group-body{
-  padding:12px;min-height:140px;
-  display:flex;flex-direction:column;gap:4px;
-  overflow-y:auto;
-}
+.vpc-group-title{font-family:var(--font-ui);font-size:12px;font-weight:700;color:var(--text0);flex:1}
+.vpc-group-subtitle{font-size:8.5px;color:var(--green);letter-spacing:.1em;text-transform:uppercase;font-family:var(--font-mono)}
+.vpc-group-cidr{font-size:9px;color:var(--green);font-family:var(--font-mono);background:rgba(52,168,83,0.1);padding:1px 7px;border-radius:99px}
+.vpc-group-body{padding:10px;min-height:130px;display:flex;flex-direction:column;gap:4px;overflow-y:auto}
 .vpc-group-empty{
   flex:1;display:flex;align-items:center;justify-content:center;
-  color:rgba(16,185,129,0.35);font-size:11px;letter-spacing:.05em;
-  border:1px dashed rgba(16,185,129,0.2);border-radius:8px;
-  padding:24px;text-align:center;line-height:1.6;
-  pointer-events:none;
+  color:rgba(52,168,83,0.3);font-size:10px;letter-spacing:.04em;
+  border:1px dashed rgba(52,168,83,0.18);border-radius:8px;
+  padding:20px;text-align:center;line-height:1.7;pointer-events:none;
+  font-family:var(--font-mono);
 }
 .vpc-child-badge{
   display:flex;align-items:center;gap:6px;
-  background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);
-  border-radius:8px;padding:5px 10px;font-size:11px;color:#a7f3d0;
+  background:rgba(52,168,83,0.07);border:1px solid rgba(52,168,83,0.18);
+  border-radius:6px;padding:4px 8px;font-size:10px;color:rgba(200,240,215,0.9);
+  font-family:var(--font-mono);
 }
-.vpc-child-badge-dot{
-  width:6px;height:6px;border-radius:50%;background:#10b981;flex-shrink:0;
+.vpc-child-badge-dot{width:5px;height:5px;border-radius:50%;background:var(--green);flex-shrink:0}
+
+/* ── node-missing required ── */
+.node-missing-required::after{
+  content:'!';position:absolute;top:-3px;right:-3px;
+  width:13px;height:13px;background:var(--yellow);color:#000;
+  font-size:8px;font-weight:900;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  line-height:13px;text-align:center;
 }
+
+/* ── Light theme patches ── */
+[data-theme="light"] .react-flow__background{background:var(--bg0)!important}
+[data-theme="light"] .react-flow__background pattern circle{fill:var(--border2)!important;opacity:.5}
+[data-theme="light"] .react-flow__minimap{background:var(--bg2)!important;border-color:var(--border)!important}
+[data-theme="light"] .react-flow__minimap-mask{fill:var(--bg3)!important;opacity:.6!important}
+[data-theme="light"] .react-flow__controls{background:var(--bg1)!important;border-color:var(--border)!important}
+[data-theme="light"] .react-flow__controls-button{color:var(--text1)!important;border-bottom-color:var(--border)!important}
+[data-theme="light"] .react-flow__controls-button:hover{background:var(--bg3)!important}
+[data-theme="light"] .react-flow__handle{border-color:var(--bg1)!important}
+[data-theme="light"] .field-input,[data-theme="light"] .field-select{background:var(--bg1);color:var(--text0);border-color:var(--border)}
+[data-theme="light"] .node-header{border-bottom-color:var(--border)}
+[data-theme="light"] .gcp-node{background:var(--bg1);box-shadow:0 1px 4px var(--shadow)}
+[data-theme="light"] .log-panel{background:var(--bg0)}
+[data-theme="light"] .canvas-wrap::after{opacity:.08}
 </style>
 </head>
 <body>
@@ -512,7 +799,337 @@ const ICONS = {
 
 // ── Node type definitions (fallback if backend offline) ───────────────────────
 // multi_in: input port accepts >1 incoming edge  |  multi: output fans-out to many
-const DEFAULT_NODE_TYPES_DATA = [];
+const DEFAULT_NODE_TYPES_DATA = [
+  // ── Compute ──
+  {type:"CloudRunNode",label:"Cloud Run",description:"Serverless container runtime",color:"#6366f1",icon:"cloud",category:"Compute",
+   url_field:"service_url",
+   params_schema:[
+     {key:"image",         label:"Container Image", type:"text",   default:"", placeholder:"gcr.io/project/image:tag"},
+     {key:"memory",        label:"Memory",          type:"select", options:["256Mi","512Mi","1Gi","2Gi","4Gi","8Gi"], default:"512Mi"},
+     {key:"cpu",           label:"CPU",             type:"select", options:["1","2","4","8"], default:"1"},
+     {key:"min_instances", label:"Min Instances",   type:"number", default:0},
+     {key:"max_instances", label:"Max Instances",   type:"number", default:10},
+     {key:"port",          label:"Container Port",  type:"number", default:8080},
+     {key:"service_url",   label:"Service URL",     type:"text",   default:"", placeholder:"https://my-service.run.app"},
+   ],
+   inputs:[
+     {name:"service_account",type:"service_account",required:true, multi_in:false,color:"#a78bfa",label:"SA"},
+     {name:"network",        type:"network",         required:false,multi_in:false,color:"#34d399",label:"Net"},
+     {name:"secret",         type:"secret",          required:false,multi_in:true, color:"#f472b6",label:"Sec"},
+   ],
+   outputs:[
+     {name:"publishes_to",type:"topic",  multi:true,color:"#60a5fa",label:"Topic"},
+     {name:"writes_to",   type:"storage",multi:true,color:"#fbbf24",label:"GCS"},
+   ]},
+  {type:"CloudFunctionNode",label:"Cloud Function",description:"Event-driven serverless function",color:"#a78bfa",icon:"zap",category:"Compute",
+   inputs:[
+     {name:"service_account",type:"service_account",required:true, multi_in:false,color:"#a78bfa",label:"SA"},
+     {name:"trigger_topic",  type:"topic",           required:false,multi_in:false,color:"#60a5fa",label:"Topic"},
+     {name:"secret",         type:"secret",          required:false,multi_in:true, color:"#f472b6",label:"Sec"},
+   ],
+   outputs:[
+     {name:"publishes_to",type:"topic",  multi:true,color:"#60a5fa",label:"Topic"},
+     {name:"writes_to",   type:"storage",multi:true,color:"#fbbf24",label:"GCS"},
+   ]},
+
+  // ── Data ──
+  {type:"CloudSQLNode",label:"Cloud SQL",description:"Managed relational database",color:"#f97316",icon:"database",category:"Data",
+   inputs:[
+     {name:"service_account",type:"service_account",required:true, multi_in:false,color:"#a78bfa",label:"SA"},
+     {name:"network",        type:"network",         required:true, multi_in:false,color:"#34d399",label:"Net"},
+   ],
+   outputs:[{name:"connection",type:"database",multi:true,color:"#fb923c",label:"DB"}]},
+  {type:"BigQueryNode",label:"BigQuery",description:"Serverless data warehouse",color:"#3b82f6",icon:"table",category:"Data",
+   inputs:[
+     {name:"service_account",type:"service_account",required:true, multi_in:false,color:"#a78bfa",label:"SA"},
+     {name:"writes_in",      type:"storage",         required:false,multi_in:true, color:"#fbbf24",label:"GCS"},
+   ],
+   outputs:[{name:"query_out",type:"database",multi:true,color:"#fb923c",label:"DB"}]},
+  {type:"FirestoreNode",label:"Firestore",description:"Serverless NoSQL document DB",color:"#f59e0b",icon:"layers",category:"Data",
+   inputs:[
+     {name:"service_account",type:"service_account",required:true,multi_in:false,color:"#a78bfa",label:"SA"},
+   ],
+   outputs:[{name:"document_ref",type:"database",multi:true,color:"#fb923c",label:"DB"}]},
+  {type:"MemorystoreNode",label:"Memorystore",description:"Managed Redis / Memcached",color:"#ef4444",icon:"zap",category:"Data",
+   inputs:[
+     {name:"service_account",type:"service_account",required:true,multi_in:false,color:"#a78bfa",label:"SA"},
+     {name:"network",        type:"network",         required:true,multi_in:false,color:"#34d399",label:"Net"},
+   ],
+   outputs:[{name:"cache_endpoint",type:"database",multi:true,color:"#fb923c",label:"DB"}]},
+
+  // ── Messaging ──
+  {type:"PubSubNode",label:"Pub/Sub",description:"Async messaging bus",color:"#3b82f6",icon:"radio",category:"Messaging",
+   inputs:[
+     // multi_in: many publishers can push to the same topic
+     {name:"topic_in",type:"topic",required:false,multi_in:true,color:"#60a5fa",label:"Topic"},
+   ],
+   outputs:[{name:"topic_out",type:"topic",multi:true,color:"#60a5fa",label:"Topic"}]},
+  {type:"SubscriptionNode",label:"Subscription",description:"Pub/Sub topic subscription",color:"#ec485b",icon:"inbox",category:"Messaging",
+   inputs:[
+     {name:"topic",type:"topic",required:true,multi_in:false,color:"#60a5fa",label:"Topic"},
+   ],
+   outputs:[{name:"delivers_to",type:"topic",multi:true,color:"#60a5fa",label:"Topic"}]},
+
+  // ── Storage ──
+  {type:"GCSBucketNode",label:"GCS Bucket",description:"Object storage bucket",color:"#eab308",icon:"archive",category:"Storage",
+   inputs:[
+     {name:"service_account",type:"service_account",required:true,multi_in:false,color:"#a78bfa",label:"SA"},
+   ],
+   outputs:[{name:"bucket",type:"storage",multi:true,color:"#fbbf24",label:"GCS"}]},
+
+  // ── Security ──
+  {type:"ServiceAccountNode",label:"Service Account",description:"IAM service identity",color:"#8b5cf6",icon:"user-check",category:"Security",
+   inputs:[],
+   outputs:[{name:"identity",type:"service_account",multi:true,color:"#a78bfa",label:"SA"}]},
+  {type:"SecretManagerNode",label:"Secret Manager",description:"Encrypted secrets store",color:"#ec4899",icon:"key",category:"Security",
+   inputs:[
+     {name:"service_account",type:"service_account",required:true,multi_in:false,color:"#a78bfa",label:"SA"},
+   ],
+   outputs:[{name:"secret_ref",type:"secret",multi:true,color:"#f472b6",label:"Sec"}]},
+
+  // ── Networking ──
+  {type:"VPCNode",label:"VPC / Subnet",description:"Virtual private network",color:"#10b981",icon:"network",category:"Networking",
+   inputs:[],
+   outputs:[{name:"subnet",type:"network",multi:true,color:"#34d399",label:"Net"}]},
+  {type:"GroupBoxNode",label:"Visual Group",description:"Visual container for grouping nodes on the canvas",color:"#8b5cf6",icon:"layers",category:"Grouping",
+   inputs:[],
+   outputs:[]},
+  {type:"LoadBalancerNode",label:"Load Balancer",description:"HTTP(S) / TCP / UDP load balancer",color:"#06b6d4",icon:"globe",category:"Networking",
+   inputs:[
+     {name:"network", type:"network",required:true, multi_in:false,color:"#34d399",label:"Net"},
+     {name:"backend", type:"network",required:false,multi_in:true, color:"#34d399",label:"Net"},
+   ],
+   outputs:[{name:"frontend_ip",type:"network",multi:true,color:"#34d399",label:"Net"}]},
+
+  // ── Compute (extended) ──
+  {type:"GKEClusterNode",label:"GKE Cluster",description:"Managed Kubernetes cluster",color:"#326ce5",icon:"cloud",category:"Compute",
+   params_schema:[
+     {key:"node_count",    label:"Node Count",      type:"number",  default:3},
+     {key:"machine_type",  label:"Machine Type",    type:"select",  options:["e2-medium","e2-standard-2","e2-standard-4","n2-standard-2","n2-standard-4"]},
+     {key:"k8s_version",   label:"K8s Version",     type:"text",    default:"1.29", placeholder:"1.29"},
+     {key:"region",        label:"Region",          type:"select",  options:["us-central1","us-east1","europe-west1","asia-east1"]},
+     {key:"autopilot",     label:"Autopilot Mode",  type:"checkbox",default:false},
+   ],
+   inputs:[
+     {name:"service_account",type:"service_account",required:true, multi_in:false,color:"#a78bfa",label:"SA"},
+     {name:"network",        type:"network",         required:true, multi_in:false,color:"#34d399",label:"Net"},
+   ],
+   outputs:[
+     {name:"workloads",  type:"network",   multi:true,color:"#34d399",label:"Net"},
+     {name:"writes_to",  type:"storage",   multi:true,color:"#fbbf24",label:"GCS"},
+   ]},
+  {type:"ComputeEngineNode",label:"Compute Engine",description:"Virtual machine instance",color:"#4285f4",icon:"cloud",category:"Compute",
+   params_schema:[
+     {key:"machine_type",  label:"Machine Type",    type:"select",  options:["e2-micro","e2-small","e2-medium","e2-standard-2","e2-standard-4","n2-standard-2","n2-standard-8"]},
+     {key:"disk_size_gb",  label:"Boot Disk (GB)",  type:"number",  default:20},
+     {key:"region",        label:"Region",          type:"select",  options:["us-central1","us-east1","europe-west1","asia-east1"]},
+     {key:"zone",          label:"Zone",            type:"text",    default:"us-central1-a", placeholder:"us-central1-a"},
+     {key:"preemptible",   label:"Preemptible",     type:"checkbox",default:false},
+     {key:"external_ip",   label:"External IP",     type:"text",    default:"", placeholder:"34.xx.xx.xx"},
+   ],
+   url_field:"external_ip",
+   inputs:[
+     {name:"service_account",type:"service_account",required:true, multi_in:false,color:"#a78bfa",label:"SA"},
+     {name:"network",        type:"network",         required:true, multi_in:false,color:"#34d399",label:"Net"},
+     {name:"secret",         type:"secret",          required:false,multi_in:true, color:"#f472b6",label:"Sec"},
+   ],
+   outputs:[
+     {name:"instance",    type:"network",   multi:true,color:"#34d399",label:"Net"},
+   ]},
+  {type:"AppEngineNode",label:"App Engine",description:"Fully managed app platform",color:"#0f9d58",icon:"zap",category:"Compute",
+   params_schema:[
+     {key:"runtime",       label:"Runtime",         type:"select",  options:["python39","python310","java17","nodejs18","go119","php82"]},
+     {key:"scaling",       label:"Scaling",         type:"select",  options:["automatic","manual","basic"]},
+     {key:"version",       label:"Service Version", type:"text",    default:"v1", placeholder:"v1"},
+     {key:"service_url",   label:"Service URL",     type:"text",    default:"", placeholder:"https://my-app.uc.r.appspot.com"},
+   ],
+   url_field:"service_url",
+   inputs:[
+     {name:"service_account",type:"service_account",required:true, multi_in:false,color:"#a78bfa",label:"SA"},
+   ],
+   outputs:[
+     {name:"publishes_to",type:"topic",  multi:true,color:"#60a5fa",label:"Topic"},
+     {name:"writes_to",   type:"storage",multi:true,color:"#fbbf24",label:"GCS"},
+   ]},
+
+  // ── Data (extended) ──
+  {type:"SpannerNode",label:"Cloud Spanner",description:"Globally distributed relational DB",color:"#db4437",icon:"database",category:"Data",
+   params_schema:[
+     {key:"instance_config", label:"Instance Config", type:"select", options:["regional-us-central1","regional-europe-west1","nam4","eur3"]},
+     {key:"processing_units",label:"Processing Units", type:"number", default:100},
+     {key:"database_id",     label:"Database ID",      type:"text",   default:"", placeholder:"my-database"},
+   ],
+   inputs:[
+     {name:"service_account",type:"service_account",required:true, multi_in:false,color:"#a78bfa",label:"SA"},
+   ],
+   outputs:[{name:"connection",type:"database",multi:true,color:"#fb923c",label:"DB"}]},
+  {type:"AlloyDBNode",label:"AlloyDB",description:"PostgreSQL-compatible high-perf DB",color:"#0288d1",icon:"database",category:"Data",
+   params_schema:[
+     {key:"cluster_type",    label:"Cluster Type",    type:"select", options:["PRIMARY","SECONDARY"]},
+     {key:"cpu_count",       label:"vCPUs",           type:"number", default:2},
+     {key:"region",          label:"Region",          type:"select", options:["us-central1","us-east4","europe-west1","asia-east1"]},
+     {key:"ha",              label:"High Availability",type:"checkbox",default:false},
+   ],
+   inputs:[
+     {name:"service_account",type:"service_account",required:true, multi_in:false,color:"#a78bfa",label:"SA"},
+     {name:"network",        type:"network",         required:true, multi_in:false,color:"#34d399",label:"Net"},
+   ],
+   outputs:[{name:"connection",type:"database",multi:true,color:"#fb923c",label:"DB"}]},
+  {type:"DataflowNode",label:"Dataflow",description:"Stream and batch data processing",color:"#ff6d00",icon:"zap",category:"Data",
+   params_schema:[
+     {key:"template",        label:"Template",        type:"text",   default:"", placeholder:"gs://dataflow-templates/..."},
+     {key:"region",          label:"Region",          type:"select", options:["us-central1","us-east1","europe-west1","asia-east1"]},
+     {key:"max_workers",     label:"Max Workers",     type:"number", default:5},
+     {key:"machine_type",    label:"Worker Machine",  type:"select", options:["n1-standard-1","n1-standard-2","n1-standard-4"]},
+   ],
+   inputs:[
+     {name:"service_account",type:"service_account",required:true, multi_in:false,color:"#a78bfa",label:"SA"},
+     {name:"source_topic",   type:"topic",           required:false,multi_in:false,color:"#60a5fa",label:"Topic"},
+     {name:"source_bucket",  type:"storage",         required:false,multi_in:false,color:"#fbbf24",label:"GCS"},
+   ],
+   outputs:[
+     {name:"sink_bucket",  type:"storage",  multi:true,color:"#fbbf24",label:"GCS"},
+     {name:"sink_bq",      type:"database", multi:true,color:"#fb923c",label:"DB"},
+   ]},
+
+  // ── Networking (extended) ──
+  {type:"CloudDNSNode",label:"Cloud DNS",description:"Scalable DNS service",color:"#009688",icon:"globe",category:"Networking",
+   params_schema:[
+     {key:"zone_name",     label:"Zone Name",       type:"text",   default:"", placeholder:"my-zone"},
+     {key:"dns_name",      label:"DNS Name",        type:"text",   default:"", placeholder:"example.com."},
+     {key:"visibility",    label:"Visibility",      type:"select", options:["public","private"]},
+   ],
+   inputs:[
+     {name:"network",      type:"network",required:false,multi_in:true,color:"#34d399",label:"Net"},
+   ],
+   outputs:[
+     {name:"dns_record",   type:"network",multi:true,color:"#34d399",label:"Net"},
+   ]},
+  {type:"CloudArmorNode",label:"Cloud Armor",description:"DDoS protection & WAF",color:"#e91e63",icon:"key",category:"Networking",
+   params_schema:[
+     {key:"policy_name",   label:"Policy Name",     type:"text",   default:"", placeholder:"my-security-policy"},
+     {key:"default_action",label:"Default Action",  type:"select", options:["allow","deny(403)","deny(404)","deny(502)"]},
+   ],
+   inputs:[
+     {name:"backend",      type:"network",required:true, multi_in:true, color:"#34d399",label:"Net"},
+   ],
+   outputs:[
+     {name:"protected",    type:"network",multi:true,color:"#34d399",label:"Net"},
+   ]},
+
+  // ── Security (extended) ──
+  {type:"IAMPolicyNode",label:"IAM Policy",description:"Identity & access management policy",color:"#673ab7",icon:"user-check",category:"Security",
+   params_schema:[
+     {key:"role",          label:"Role",            type:"text",   default:"", placeholder:"roles/storage.objectViewer"},
+     {key:"member",        label:"Member",          type:"text",   default:"", placeholder:"serviceAccount:..."},
+   ],
+   inputs:[
+     {name:"service_account",type:"service_account",required:false,multi_in:true,color:"#a78bfa",label:"SA"},
+   ],
+   outputs:[
+     {name:"grants",       type:"service_account",multi:true,color:"#a78bfa",label:"SA"},
+   ]},
+  {type:"CertificateNode",label:"SSL Certificate",description:"Managed SSL/TLS certificate",color:"#00897b",icon:"key",category:"Security",
+   params_schema:[
+     {key:"cert_name",     label:"Certificate Name",type:"text",   default:"", placeholder:"my-cert"},
+     {key:"domains",       label:"Domains",         type:"text",   default:"", placeholder:"example.com,*.example.com"},
+     {key:"type",          label:"Type",            type:"select", options:["MANAGED","SELF_MANAGED"]},
+   ],
+   inputs:[],
+   outputs:[
+     {name:"cert_ref",     type:"secret",multi:true,color:"#f472b6",label:"Sec"},
+   ]},
+  {type:"WorkloadIdentityNode",label:"Workload Identity",description:"K8s workload IAM binding",color:"#512da8",icon:"user-check",category:"Security",
+   params_schema:[
+     {key:"namespace",     label:"K8s Namespace",   type:"text",   default:"default", placeholder:"default"},
+     {key:"k8s_sa",        label:"K8s Service Acct",type:"text",   default:"", placeholder:"my-ksa"},
+   ],
+   inputs:[
+     {name:"service_account",type:"service_account",required:true,multi_in:false,color:"#a78bfa",label:"SA"},
+   ],
+   outputs:[
+     {name:"identity",     type:"service_account",multi:true,color:"#a78bfa",label:"SA"},
+   ]},
+
+  // ── Messaging (extended) ──
+  {type:"EventarcNode",label:"Eventarc",description:"Event-driven Cloud Run triggers",color:"#1565c0",icon:"radio",category:"Messaging",
+   params_schema:[
+     {key:"trigger_name",  label:"Trigger Name",    type:"text",   default:"", placeholder:"my-trigger"},
+     {key:"event_type",    label:"Event Type",      type:"text",   default:"", placeholder:"google.cloud.storage.object.v1.finalized"},
+     {key:"region",        label:"Region",          type:"select", options:["us-central1","us-east1","europe-west1","asia-east1"]},
+   ],
+   inputs:[
+     {name:"source_topic", type:"topic",            required:false,multi_in:false,color:"#60a5fa",label:"Topic"},
+   ],
+   outputs:[
+     {name:"triggers",     type:"topic",            multi:true,color:"#60a5fa",label:"Topic"},
+   ]},
+  {type:"SchedulerNode",label:"Cloud Scheduler",description:"Cron-based job scheduler",color:"#37474f",icon:"zap",category:"Messaging",
+   params_schema:[
+     {key:"schedule",      label:"Cron Schedule",   type:"text",   default:"0 9 * * 1", placeholder:"0 9 * * 1"},
+     {key:"timezone",      label:"Timezone",        type:"text",   default:"UTC", placeholder:"America/New_York"},
+     {key:"target_url",    label:"Target URL",      type:"text",   default:"", placeholder:"https://..."},
+   ],
+   inputs:[],
+   outputs:[
+     {name:"triggers",     type:"topic",            multi:true,color:"#60a5fa",label:"Topic"},
+   ]},
+
+  // ── Storage (extended) ──
+  {type:"FileStoreNode",label:"Filestore",description:"Managed NFS file storage",color:"#f57f17",icon:"archive",category:"Storage",
+   params_schema:[
+     {key:"tier",          label:"Tier",            type:"select", options:["BASIC_HDD","BASIC_SSD","HIGH_SCALE_SSD","ENTERPRISE"]},
+     {key:"capacity_gb",   label:"Capacity (GB)",   type:"number", default:1024},
+     {key:"region",        label:"Region",          type:"select", options:["us-central1","us-east1","europe-west1","asia-east1"]},
+   ],
+   inputs:[
+     {name:"network",      type:"network",required:true, multi_in:false,color:"#34d399",label:"Net"},
+   ],
+   outputs:[
+     {name:"nfs_mount",    type:"storage",multi:true,color:"#fbbf24",label:"GCS"},
+   ]},
+  {type:"CloudCDNNode",label:"Cloud CDN",description:"Content delivery network",color:"#0288d1",icon:"globe",category:"Storage",
+   params_schema:[
+     {key:"cache_mode",    label:"Cache Mode",      type:"select", options:["CACHE_ALL_STATIC","USE_ORIGIN_HEADERS","FORCE_CACHE_ALL"]},
+     {key:"ttl_seconds",   label:"Default TTL (s)", type:"number", default:3600},
+     {key:"signed_urls",   label:"Signed URLs",     type:"checkbox",default:false},
+   ],
+   inputs:[
+     {name:"origin",       type:"network",required:true,multi_in:false,color:"#34d399",label:"Net"},
+   ],
+   outputs:[
+     {name:"cdn_url",      type:"network",multi:true,color:"#34d399",label:"Net"},
+   ]},
+
+  // ── Observability ──
+  {type:"MonitoringNode",label:"Cloud Monitoring",description:"Metrics, alerting & dashboards",color:"#0097a7",icon:"radio",category:"Observability",
+   params_schema:[
+     {key:"alert_policy",  label:"Alert Policy",    type:"text",   default:"", placeholder:"my-alert-policy"},
+     {key:"notification",  label:"Notification Ch.",type:"text",   default:"", placeholder:"email:...,pagerduty:..."},
+   ],
+   inputs:[
+     {name:"metrics_source",type:"topic",required:false,multi_in:true,color:"#60a5fa",label:"Topic"},
+   ],
+   outputs:[]},
+  {type:"LoggingNode",label:"Cloud Logging",description:"Log aggregation & routing",color:"#039be5",icon:"layers",category:"Observability",
+   params_schema:[
+     {key:"sink_name",     label:"Log Sink Name",   type:"text",   default:"", placeholder:"my-log-sink"},
+     {key:"filter",        label:"Log Filter",      type:"text",   default:"", placeholder:"severity>=WARNING"},
+     {key:"destination",   label:"Destination",     type:"select", options:["BigQuery","GCS","Pub/Sub","Logging bucket"]},
+   ],
+   inputs:[],
+   outputs:[
+     {name:"log_export",   type:"storage",multi:true,color:"#fbbf24",label:"GCS"},
+   ]},
+  {type:"TraceNode",label:"Cloud Trace",description:"Distributed tracing service",color:"#00acc1",icon:"network",category:"Observability",
+   params_schema:[
+     {key:"sampling_rate", label:"Sampling Rate %", type:"number", default:5},
+   ],
+   inputs:[
+     {name:"traces_in",    type:"topic",required:false,multi_in:true,color:"#60a5fa",label:"Topic"},
+   ],
+   outputs:[]},
+];
 
 // ── GCP Icon Loader — tries icons/{NodeType}.svg first, falls back to inline ──
 const gcpIconCache = {};
@@ -528,7 +1145,8 @@ const GCPIcon = ({ nodeType, fallbackIcon, color, size = 20 }) => {
       return;
     }
     
-    const formattedType = fallbackIcon
+    const formattedType = nodeType
+    .slice(0, -4)              // מוריד את 4 התווים האחרונים (Node)
     .replace(/([a-z])([A-Z])/g, '$1_$2') // מוסיף קו תחתון בין אות קטנה לגדולה
     .toLowerCase();            // הופך הכל לאותיות קטנות
     
@@ -705,19 +1323,33 @@ const GCPNodeComponent = ({ data, selected, id }) => {
       >
         {/* Header */}
         <div className="node-header">
-          <div className="node-header-icon" style={{ background: nodeColor + '22', color: nodeColor }}>
-            <GCPIcon nodeType={schema.type} fallbackIcon={schema.icon} color={nodeColor} size={18} />
+          <div className="node-header-icon" style={{ background: nodeColor + '20', color: nodeColor, border: `1px solid ${nodeColor}33` }}>
+            <GCPIcon nodeType={schema.type} fallbackIcon={schema.icon} color={nodeColor} size={16} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="node-header-name">{data.label || schema.label}</div>
-            <div className="node-header-type">{schema.type.replace('Node', '')}</div>
+            <div className="node-header-type">{schema.category || schema.type.replace('Node', '')}</div>
           </div>
+          {/* Status label chip */}
+          {status !== 'idle' && (
+            <span style={{
+              fontSize: 8, fontWeight: 700, letterSpacing: '.06em', textTransform:'uppercase',
+              color: status==='deployed'?'var(--green)':status==='failed'||status==='error'?'var(--red)':status==='working'?'#fff':'var(--yellow)',
+              background: status==='deployed'?'rgba(52,168,83,.12)':status==='failed'||status==='error'?'rgba(234,67,53,.12)':status==='working'?'rgba(255,255,255,.1)':'rgba(251,188,4,.12)',
+              borderRadius: 4, padding: '1px 5px', marginRight: 2, flexShrink: 0,
+              border: `1px solid ${status==='deployed'?'rgba(52,168,83,.25)':status==='failed'||status==='error'?'rgba(234,67,53,.25)':'transparent'}`,
+              fontFamily: 'var(--font-mono)',
+            }}>
+              {status==='deployed'?'LIVE':status==='failed'?'FAILED':status==='error'?'ERROR':status==='working'?'RUNNING':'PENDING'}
+            </span>
+          )}
           {/* Connection count badge */}
           {edgeCount > 0 && (
             <span title={`${edgeCount} connection(s)`} style={{
-              fontSize: 9, fontWeight: 700, color: 'var(--text2)',
-              background: 'var(--bg3)', borderRadius: 99,
-              padding: '1px 5px', marginRight: 4, flexShrink: 0,
+              fontSize: 8, fontWeight: 700, color: 'var(--text2)',
+              background: 'var(--bg3)', borderRadius: 4,
+              padding: '1px 5px', marginRight: 3, flexShrink: 0,
+              fontFamily: 'var(--font-mono)',
             }}>
               {edgeCount}
             </span>
@@ -850,7 +1482,7 @@ const GCPEdge = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targe
       {selected && (
         <foreignObject x={labelX - 60} y={labelY - (label ? 30 : 14)} width={120} height={28} style={{ overflow: 'visible', zIndex: 50 }}>
           <div style={{ display: 'flex', gap: 3, justifyContent: 'center' }}>
-            {['step', 'bezier','straight'].map(t => (
+            {['bezier','step','straight'].map(t => (
               <button key={t} onClick={() => setEdges(eds => eds.map(e => e.id===id ? {...e, data:{...e.data, edgeType:t}} : e))}
                 style={{ padding:'2px 5px', borderRadius:4, border:'1px solid var(--border)', background: edgeType===t?'var(--accent)':'var(--bg1)', color: edgeType===t?'#fff':'var(--text1)', fontSize:8, fontFamily:'var(--font-mono)', cursor:'pointer' }}>
                 {t[0].toUpperCase()}
@@ -956,15 +1588,15 @@ const CategoryList = ({ filteredTypes }) => {
               <div
                 key={schema.type}
                 className="node-item"
-                style={{ marginLeft: 8, marginBottom: 3 }}
+                style={{ marginLeft: 8, marginBottom: 2, '--item-color': schema.color }}
                 draggable
                 onDragStart={e => e.dataTransfer.setData('application/vco-node', schema.type)}
               >
-                <div className="node-icon" style={{ background: schema.color + '22', color: schema.color, width: 28, height: 28 }}>
-                  <GCPIcon nodeType={schema.type} fallbackIcon={schema.icon} color={schema.color} size={14} />
+                <div className="node-icon" style={{ background: schema.color + '18', color: schema.color, width: 26, height: 26, border: `1px solid ${schema.color}28` }}>
+                  <GCPIcon nodeType={schema.type} fallbackIcon={schema.icon} color={schema.color} size={13} />
                 </div>
                 <div className="node-info">
-                  <div className="node-name">{schema.label}</div>
+                  <div className="node-name" style={{ fontSize:11 }}>{schema.label}</div>
                   <div className="node-desc">{schema.description}</div>
                 </div>
               </div>
@@ -1358,14 +1990,22 @@ const LogPanel = ({ logs, visible, onToggle }) => {
   return (
     <div className={`log-panel ${visible ? '' : 'hidden'}`}>
       <div className="log-header">
-        <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)', boxShadow: '0 0 6px var(--green)', flexShrink: 0 }} />
-        <div className="log-title">Deploy Log</div>
-        <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 10, color: 'var(--text2)', fontFamily: 'var(--font-mono)' }}>
-          {logs.length} entries
+        <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+          <div style={{ width:5, height:5, borderRadius:'50%', background:'var(--green)', boxShadow:'0 0 5px var(--green)' }} />
+          <div style={{ width:5, height:5, borderRadius:'50%', background:'var(--yellow)' }} />
+          <div style={{ width:5, height:5, borderRadius:'50%', background:'var(--red)' }} />
+        </div>
+        <div className="log-title" style={{ marginLeft:6 }}>
+          <span style={{ color:'var(--accent)' }}>$</span> deploy.log
+        </div>
+        <div style={{ flex:1 }}/>
+        <span style={{ fontSize:9, color:'var(--text2)', fontFamily:'var(--font-mono)', background:'var(--bg2)', padding:'1px 6px', borderRadius:4, border:'1px solid var(--border)' }}>
+          {logs.length} lines
         </span>
-        <button className="btn btn-ghost" style={{ padding: '2px 8px', fontSize: 10, marginLeft: 8 }} onClick={onToggle}>
-          {visible ? '▼' : '▲'}
+        <button style={{ background:'none', border:'none', color:'var(--text2)', cursor:'pointer', padding:'2px 6px', borderRadius:4, fontSize:11, marginLeft:4, transition:'all .12s' }}
+          onMouseEnter={e=>e.target.style.color='var(--text0)'} onMouseLeave={e=>e.target.style.color='var(--text2)'}
+          onClick={onToggle}>
+          {visible ? '⌄' : '⌃'}
         </button>
       </div>
       {visible && (
@@ -1375,26 +2015,18 @@ const LogPanel = ({ logs, visible, onToggle }) => {
           )}
           {logs.map((l, i) => {
             const cfg = levelConfig[l.level] || levelConfig.info;
+            const isLast = i === logs.length - 1;
             return (
               <div key={i} style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '3px 8px', borderRadius: 6,
-                background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)',
-                marginBottom: 1,
+                display:'flex', alignItems:'baseline', gap:0,
+                padding:'1px 14px',
+                borderLeft: isLast ? `2px solid ${cfg.color}` : '2px solid transparent',
               }}>
-                {/* timestamp */}
-                <span style={{ fontSize: 10, color: 'var(--text2)', fontFamily: 'var(--font-mono)', flexShrink: 0, minWidth: 70 }}>{l.ts}</span>
-                {/* level badge */}
-                <span style={{
-                  fontSize: 9, fontWeight: 700, letterSpacing: '.06em',
-                  padding: '1px 6px', borderRadius: 99,
-                  background: cfg.bg, color: cfg.color,
-                  minWidth: 32, textAlign: 'center', flexShrink: 0,
-                }}>
-                  {cfg.label}
+                <span style={{ fontSize:10, color:'var(--text2)', fontFamily:'var(--font-mono)', flexShrink:0, minWidth:68 }}>{l.ts}</span>
+                <span style={{ fontSize:9, fontWeight:700, letterSpacing:'.05em', padding:'0 6px', color:cfg.color, minWidth:36, textAlign:'right', flexShrink:0 }}>
+                  [{cfg.label}]
                 </span>
-                {/* message */}
-                <span style={{ fontSize: 11, color: cfg.color, fontFamily: 'var(--font-mono)', flex: 1 }}>{l.msg}</span>
+                <span style={{ fontSize:10.5, color:cfg.color, fontFamily:'var(--font-mono)', flex:1, opacity: i === logs.length-1 ? 1 : .85 }}>{l.msg}</span>
               </div>
             );
           })}
@@ -1540,21 +2172,22 @@ function VCOApp() {
 
   const closeCtxMenu = useCallback(() => setCtxMenu(null), []);
 
-  // Load node types AND saved state in sequence — avoids all race conditions
+  // Load node types from backend (falls back to defaults)
   useEffect(() => {
-    (async () => {
-      try {
-        // 1. First get the node schemas
-        const typesRes = await fetch('http://localhost:8000/api/node-types');
-        const typesData = await typesRes.json();
-        if (typesData?.length) setNodeTypesData(typesData);
+    fetch('http://localhost:8000/api/node-types')
+      .then(r => r.json())
+      .then(data => { if (data?.length) setNodeTypesData(data); })
+      .catch(() => {});
+  }, []);
 
-        // 2. Then get the saved graph (schemas are now available in typesData)
-        const stateRes = await fetch('http://localhost:8000/api/state');
-        const state = await stateRes.json();
-        if (!state?.nodes?.length) { graphLoadedRef.current = true; return; }
-
-        const schemaSource = typesData?.length ? typesData : [];
+  // Restore saved graph on startup
+  useEffect(() => {
+    fetch('http://localhost:8000/api/state')
+      .then(r => r.json())
+      .then(state => {
+        if (!state?.nodes?.length) return;
+        // nodeTypesData may not be loaded yet — use DEFAULT as fallback for schema lookup
+        const schemaSource = nodeTypesData.length ? nodeTypesData : DEFAULT_NODE_TYPES_DATA;
         const restored = state.nodes.map(n => {
           const schema = schemaSource.find(s => s.type === n.type);
           return {
@@ -1564,6 +2197,7 @@ function VCOApp() {
             data: {
               label: n.label,
               schema,
+              // Preserve any saved status — failed/error stays red on reload
               status: n.status || (n.deployed ? 'deployed' : 'idle'),
               props: n.props || {},
             },
@@ -1581,15 +2215,11 @@ function VCOApp() {
         }));
         setNodes(restored);
         setEdges(restoredEdges);
-        graphLoadedRef.current = true;
         addLog(`Restored ${restored.length} node(s) from saved state`, 'info');
-      } catch (e) {
-        graphLoadedRef.current = true; // allow saves even if restore fails
-        addLog(`Failed to load saved state: ${e.message}`, 'warn');
-      }
-    })();
+      })
+      .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // run once on mount
 
   // WebSocket connection
   useEffect(() => {
@@ -1606,44 +2236,6 @@ function VCOApp() {
     return () => wsRef.current?.close();
   }, []);
 
-  // Keep edges in a ref so autoSave always reads the latest value
-  const edgesRef = useRef(edges);
-  useEffect(() => { edgesRef.current = edges; }, [edges]);
-
-  // autoSaveAfterDeploy — defined BEFORE handleWsMessage so it's in scope
-  const autoSaveAfterDeploy = useCallback(async () => {
-    const currentNodes = nodesRef.current;
-    const currentEdges = edgesRef.current;
-    const payload = {
-      nodes: currentNodes.map(n => ({
-        id: n.id,
-        type: n.data.schema?.type,
-        label: n.data.label,
-        props: n.data.props || {},
-        position: n.position,
-        status: n.data.status || 'idle',
-      })),
-      edges: currentEdges.map(e => ({
-        id: e.id,
-        source: e.source,
-        sourceHandle: e.sourceHandle,
-        target: e.target,
-        targetHandle: e.targetHandle,
-        color: e.data?.color || null,
-      })),
-    };
-    try {
-      await fetch('http://localhost:8000/api/graph', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
-      });
-      addLog('State auto-saved after deploy', 'ok');
-    } catch { /* silent */ }
-  }, []);
-
-  // Use a ref so handleWsMessage always calls the latest autoSaveAfterDeploy
-  const autoSaveRef = useRef(autoSaveAfterDeploy);
-  useEffect(() => { autoSaveRef.current = autoSaveAfterDeploy; }, [autoSaveAfterDeploy]);
-
   const handleWsMessage = useCallback((msg) => {
     // Typed log line sent by the server
     if (msg.event === 'log') {
@@ -1651,43 +2243,36 @@ function VCOApp() {
     }
 
     if (msg.event === 'node_status') {
-      const newStatus = msg.status;
-      const action = msg.action;
-      setNodes(nds => {
-        const updated = nds.map(n => {
-          if (n.id !== msg.node_id) return n;
-          if (action === 'unchanged' && (n.data.status === 'failed' || n.data.status === 'error')) {
-            return n;
-          }
-          return { ...n, data: { ...n.data, status: newStatus } };
-        });
-        nodesRef.current = updated; // sync immediately, don't wait for useEffect
-        return updated;
-      });
+      const newStatus = msg.status; // 'deployed' | 'destroyed' | 'failed' | 'error'
+      const action = msg.action;    // 'create' | 'update' | 'destroy' | 'unchanged'
+      setNodes(nds => nds.map(n => {
+        if (n.id !== msg.node_id) return n;
+        // Don't overwrite a real failure with "deployed" for unchanged nodes —
+        // the server marks unchanged nodes as deployed, but if this node previously
+        // failed it should stay failed until the user explicitly re-deploys it.
+        if (action === 'unchanged' && (n.data.status === 'failed' || n.data.status === 'error')) {
+          return n;
+        }
+        return { ...n, data: { ...n.data, status: newStatus } };
+      }));
     }
 
     if (msg.event === 'node_working') {
-      setNodes(nds => {
-        const updated = nds.map(n =>
-          n.id === msg.node_id ? { ...n, data: { ...n.data, status: 'working' } } : n
-        );
-        nodesRef.current = updated;
-        return updated;
-      });
+      setNodes(nds => nds.map(n =>
+        n.id === msg.node_id ? { ...n, data: { ...n.data, status: 'working' } } : n
+      ));
     }
 
     if (msg.event === 'deploy_started') {
+      // Mark only the nodes that will be touched as 'deploying'
+      // The server tells us which IDs will change
       const touchedIds = new Set(msg.touched_ids || []);
-      setNodes(nds => {
-        const updated = nds.map(n => {
-          if (touchedIds.size === 0 || touchedIds.has(n.id)) {
-            return { ...n, data: { ...n.data, status: 'deploying' } };
-          }
-          return n;
-        });
-        nodesRef.current = updated;
-        return updated;
-      });
+      setNodes(nds => nds.map(n => {
+        if (touchedIds.size === 0 || touchedIds.has(n.id)) {
+          return { ...n, data: { ...n.data, status: 'deploying' } };
+        }
+        return n;
+      }));
       addLog(
         `Deploy started — ${msg.create} create / ${msg.update} update / ${msg.destroy} destroy`,
         'info'
@@ -1703,13 +2288,35 @@ function VCOApp() {
         addLog(`Deploy complete — ${msg.changed} resource(s) changed`, 'ok');
         showToast('Deployment complete!', 'success');
       }
-      // 600ms gives React time to flush all WS-triggered setNodes before we read nodesRef
-      setTimeout(() => autoSaveRef.current(), 600);
+      // Auto-save after deploy so statuses (including failed) persist on reload
+      setTimeout(() => autoSaveAfterDeploy(), 400);
     }
 
     if (msg.event === 'graph_saved') {
       addLog(`Graph saved (${msg.node_count} nodes)`, 'ok');
     }
+  }, []);
+
+  const autoSaveAfterDeploy = useCallback(async () => {
+    // Uses nodesRef so it gets the latest node statuses after WS updates
+    const currentNodes = nodesRef.current;
+    const payload = {
+      nodes: currentNodes.map(n => ({
+        id: n.id,
+        type: n.data.schema?.type,
+        label: n.data.label,
+        props: n.data.props || {},
+        position: n.position,
+        status: n.data.status || 'idle',
+      })),
+      edges: [],
+    };
+    try {
+      await fetch('http://localhost:8000/api/graph', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      });
+      addLog('State auto-saved after deploy', 'ok');
+    } catch { /* silent */ }
   }, []);
 
   const openNodeLogs = useCallback((nodeId, label) => {
@@ -1918,18 +2525,9 @@ function VCOApp() {
     }
   };
 
-  // Track whether initial graph load is complete
-  const graphLoadedRef = useRef(false);
-
   // Save — include position so we can restore the canvas layout
   const handleSave = async () => {
     const currentNodes = nodesRef.current;
-    // Guard: don't overwrite saved state before initial load completes
-    if (!graphLoadedRef.current && currentNodes.length === 0) {
-      showToast('Still loading — try again in a moment', 'warn');
-      return;
-    }
-    const currentEdges = edgesRef.current;
     const payload = {
       nodes: currentNodes.map(n => ({
         id: n.id,
@@ -1939,7 +2537,7 @@ function VCOApp() {
         position: n.position,
         status: n.data.status || 'idle',
       })),
-      edges: currentEdges.map(e => ({
+      edges: edges.map(e => ({
         id: e.id,
         source: e.source,
         sourceHandle: e.sourceHandle,
@@ -1962,16 +2560,9 @@ function VCOApp() {
     }
   };
 
-  const handleClear = async () => {
+  const handleClear = () => {
     setNodes([]); setEdges([]); setSelectedNode(null);
     addLog('Canvas cleared', 'warn');
-    // Persist the empty state so reload doesn't bring back deleted nodes
-    try {
-      await fetch('http://localhost:8000/api/graph', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodes: [], edges: [] }),
-      });
-    } catch { /* silent */ }
   };
 
   const filteredTypes = useMemo(() =>
@@ -2069,108 +2660,94 @@ function VCOApp() {
       <div className="canvas-wrap" ref={reactFlowWrapper} onClick={() => { closeCtxMenu(); setMenuOpen(false); }}>
         {/* Topbar */}
         <div className="topbar">
-          <div className="topbar-menu">
-            <button
-              id="topbar-menu-button"
-              className="topbar-menu-button"
-              onClick={e => {
-                e.stopPropagation();
-                setMenuOpen(open => !open);
-              }}
-              type="button"
-            >
-              ☰ Menu
-            </button>
-            {menuOpen && (
-              <div id="topbar-menu-panel" className="topbar-menu-panel" onClick={e => e.stopPropagation()}>
-                <div className="topbar-menu-item" onClick={() => { fitView(); setMenuOpen(false); }}>
-                  <span>Center View</span>
-                  <span style={{ color: 'var(--text2)' }}>focus</span>
-                </div>
-                <div className="topbar-menu-item" onClick={() => { handleSave(); setMenuOpen(false); }}>
-                  <span>Save Graph</span>
-                  <span style={{ color: 'var(--text2)' }}>yaml/json</span>
-                </div>
-                <div className="topbar-menu-item" onClick={() => { handleDeploy(); setMenuOpen(false); }}>
-                  <span>Deploy</span>
-                  <span style={{ color: 'var(--text2)' }}>run</span>
-                </div>
-                <div className="topbar-menu-item" onClick={() => { handleClear(); setMenuOpen(false); }}>
-                  <span>Clear Canvas</span>
-                  <span style={{ color: 'var(--text2)' }}>reset</span>
-                </div>
-                <div className="topbar-menu-divider" />
-                <div className="topbar-menu-item" onClick={() => { setInfoModal('guide'); setMenuOpen(false); }}>
-                  <span>Guide</span>
-                  <span style={{ color: 'var(--text2)' }}>help</span>
-                </div>
-                <div className="topbar-menu-item" onClick={() => { setInfoModal('contact'); setMenuOpen(false); }}>
-                  <span>Contact</span>
-                  <span style={{ color: 'var(--text2)' }}>about</span>
-                </div>
-                <div className="topbar-menu-divider" />
-                <div className="topbar-menu-item" onClick={() => { setTheme(t => t === 'dark' ? 'light' : 'dark'); setMenuOpen(false); }}>
-                  <span>Toggle Theme</span>
-                  <span style={{ color: 'var(--text2)' }}>{theme === 'dark' ? 'Light' : 'Dark'}</span>
-                </div>
-              </div>
-            )}
+          {/* Logo — fixed width matches sidebar */}
+          <div className="logo">
+            <div className="logo-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
+              </svg>
+            </div>
+            <div className="logo-text">
+              <div className="logo-title">Cloud Orchestrator</div>
+              <div className="logo-sub">visual infrastructure · gcp</div>
+            </div>
           </div>
-          <div style={{ width: 260 }} />
+
+          {/* Breadcrumb */}
+          <div className="topbar-breadcrumb" style={{ marginLeft: 16 }}>
+            <span>Projects</span>
+            <span className="topbar-breadcrumb-sep">›</span>
+            <span>my-project</span>
+            <span className="topbar-breadcrumb-sep">›</span>
+            <span className="topbar-breadcrumb-active">Infrastructure</span>
+          </div>
+
           <div className="topbar-spacer"/>
 
           {/* Edge type selector */}
-          <div style={{ display: 'flex', gap: 2, background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 'var(--r8)', padding: 3 }}>
-            {['step', 'bezier','straight'].map(t => (
+          <div style={{ display:'flex', gap:2, background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:'var(--r8)', padding:3, marginRight:4 }}>
+            {[['bezier','~'],['step','⌐'],['straight','—']].map(([t,sym]) => (
               <button key={t} onClick={() => setDefaultEdgeType(t)}
-                style={{ padding: '3px 8px', borderRadius: 6, border: 'none', background: defaultEdgeType===t ? 'var(--accent)' : 'transparent', color: defaultEdgeType===t ? '#fff' : 'var(--text1)', fontSize: 10, fontFamily: 'var(--font-mono)', cursor: 'pointer', transition: 'all .12s' }}>
-                {t[0].toUpperCase()+t.slice(1)}
+                style={{ padding:'3px 8px', borderRadius:6, border:'none',
+                  background: defaultEdgeType===t ? 'var(--accent)' : 'transparent',
+                  color: defaultEdgeType===t ? '#fff' : 'var(--text1)',
+                  fontSize:10, fontFamily:'var(--font-mono)', cursor:'pointer', transition:'all .12s' }}
+                title={`Edge style: ${t}`}>
+                {sym}
               </button>
             ))}
           </div>
 
-          {/* WS status */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 6, height: 6, borderRadius: '50%', background: wsConnected ? 'var(--green)' : 'var(--text2)', boxShadow: wsConnected ? '0 0 6px var(--green)' : 'none' }} />
-            <span style={{ fontSize: 10, color: wsConnected ? 'var(--green)' : 'var(--text2)' }}>
-              {wsConnected ? 'live' : 'offline'}
-            </span>
+          {/* Stats pill */}
+          <div style={{ display:'flex', alignItems:'center', gap:10, padding:'0 12px', height:32, background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:'var(--r8)', fontSize:10, fontFamily:'var(--font-mono)', color:'var(--text2)', marginRight:4 }}>
+            <span title="Nodes"><span style={{ color:'var(--text0)', fontWeight:600 }}>{nodes.length}</span> nodes</span>
+            <span style={{ color:'var(--border2)' }}>|</span>
+            <span title="Edges"><span style={{ color:'var(--text0)', fontWeight:600 }}>{edges.length}</span> edges</span>
           </div>
-          <button className="btn btn-ghost" onClick={() => setInfoModal('contact')} title="מידע ויצירת קשר">
-          {/* info icon */}
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-            Info
+
+          {/* WS status pill */}
+          <div className={`ws-pill${wsConnected ? ' connected' : ''}`} style={{ marginRight:4 }}>
+            <div className="ws-dot"/>
+            {wsConnected ? 'connected' : 'offline'}
+          </div>
+
+          <div className="topbar-divider"/>
+
+          {/* Action buttons */}
+          <button className="btn-icon" onClick={() => setLogVisible(v => !v)} title="Toggle deploy log" style={ logVisible ? { background:'var(--accent-glow)', color:'var(--accent)', borderColor:'var(--accent)44' } : {}}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
           </button>
-          <button className="btn btn-ghost" onClick={() => setInfoModal('guide')} title="System Guide">
-            {/* book icon */}
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-            Guide
+          <button className="btn-icon" onClick={() => setInfoModal('guide')} title="Guide">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
           </button>
-          <button className="btn btn-ghost" onClick={handleClear}>{ICONS.trash} Clear</button>
-          <button className="btn btn-ghost" onClick={handleSave}>{ICONS.save} Save</button>
-          <button className="btn btn-deploy" onClick={handleDeploy} disabled={isDeploying}>
-            {ICONS.play} {isDeploying ? 'Deploying...' : 'Deploy'}
-          </button>
-          <button className="btn btn-ghost" onClick={() => setLogVisible(v => !v)} style={{ marginLeft: 4 }}>
-            {ICONS.terminal} Log
+          <button className="btn-icon" onClick={() => setTheme(t => t==='dark'?'light':'dark')} title="Toggle theme">
+            {theme==='dark'
+              ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>
+              : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            }
           </button>
 
-          {/* Theme toggle */}
-          <button
-            onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 99, border: '1px solid var(--border2)', background: 'var(--bg2)', color: 'var(--text1)', cursor: 'pointer', fontSize: 11, fontFamily: 'var(--font-mono)', transition: 'all .15s' }}
-            title="Toggle light/dark mode"
-          >
-            {theme === 'dark'
-              ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-              : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <div className="topbar-divider"/>
+
+          <button className="btn btn-ghost" onClick={handleClear} style={{ gap:5 }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            Clear
+          </button>
+          <button className="btn btn-ghost" onClick={handleSave} style={{ gap:5 }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Save
+          </button>
+          <button className="btn btn-deploy" onClick={handleDeploy} disabled={isDeploying} style={{ minWidth:90, position:'relative', overflow:'hidden' }}>
+            {isDeploying
+              ? <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation:'spin .8s linear infinite' }}><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Deploying</>
+              : <><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Deploy</>
             }
-            {theme === 'dark' ? 'Light' : 'Dark'}
+            {isDeploying && <div className="deploy-progress"/>}
           </button>
         </div>
 
         {/* ReactFlow Canvas */}
-        <div style={{ position: 'absolute', inset: 0, top: 48, bottom: logVisible ? 160 : 0 }}>
+        <div style={{ position:'absolute', inset:0, top:52, bottom:logVisible?172:0 }}>
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -2199,12 +2776,17 @@ function VCOApp() {
 
           {/* Empty state */}
           {nodes.length === 0 && (
-            <div className="empty-canvas" style={{ pointerEvents: 'none' }}>
-              <div className="empty-title">Drop nodes to start</div>
-              <div className="empty-sub">
-                Drag resources from the sidebar<br/>
-                Connect ports to define relationships<br/>
-                Hit Deploy to provision on GCP
+            <div className="empty-canvas" style={{ pointerEvents:'none' }}>
+              <div style={{ marginBottom:20, opacity:.15 }}>
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
+                </svg>
+              </div>
+              <div className="empty-title">No resources defined</div>
+              <div className="empty-sub" style={{ fontFamily:'var(--font-mono)' }}>
+                <span style={{ color:'var(--accent)' }}>→</span> Drag resources from the sidebar<br/>
+                <span style={{ color:'var(--accent)' }}>→</span> Connect ports to define relationships<br/>
+                <span style={{ color:'var(--green)' }}>→</span> Hit <strong style={{ color:'var(--green)' }}>Deploy</strong> to provision on GCP
               </div>
             </div>
           )}
@@ -2260,23 +2842,8 @@ function VCOApp() {
             </div>
             <div className="ctx-item sep" />
             <div className="ctx-item danger" onClick={() => {
-              const deletedId = ctxMenu.nodeId;
-              deleteElements({ nodes: [{ id: deletedId }] });
+              deleteElements({ nodes: [{ id: ctxMenu.nodeId }] });
               closeCtxMenu();
-              // Auto-save so deletion persists on reload
-              setTimeout(async () => {
-                const currentNodes = nodesRef.current.filter(n => n.id !== deletedId);
-                const currentEdges = edgesRef.current.filter(e => e.source !== deletedId && e.target !== deletedId);
-                try {
-                  await fetch('http://localhost:8000/api/graph', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      nodes: currentNodes.map(n => ({ id: n.id, type: n.data.schema?.type, label: n.data.label, props: n.data.props || {}, position: n.position, status: n.data.status || 'idle' })),
-                      edges: currentEdges.map(e => ({ id: e.id, source: e.source, sourceHandle: e.sourceHandle, target: e.target, targetHandle: e.targetHandle, color: e.data?.color || null })),
-                    }),
-                  });
-                } catch { /* silent */ }
-              }, 100);
             }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
               Delete Node

@@ -1,30 +1,15 @@
 node_ids:
-- SubscriptionNode-1776425631293
-- PubsubNode-1776424902689
-- SubscriptionNode-1776545847838
-- SubscriptionNode-1776545846086
-- PubsubNode-1776424884408
-- VirtualPrivateCloudNode-1776426008375
-- GroupBox-1776424953787
-- GroupBox-1776424882597
-- PubsubNode-1776425404630
-- CloudRunNode-1776425409526
-- ServiceAccountNode-1776425652557
-- GCSBucketNode-1776425587997
-- PubsubNode-1776545832001
-- CloudRunNode-1776424932033
+- CloudRunNode-1776604537206
+- PubsubTopicNode-1776604543940
+- CloudRunNode-1776604530728
+- PubsubPullSubscriptionNode-1776604552774
+- PubsubPushSubscriptionNode-1776604613549
+- CloudRunNode-1776604605003
 node_props:
-  CloudRunNode-1776424932033: {}
-  CloudRunNode-1776425409526: {}
-  GCSBucketNode-1776425587997: {}
-  GroupBox-1776424882597: {}
-  GroupBox-1776424953787: {}
-  PubsubNode-1776424884408: {}
-  PubsubNode-1776424902689: {}
-  PubsubNode-1776425404630: {}
-  PubsubNode-1776545832001: {}
-  ServiceAccountNode-1776425652557: {}
-  SubscriptionNode-1776425631293: {}
-  SubscriptionNode-1776545846086: {}
-  SubscriptionNode-1776545847838: {}
-  VirtualPrivateCloudNode-1776426008375: {}
+  CloudRunNode-1776604530728: {}
+  CloudRunNode-1776604537206: {}
+  CloudRunNode-1776604605003:
+    service_url: ''
+  PubsubPullSubscriptionNode-1776604552774: {}
+  PubsubPushSubscriptionNode-1776604613549: {}
+  PubsubTopicNode-1776604543940: {}

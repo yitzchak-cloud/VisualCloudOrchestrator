@@ -5,6 +5,7 @@ Run: uvicorn main:app --reload --port 8000
 from __future__ import annotations
 
 import asyncio
+import datetime
 import json
 import uuid
 from pathlib import Path
@@ -13,24 +14,46 @@ from typing import Any
 import yaml
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
-from nodes import (
-    CloudRunNode, CloudSQLNode, PubsubNode,
-    GCSBucketNode, ServiceAccountNode, VirtualPrivateCloudNode, SecretManagerNode,
-    SubscriptionNode, GroupBoxNode
-)
+# from nodes import (
+#     CloudRunNode, CloudSQLNode, PubsubNode,
+#     GCSBucketNode, ServiceAccountNode, VirtualPrivateCloudNode, SecretManagerNode,
+#     SubscriptionNode, GroupBoxNode, SchemaNode
+# )
 
-# ── Registry ──────────────────────────────────────────────────────────────────
+# # ── Registry ──────────────────────────────────────────────────────────────────
 
-NODE_REGISTRY: dict[str, type] = {
-    cls.__name__: cls for cls in [
-        CloudRunNode, CloudSQLNode, PubsubNode,
-        GCSBucketNode, ServiceAccountNode, VirtualPrivateCloudNode, SecretManagerNode, SubscriptionNode,
-        GroupBoxNode
-    ]
-}
+# NODE_REGISTRY: dict[str, type] = {
+#     cls.__name__: cls for cls in [
+#         CloudRunNode, CloudSQLNode, PubsubNode,
+#         GCSBucketNode, ServiceAccountNode, VirtualPrivateCloudNode, SecretManagerNode, SubscriptionNode,
+#         GroupBoxNode, SchemaNode
+#     ]
+# }
+
+import importlib
+import pkgutil
+import inspect
+import nodes  # התיקייה שבה נמצאים כל קבצי ה-Nodes שלך
+from base_node import GCPNode
+
+def discover_nodes() -> dict[str, type]:
+    registry = {}
+    
+    for loader, module_name, is_pkg in pkgutil.walk_packages(nodes.__path__, nodes.__name__ + "."):
+        module = importlib.import_module(module_name)
+        
+        for name, obj in inspect.getmembers(module):
+            if inspect.isclass(obj) and issubclass(obj, GCPNode) and obj is not GCPNode:
+                registry[obj.__name__] = obj
+                
+    return registry
+
+
+NODE_REGISTRY = discover_nodes()
+print(f"Loaded {len(NODE_REGISTRY)} nodes: {list(NODE_REGISTRY.keys())}")
 
 STATE_FILE = Path("state/desired.yaml")
 ACTUAL_FILE = Path("state/actual.yaml")
@@ -96,13 +119,21 @@ def validate_edge(body: EdgeValidation):
     return {"valid": valid, "reason": None if valid else f"Cannot connect {body.source_type} → {body.target_type}"}
 
 
+# @app.get("/api/state")
+# def get_state():
+#     """Return current desired state YAML as JSON."""
+#     if STATE_FILE.exists():
+#         with open(STATE_FILE) as f:
+#             return yaml.safe_load(f) or {}
+#     return {}
+
 @app.get("/api/state")
 def get_state():
-    """Return current desired state YAML as JSON."""
     if STATE_FILE.exists():
         with open(STATE_FILE) as f:
-            return yaml.safe_load(f) or {}
-    return {}
+            data = yaml.safe_load(f) or {}
+            return {"nodes": data.get("nodes", []), "edges": data.get("edges", [])}
+    return {"nodes": [], "edges": []}
 
 
 @app.post("/api/graph")
@@ -125,6 +156,7 @@ async def save_graph(payload: GraphPayload):
     with open(STATE_FILE, "w") as f:
         yaml.dump(state, f, default_flow_style=False, allow_unicode=True)
 
+    
     await manager.broadcast({"event": "graph_saved", "node_count": len(payload.nodes)})
     return {"status": "saved"}
 
@@ -146,16 +178,27 @@ def _save_actual(state: dict):
 async def _log(msg: str, level: str = "info"):
     """Broadcast a log line with level so the UI can colour it."""
     await manager.broadcast({"event": "log", "msg": msg, "level": level})
+    
 
+@app.get("/api/logs/{node_id}")
+async def stream_logs(node_id: str):
+    async def generate():
+        print(f"Client connected to logs of {node_id}")
+        # כאן תחבר ל־GCP Logging API (google-cloud-logging)
+        # לסימולציה:
+        while True:
+            yield f"data: [INFO] {node_id}: heartbeat at {datetime.datetime.now()}\n\n"
+            await asyncio.sleep(2)
+    return StreamingResponse(generate(), media_type="text/event-stream")
 
 @app.post("/api/deploy")
 async def deploy(payload: GraphPayload):
     """
     Diff-based deployment simulation.
     Compares desired graph against actual.yaml to determine:
-      - new nodes   → deploy
-      - changed nodes → update
-      - removed nodes → destroy
+        - new nodes     → deploy
+        - changed nodes → update
+        - removed nodes → destroy
     Sends typed WebSocket events so the UI can colour each log line.
     """
     desired_ids: set[str] = {n["id"] for n in payload.nodes}
@@ -166,7 +209,7 @@ async def deploy(payload: GraphPayload):
 
     to_create  = [n for n in payload.nodes if n["id"] not in actual_ids]
     to_update  = [n for n in payload.nodes if n["id"] in actual_ids
-                  and actual_props.get(n["id"]) != n.get("props", {})]
+                and actual_props.get(n["id"]) != n.get("props", {})]
     to_destroy = [nid for nid in actual_ids if nid not in desired_ids]
 
     total = len(to_create) + len(to_update) + len(to_destroy)
@@ -215,14 +258,26 @@ async def deploy(payload: GraphPayload):
     # ── CREATE new nodes ───────────────────────────────────────────────────
     for node in to_create:
         index += 1
-        await asyncio.sleep(0.8)
-        label = node.get("label") or node["id"]
-        await _log(f"[{index}/{total}] {label} → deployed", "ok")
+        
         await manager.broadcast({
-            "event": "node_status", "node_id": node["id"],
-            "status": "deployed", "action": "create",
+            "event": "node_working", "node_id": node["id"],
             "index": index, "total": total,
         })
+        
+        await asyncio.sleep(0.8)
+        label = node.get("label") or node["id"]
+        import random
+        if random.random() < 0.30:
+            await _log(f"[{index}/{total}] {label} → FAILED", "error")
+            await manager.broadcast({"event": "node_status", "node_id": node["id"], "status": "failed", "action": "create",
+                "index": index, "total": total,})
+        else:
+            await _log(f"[{index}/{total}] {label} → deployed", "ok")
+            await manager.broadcast({
+                "event": "node_status", "node_id": node["id"],
+                "status": "deployed", "action": "create",
+                "index": index, "total": total,
+            })
 
     # ── Persist new actual state ───────────────────────────────────────────
     _save_actual({

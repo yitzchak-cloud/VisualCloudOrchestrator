@@ -9,6 +9,8 @@ class PortType(Enum):
     TOPIC               = "topic"
     DATABASE            = "database"
     SUBSCRIPTION        = "subscription"
+    SCHEMA              = "schema"
+    MESSAGE             = "message"
 
 
 PORT_META: dict[str, dict] = {
@@ -19,4 +21,6 @@ PORT_META: dict[str, dict] = {
     PortType.TOPIC.value:           {"color": "#60a5fa", "label": "Topic"},
     PortType.SUBSCRIPTION.value:    {"color": "#1523bd", "label": "Sub"},
     PortType.DATABASE.value:        {"color": "#fb923c", "label": "DB"},
+    PortType.SCHEMA.value:          {"color": "#8b5cf6", "label": "Schema"},
+    PortType.MESSAGE.value:         {"color": "#ec4899", "label": "Msg"},
 }

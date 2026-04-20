@@ -15,19 +15,33 @@ class CloudRunNode(GCPNode):
     max_instances: int  = 10
     port:          int  = 8080
     env_vars:      dict = field(default_factory=dict)
+    service_url:   str  = ""
+
+    params_schema: ClassVar = [
+        {"key": "image",         "label": "Container Image", "type": "text",   "default": "", "placeholder": "gcr.io/project/image:tag"},
+        {"key": "memory",        "label": "Memory",          "type": "select", "options": ["256Mi","512Mi","1Gi","2Gi","4Gi","8Gi"], "default": "512Mi"},
+        {"key": "cpu",           "label": "CPU",             "type": "select", "options": ["1","2","4","8"], "default": "1"},
+        {"key": "min_instances", "label": "Min Instances",   "type": "number", "default": 0},
+        {"key": "max_instances", "label": "Max Instances",   "type": "number", "default": 10},
+        {"key": "port",          "label": "Port",            "type": "number", "default": 8080},
+        {"key": "port",          "label": "Port",            "type": "number", "default": 8080},
+        {"key": "service_url",   "label": "Service URL",     "type": "text",   "default": "", "placeholder": "https://my-service.run.app"},
+    ]
+    url_field: ClassVar = "service_url"   # ← השדה שמכיל את ה־URL
 
     inputs: ClassVar = [
         Port("service_account", PortType.SERVICE_ACCOUNT, required=True),
-        Port("network",         PortType.NETWORK),
+        # Port("network",         PortType.NETWORK),
         # multi_in=True: multiple secrets can be mounted on the same CR
         Port("secret",          PortType.SECRET, multi=True, multi_in=True),
+        Port("MESSAGE",         PortType.MESSAGE, multi=True, multi_in=True), # אפשר גם לקבל הודעות ישירות מ־Pub/Sub
     ]
     outputs: ClassVar = [
         Port("publishes_to",    PortType.TOPIC,   multi=True),
         Port("writes_to",       PortType.STORAGE, multi=True),
     ]
     node_color:  ClassVar = "#6366f1"
-    icon:        ClassVar = "cloud"
+    icon:        ClassVar = "cloudRun"
     category:    ClassVar = "Compute"
     description: ClassVar = "Serverless container runtime"
 
@@ -50,7 +64,7 @@ class CloudFunctionNode(GCPNode):
         Port("writes_to",       PortType.STORAGE, multi=True),
     ]
     node_color:  ClassVar = "#a78bfa"
-    icon:        ClassVar = "zap"
+    icon:        ClassVar = "cloudFunctions"
     category:    ClassVar = "Compute"
     description: ClassVar = "Event-driven serverless function"
 
@@ -74,7 +88,7 @@ class CloudSQLNode(GCPNode):
         Port("connection",      PortType.DATABASE, multi=True),
     ]
     node_color:  ClassVar = "#f97316"
-    icon:        ClassVar = "database"
+    icon:        ClassVar = "cloudSql"
     category:    ClassVar = "Data"
     description: ClassVar = "Managed relational database"
 
@@ -94,7 +108,7 @@ class BigQueryNode(GCPNode):
         Port("query_out",       PortType.DATABASE, multi=True),
     ]
     node_color:  ClassVar = "#3b82f6"
-    icon:        ClassVar = "table"
+    icon:        ClassVar = "bigquery"
     category:    ClassVar = "Data"
     description: ClassVar = "Serverless data warehouse"
 
@@ -112,7 +126,7 @@ class FirestoreNode(GCPNode):
         Port("document_ref",    PortType.DATABASE, multi=True),
     ]
     node_color:  ClassVar = "#f59e0b"
-    icon:        ClassVar = "layers"
+    icon:        ClassVar = "firestore"
     category:    ClassVar = "Data"
     description: ClassVar = "Serverless NoSQL document DB"
 
@@ -132,48 +146,11 @@ class MemorystoreNode(GCPNode):
         Port("cache_endpoint",  PortType.DATABASE, multi=True),
     ]
     node_color:  ClassVar = "#ef4444"
-    icon:        ClassVar = "zap"
+    icon:        ClassVar = "memorystore"
     category:    ClassVar = "Data"
     description: ClassVar = "Managed Redis / Memcached"
 
 
-# ── Messaging ─────────────────────────────────────────────────────────────────
-
-@dataclass
-class PubsubNode(GCPNode):
-    ack_deadline_seconds:       int = 20
-    message_retention_duration: str = "604800s"
-
-    inputs: ClassVar = [
-        # multi_in=True: many publishers (CR, CF…) can push to the same topic
-        Port("topic_in",        PortType.TOPIC, multi_in=True),
-    ]
-    outputs: ClassVar = [
-        Port("topic_out",       PortType.TOPIC, multi=True),
-    ]
-    node_color:  ClassVar = "#3b82f6"
-    icon:        ClassVar = "radio"
-    category:    ClassVar = "Messaging"
-    description: ClassVar = "Async messaging bus"
-
-
-@dataclass
-class SubscriptionNode(GCPNode):
-    ack_deadline_seconds:  int  = 20
-    retain_acked_messages: bool = False
-    filter_expr:           str  = ""
-    push_endpoint:         str  = ""   # empty = pull subscription
-
-    inputs: ClassVar = [
-        Port("topic",           PortType.TOPIC, required=True),
-    ]
-    outputs: ClassVar = [
-        Port("delivers_to",     PortType.TOPIC, multi=True),
-    ]
-    node_color:  ClassVar = "#ec485b"
-    icon:        ClassVar = "inbox"
-    category:    ClassVar = "Messaging"
-    description: ClassVar = "Pub/Sub topic subscription"
 
 
 # ── Storage ───────────────────────────────────────────────────────────────────
@@ -194,7 +171,7 @@ class GCSBucketNode(GCPNode):
     #     Port("bucket",          PortType.STORAGE, multi=True),
     # ]
     node_color:  ClassVar = "#eab308"
-    icon:        ClassVar = "archive"
+    icon:        ClassVar = "cloudStorage"
     category:    ClassVar = "Storage"
     description: ClassVar = "Object storage bucket"
 
@@ -211,7 +188,7 @@ class ServiceAccountNode(GCPNode):
         Port("identity",        PortType.SERVICE_ACCOUNT, multi=True),
     ]
     node_color:  ClassVar = "#8b5cf6"
-    icon:        ClassVar = "user-check"
+    icon:        ClassVar = "security"
     category:    ClassVar = "Security"
     description: ClassVar = "IAM service identity"
 
@@ -228,7 +205,7 @@ class SecretManagerNode(GCPNode):
         Port("secret_ref",      PortType.SECRET, multi=True),
     ]
     node_color:  ClassVar = "#ec4899"
-    icon:        ClassVar = "key"
+    icon:        ClassVar = "secretManager"
     category:    ClassVar = "Security"
     description: ClassVar = "Encrypted secrets store"
 
@@ -246,21 +223,21 @@ class VirtualPrivateCloudNode(GCPNode):
         Port("subnet",          PortType.NETWORK, multi=True),
     ]
     node_color:  ClassVar = "#10b981"
-    icon:        ClassVar = "network"
+    icon:        ClassVar = "VirtualPrivateCloud"
     category:    ClassVar = "Networking"
     description: ClassVar = "Virtual private network"
 
 
-@dataclass
-class GroupBoxNode(GCPNode):
-    title: str = "Visual Group"
+# @dataclass
+# class GroupBoxNode(GCPNode):
+#     title: str = "Visual Group"
 
-    inputs: ClassVar = []
-    outputs: ClassVar = []
-    node_color:  ClassVar = "#8b5cf6"
-    icon:        ClassVar = "layers"
-    category:    ClassVar = "Grouping"
-    description: ClassVar = "Visual container for grouping nodes on the canvas"
+#     inputs: ClassVar = []
+#     outputs: ClassVar = []
+#     node_color:  ClassVar = "#8b5cf6"
+#     icon:        ClassVar = "layers"
+#     category:    ClassVar = "Grouping"
+#     description: ClassVar = "Visual container for grouping nodes on the canvas"
 
 
 @dataclass
@@ -279,6 +256,6 @@ class LoadBalancerNode(GCPNode):
         Port("frontend_ip",     PortType.NETWORK, multi=True),
     ]
     node_color:  ClassVar = "#06b6d4"
-    icon:        ClassVar = "globe"
-    category:    ClassVar = "Networking"
+    icon:        ClassVar = "cloudLoadBalancing"
+    category:    ClassVar = "LoadBalancer"
     description: ClassVar = "HTTP(S) / TCP / UDP load balancer"
