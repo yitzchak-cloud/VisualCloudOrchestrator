@@ -4,6 +4,11 @@ __pycache__/
 *$py.class
 
 state/
+.pulumi/
+.pulumi-cli/
+.pulumi-home/
+state/pulumi_stack/.pulumi*
+*.exe
 
 # C extensions
 *.so
