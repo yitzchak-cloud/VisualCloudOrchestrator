@@ -22,8 +22,8 @@ import importlib
 import pkgutil
 import inspect
 import nodes
-from base_node import GCPNode
-from pulumi_synth import synthesize_and_deploy, synthesize_only, read_actual_state
+from vco.nodes.base_node import GCPNode
+from vco.pulumi_synth import synthesize_and_deploy, synthesize_only, read_actual_state
 
 def discover_nodes() -> dict[str, type]:
     registry = {}

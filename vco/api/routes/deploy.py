@@ -1,0 +1,130 @@
+"""
+api/routes/deploy.py
+====================
+/api/synth   — preview the deployment plan (no GCP changes)
+/api/deploy  — full Pulumi deploy, streaming progress over WebSocket
+"""
+from __future__ import annotations
+
+import logging
+
+from fastapi import APIRouter
+from fastapi.responses import JSONResponse
+
+from api.models import DeployPayload, SynthPayload
+from core.log_bridge import deploy_log
+from core.state import STACK_DIR
+from core.ws_manager import manager
+from pulumi_synth import synthesize_and_deploy, synthesize_only
+
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/api", tags=["deploy"])
+
+
+# ── Preview ───────────────────────────────────────────────────────────────────
+
+@router.post("/synth")
+async def synth_preview(payload: SynthPayload):
+    """
+    Resolve the graph and compute the deployment order **without** touching GCP.
+
+    Returns:
+        deployment_order : list of node labels in the order they would deploy
+        resolved_graph   : per-node relationship context (topics, subscriptions …)
+    """
+    logger.info(
+        "Synth preview requested: %d nodes, project=%s, region=%s",
+        len(payload.nodes), payload.project, payload.region,
+    )
+    result = await synthesize_only(
+        nodes=payload.nodes,
+        edges=payload.edges,
+        project=payload.project,
+        region=payload.region,
+    )
+    logger.info("Synth preview done: order=%s", result.get("deployment_order"))
+    return result
+
+
+# ── Deploy ────────────────────────────────────────────────────────────────────
+
+@router.post("/deploy")
+async def deploy(payload: DeployPayload):
+    """
+    Deploy all nodes to GCP via the Pulumi Automation API.
+
+    Progress is streamed to connected WebSocket clients in real time.
+    The HTTP response is returned only after the entire run completes.
+
+    Authentication:
+        The server process must have GCP credentials available:
+          - GOOGLE_APPLICATION_CREDENTIALS env var → service-account JSON, OR
+          - gcloud auth application-default login (already run)
+
+    WebSocket events emitted during deploy (in order):
+        deploy_started  → run kicked off
+        node_working    → node is being deployed right now
+        node_status     → node finished (deployed / failed / no_change)
+        log             → raw Pulumi log line
+        deploy_outputs  → live resource URLs / IDs (on success)
+        deploy_complete → run finished
+    """
+    total = len(payload.nodes)
+    logger.info(
+        "Deploy started: %d nodes, project=%s, region=%s, stack=%s",
+        total, payload.project, payload.region, payload.stack,
+    )
+
+    await manager.broadcast_deploy_started(
+        total=total,
+        create=total,   # we don't know create vs update until Pulumi previews
+        update=0,
+        destroy=0,
+        touched_ids=[n["id"] for n in payload.nodes],
+    )
+
+    result = await synthesize_and_deploy(
+        nodes=payload.nodes,
+        edges=payload.edges,
+        project=payload.project,
+        region=payload.region,
+        stack=payload.stack,
+        log=deploy_log,
+        work_dir=str(STACK_DIR),
+    )
+
+    run_status = result.get("status")  # "ok" | "partial" | "error"
+
+    if run_status in ("ok", "partial"):
+        outputs      = result.get("outputs", {})
+        failed_nodes = result.get("failed", [])
+        changed      = total - len(failed_nodes)
+
+        if outputs:
+            await manager.broadcast_deploy_outputs(outputs)
+
+        await manager.broadcast_deploy_complete(changed=changed, failed=len(failed_nodes))
+
+        logger.info(
+            "Deploy finished: status=%s  changed=%d  failed=%d",
+            run_status, changed, len(failed_nodes),
+        )
+        return {"status": run_status, "outputs": outputs, "failed": failed_nodes}
+
+    # ── Hard failure (e.g. DAG cycle, plugin install error) ──────────────────
+    for node in payload.nodes:
+        await manager.broadcast_node_status(node["id"], status="failed")
+    await manager.broadcast_deploy_complete(changed=0, failed=total)
+
+    logger.error(
+        "Deploy failed in phase=%s: %s",
+        result.get("phase"), result.get("output", "")[:200],
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "status": "error",
+            "phase":  result.get("phase"),
+            "detail": result.get("output", ""),
+        },
+    )

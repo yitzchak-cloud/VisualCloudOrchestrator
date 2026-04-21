@@ -68,3 +68,11 @@ python -m http.server 3000
 { "event": "deploy_complete" }
 { "event": "graph_saved", "node_count": 5 }
 ```
+
+
+בעיות שצירכות טיפול
+שיהיה אפשר לראות כמה קבצי desired יש בתיקייה state ו
+להציג את זה בUI
+
+טיפול במצב של מחיקה שימחק גם בענן 
+
