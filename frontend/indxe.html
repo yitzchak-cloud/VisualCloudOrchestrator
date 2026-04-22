@@ -72,7 +72,7 @@ html,body,#root{height:100%;width:100%;overflow:hidden;background:var(--bg0);col
 
 /* ── Layout ── */
 .app{display:flex;height:100vh;width:100vw;overflow:hidden}
-.sidebar{width:260px;min-width:260px;background:var(--bg1);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:10}
+.sidebar{width:260px;min-width:260px;background:var(--bg1);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:10;background: linear-gradient(180deg, var(--bg1) 0%, var(--bg0) 100%)}
 .canvas-wrap{flex:1;position:relative;background:var(--bg0)}
 .panel-right{width:280px;min-width:280px;background:var(--bg1);border-left:1px solid var(--border);display:flex;flex-direction:column;transition:width .2s;z-index:10}
 .panel-right.collapsed{width:0;min-width:0;overflow:hidden}
@@ -365,10 +365,109 @@ html,body,#root{height:100%;width:100%;overflow:hidden;background:var(--bg0);col
 }
 .collapse-btn:hover{color:var(--text0);background:var(--bg3)}
 
-/* ── Category accordion ── */
-.cat-header{transition:background .15s,border-color .15s}
-.cat-header:hover{opacity:.9}
-.node-item.indented{margin-left:8px}
+/* ── Node Edit Modal ── */
+@keyframes modal-in {
+  from { opacity: 0; transform: scale(.96) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.node-edit-modal-overlay {
+  position: fixed; inset: 0; z-index: 2500;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.node-edit-modal {
+  background: var(--bg1);
+  border: 1px solid var(--border2);
+  border-radius: 20px;
+  width: 680px; max-width: 95vw;
+  max-height: 85vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 40px 100px rgba(0,0,0,.85), 0 0 0 1px rgba(255,255,255,0.04);
+  animation: modal-in .18s cubic-bezier(.2,.8,.2,1);
+  overflow: hidden;
+}
+.node-edit-modal-header {
+  padding: 22px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 14px;
+  background: linear-gradient(135deg, var(--bg2) 0%, var(--bg1) 100%);
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+.node-edit-modal-header::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: var(--modal-accent, var(--accent));
+  border-radius: 20px 20px 0 0;
+}
+.node-edit-modal-header::after {
+  content: '';
+  position: absolute; top: -60px; right: -40px;
+  width: 160px; height: 160px; border-radius: 50%;
+  background: var(--modal-accent, var(--accent));
+  opacity: .04;
+  pointer-events: none;
+}
+.node-edit-modal-body {
+  flex: 1; overflow-y: auto; padding: 24px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px;
+}
+.node-edit-modal-body::-webkit-scrollbar { width: 4px; }
+.node-edit-modal-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 99px; }
+.node-edit-modal-footer {
+  padding: 14px 24px;
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+  background: var(--bg2);
+  flex-shrink: 0;
+}
+.modal-field-group { margin-bottom: 18px; }
+.modal-field-label {
+  font-size: 10px; font-weight: 700; letter-spacing: .1em;
+  color: var(--text2); text-transform: uppercase; margin-bottom: 7px; display: block;
+}
+.modal-field-input {
+  width: 100%; background: var(--bg2);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r8);
+  padding: 9px 12px; color: var(--text0);
+  font-family: var(--font-mono); font-size: 12.5px;
+  outline: none; transition: border-color .15s, box-shadow .15s;
+}
+.modal-field-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(59,130,246,.12);
+}
+.modal-field-select {
+  width: 100%; background: var(--bg2);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r8);
+  padding: 9px 12px; color: var(--text0);
+  font-family: var(--font-mono); font-size: 12.5px;
+  outline: none; cursor: pointer; transition: border-color .15s;
+}
+.modal-field-select:focus { border-color: var(--accent); }
+.modal-section-title {
+  font-family: var(--font-display); font-size: 11px; font-weight: 700;
+  letter-spacing: .08em; color: var(--text2); text-transform: uppercase;
+  margin: 0 0 14px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  grid-column: 1 / -1;
+}
+.modal-full { grid-column: 1 / -1; }
+
+/* ── Sidebar category card hover glow ── */
+.cat-card { position: relative; overflow: hidden; }
+.cat-card::after {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(circle at 80% 50%, var(--cat-glow, transparent) 0%, transparent 70%);
+  opacity: 0; transition: opacity .2s; pointer-events: none; border-radius: inherit;
+}
+.cat-card:hover::after { opacity: 1; }
+
 
 /* ── multi_in handle glow ── */
 .react-flow__handle[data-multiin="true"]{
@@ -897,8 +996,8 @@ const CATEGORY_META = {
   Observability: { color: '#0097a7', icon: 'layers' },
 };
 
-const CategoryList = ({ filteredTypes }) => {
-  // Group by category
+// ── Sidebar Navigation — Categories → Nodes two-level drill-down ─────────────
+const CategoryList = ({ filteredTypes, isSearching }) => {
   const grouped = useMemo(() => {
     const map = {};
     filteredTypes.forEach(schema => {
@@ -909,89 +1008,444 @@ const CategoryList = ({ filteredTypes }) => {
     return map;
   }, [filteredTypes]);
 
-  // All categories open by default
   const allCats = Object.keys(grouped);
-  const [open, setOpen] = useState(() => Object.fromEntries(allCats.map(c => [c, true])));
+  // activeCategory: null = show categories list, string = show nodes of that category
+  const [activeCategory, setActiveCategory] = useState(null);
 
-  // Open newly-appearing categories when search changes
+  // When searching, always show all flat
+  const showFlat = isSearching;
+
+  // If active cat disappears from filtered results, reset
   useEffect(() => {
-    setOpen(prev => {
-      const next = { ...prev };
-      allCats.forEach(c => { if (!(c in next)) next[c] = true; });
-      return next;
-    });
-  }, [allCats.join(',')]);
-
-  const toggle = (cat) => setOpen(prev => ({ ...prev, [cat]: !prev[cat] }));
+    if (activeCategory && !grouped[activeCategory]) setActiveCategory(null);
+  }, [grouped, activeCategory]);
 
   if (allCats.length === 0) {
-    return <div style={{ padding: '12px', fontSize: 11, color: 'var(--text2)', textAlign: 'center' }}>No nodes match</div>;
+    return <div style={{ padding: '24px 12px', fontSize: 11, color: 'var(--text2)', textAlign: 'center' }}>
+      <div style={{ fontSize: 20, marginBottom: 8 }}>🔍</div>
+      No nodes match
+    </div>;
   }
 
+  // ── FLAT search view ──────────────────────────────────────────────────────
+  if (showFlat) {
+    return (
+      <>
+        {allCats.map(cat => {
+          const meta = CATEGORY_META[cat] || { color: 'var(--accent)', icon: 'cloud' };
+          return (
+            <div key={cat} style={{ marginBottom: 6 }}>
+              <div style={{ padding: '3px 8px 5px', fontSize: 9, letterSpacing: '.12em', color: meta.color, fontWeight: 700, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 5 }}>
+                <div style={{ width: 5, height: 5, borderRadius: '50%', background: meta.color, flexShrink: 0 }} />
+                {cat}
+              </div>
+              {grouped[cat].map(schema => (
+                <div key={schema.type} className="node-item" style={{ marginLeft: 8, marginBottom: 3 }}
+                  draggable onDragStart={e => e.dataTransfer.setData('application/vco-node', schema.type)}>
+                  <div className="node-icon" style={{ background: schema.color + '22', color: schema.color, width: 28, height: 28 }}>
+                    <GCPIcon nodeType={schema.type} fallbackIcon={schema.icon} color={schema.color} size={14} />
+                  </div>
+                  <div className="node-info">
+                    <div className="node-name">{schema.label}</div>
+                    <div className="node-desc">{schema.description}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </>
+    );
+  }
+
+  // ── NODE DRILL-DOWN view ──────────────────────────────────────────────────
+  if (activeCategory) {
+    const meta = CATEGORY_META[activeCategory] || { color: 'var(--accent)', icon: 'cloud' };
+    const nodes = grouped[activeCategory] || [];
+    return (
+      <div>
+        {/* Back button */}
+        <div onClick={() => setActiveCategory(null)} style={{
+          display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px 10px',
+          cursor: 'pointer', color: 'var(--text2)', fontSize: 11, fontFamily: 'var(--font-mono)',
+          borderBottom: '1px solid var(--border)', marginBottom: 6,
+          transition: 'color .15s',
+        }}
+          onMouseEnter={e => e.currentTarget.style.color = 'var(--text0)'}
+          onMouseLeave={e => e.currentTarget.style.color = 'var(--text2)'}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+          <span>All Categories</span>
+          <div style={{ flex: 1 }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <div style={{ width: 14, height: 14, borderRadius: 4, background: meta.color + '22', color: meta.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <GCPIcon nodeType={activeCategory + 'Cat'} fallbackIcon={meta.icon} color={meta.color} size={9} />
+            </div>
+            <span style={{ fontSize: 10, fontWeight: 700, color: meta.color, textTransform: 'uppercase', letterSpacing: '.08em' }}>{activeCategory}</span>
+          </div>
+        </div>
+
+        {/* Node count badge */}
+        <div style={{ padding: '0 10px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 9, color: 'var(--text2)', letterSpacing: '.1em', textTransform: 'uppercase', fontWeight: 600 }}>
+            {nodes.length} nodes
+          </span>
+          <div style={{ height: 2, flex: 1, marginLeft: 8, borderRadius: 99, background: `linear-gradient(90deg, ${meta.color}66, transparent)` }} />
+        </div>
+
+        {/* Nodes list */}
+        {nodes.map(schema => (
+          <div key={schema.type} className="node-item" style={{ marginBottom: 4, borderColor: 'transparent' }}
+            draggable onDragStart={e => e.dataTransfer.setData('application/vco-node', schema.type)}>
+            <div className="node-icon" style={{ background: schema.color + '22', color: schema.color, width: 30, height: 30 }}>
+              <GCPIcon nodeType={schema.type} fallbackIcon={schema.icon} color={schema.color} size={16} />
+            </div>
+            <div className="node-info">
+              <div className="node-name" style={{ fontSize: 12 }}>{schema.label}</div>
+              <div className="node-desc">{schema.description}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // ── CATEGORIES GRID view ──────────────────────────────────────────────────
   return (
-    <>
+    <div>
+      <div style={{ padding: '4px 8px 8px', fontSize: 9, letterSpacing: '.12em', color: 'var(--text2)', fontWeight: 700, textTransform: 'uppercase' }}>
+        Categories
+      </div>
       {allCats.map(cat => {
         const meta = CATEGORY_META[cat] || { color: 'var(--accent)', icon: 'cloud' };
-        const isOpen = open[cat] !== false;
+        const count = grouped[cat].length;
         return (
-          <div key={cat} style={{ marginBottom: 4 }}>
-            {/* Category header */}
-            <div
-              onClick={() => toggle(cat)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 7,
-                padding: '5px 8px', borderRadius: 'var(--r8)',
-                cursor: 'pointer', userSelect: 'none',
-                background: isOpen ? meta.color + '14' : 'transparent',
-                border: `1px solid ${isOpen ? meta.color + '33' : 'transparent'}`,
-                marginBottom: isOpen ? 4 : 0,
-                transition: 'all .15s',
-              }}
-            >
-              <div style={{
-                width: 18, height: 18, borderRadius: 5,
-                background: meta.color + '22', color: meta.color,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-              }}>
-                <GCPIcon nodeType={cat + 'Cat'} fallbackIcon={meta.icon} color={meta.color} size={11} />
-              </div>
-              <span style={{ flex: 1, fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: isOpen ? meta.color : 'var(--text2)', fontFamily: 'var(--font-display)' }}>
-                {cat}
-              </span>
-              <span style={{ fontSize: 9, color: 'var(--text2)', background: 'var(--bg3)', borderRadius: 99, padding: '1px 5px' }}>
-                {grouped[cat].length}
-              </span>
-              <span style={{ color: isOpen ? meta.color : 'var(--text2)', transition: 'transform .15s', transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)', display: 'inline-flex' }}>
-                {ICONS['chevron-down']}
-              </span>
+          <div key={cat} onClick={() => setActiveCategory(cat)} style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '10px 10px', borderRadius: 'var(--r8)', marginBottom: 3,
+            cursor: 'pointer', userSelect: 'none',
+            background: 'var(--bg2)',
+            border: `1px solid transparent`,
+            transition: 'all .15s',
+          }}
+            onMouseEnter={e => { e.currentTarget.style.background = meta.color + '0f'; e.currentTarget.style.borderColor = meta.color + '33'; e.currentTarget.style.transform = 'translateX(2px)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg2)'; e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.transform = 'translateX(0)'; }}
+          >
+            {/* Icon */}
+            <div style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: `linear-gradient(135deg, ${meta.color}33, ${meta.color}11)`,
+              color: meta.color, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0, border: `1px solid ${meta.color}33`,
+            }}>
+              <GCPIcon nodeType={cat + 'Cat'} fallbackIcon={meta.icon} color={meta.color} size={16} />
             </div>
-
-            {/* Node items */}
-            {isOpen && grouped[cat].map(schema => (
-              <div
-                key={schema.type}
-                className="node-item"
-                style={{ marginLeft: 8, marginBottom: 3 }}
-                draggable
-                onDragStart={e => e.dataTransfer.setData('application/vco-node', schema.type)}
-              >
-                <div className="node-icon" style={{ background: schema.color + '22', color: schema.color, width: 28, height: 28 }}>
-                  <GCPIcon nodeType={schema.type} fallbackIcon={schema.icon} color={schema.color} size={14} />
-                </div>
-                <div className="node-info">
-                  <div className="node-name">{schema.label}</div>
-                  <div className="node-desc">{schema.description}</div>
-                </div>
+            {/* Text */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 700, color: 'var(--text0)', letterSpacing: '.02em' }}>
+                {cat}
               </div>
-            ))}
+              <div style={{ fontSize: 9, color: 'var(--text2)', marginTop: 1 }}>
+                {count} node{count !== 1 ? 's' : ''}
+              </div>
+            </div>
+            {/* Arrow + count */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: meta.color, background: meta.color + '18', borderRadius: 99, padding: '2px 8px', fontFamily: 'var(--font-mono)' }}>
+                {count}
+              </span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text2)' }}>
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+            </div>
           </div>
         );
       })}
-    </>
+    </div>
   );
 };
 
-// ── VPC Group Node Component ──────────────────────────────────────────────────
+// ── Node Edit Modal ───────────────────────────────────────────────────────────
+const NodeEditModal = ({ node, onClose, onChange }) => {
+  if (!node) return null;
+
+  const isGroup = node.type === 'vpcGroup' || node.type === 'groupBox';
+  const schema = node.data.schema;
+  const props = node.data.props || {};
+  const isVisualGroup = node.type === 'groupBox';
+  const nodeColor = node.data.accentColor || schema?.color || 'var(--accent)';
+
+  // Fields definition (same as PropertyPanel)
+  const fieldDefs = {
+    CloudRunNode: [
+      { key: 'image', label: 'Container Image', type: 'text', placeholder: 'gcr.io/project/image:tag' },
+      { key: 'memory', label: 'Memory', type: 'select', options: ['256Mi','512Mi','1Gi','2Gi','4Gi','8Gi'] },
+      { key: 'cpu', label: 'CPU', type: 'select', options: ['1','2','4','8'] },
+      { key: 'min_instances', label: 'Min Instances', type: 'number' },
+      { key: 'max_instances', label: 'Max Instances', type: 'number' },
+      { key: 'port', label: 'Container Port', type: 'number' },
+    ],
+    CloudSQLNode: [
+      { key: 'database_version', label: 'Engine', type: 'select', options: ['POSTGRES_15','POSTGRES_14','MYSQL_8_0','SQLSERVER_2019_STANDARD'] },
+      { key: 'tier', label: 'Machine Tier', type: 'select', options: ['db-f1-micro','db-g1-small','db-n1-standard-1','db-n1-standard-2','db-n1-standard-4'] },
+      { key: 'region', label: 'Region', type: 'select', options: ['us-central1','us-east1','europe-west1','asia-east1'] },
+      { key: 'disk_size_gb', label: 'Disk (GB)', type: 'number' },
+      { key: 'ha', label: 'High Availability', type: 'checkbox' },
+    ],
+    PubSubNode: [
+      { key: 'ack_deadline_seconds', label: 'Ack Deadline (sec)', type: 'number' },
+      { key: 'message_retention_duration', label: 'Retention', type: 'text', placeholder: '604800s' },
+    ],
+    GCSBucketNode: [
+      { key: 'location', label: 'Location', type: 'select', options: ['US','EU','ASIA','us-central1','europe-west1'] },
+      { key: 'storage_class', label: 'Storage Class', type: 'select', options: ['STANDARD','NEARLINE','COLDLINE','ARCHIVE'] },
+      { key: 'versioning', label: 'Versioning', type: 'checkbox' },
+      { key: 'public_access', label: 'Public Access', type: 'checkbox' },
+    ],
+    ServiceAccountNode: [
+      { key: 'description_sa', label: 'Description', type: 'text', placeholder: 'Service account for...' },
+    ],
+    VPCNode: [
+      { key: 'subnet_cidr', label: 'Subnet CIDR', type: 'text', placeholder: '10.0.0.0/24' },
+      { key: 'region', label: 'Region', type: 'select', options: ['us-central1','us-east1','europe-west1','asia-east1'] },
+      { key: 'private_google_access', label: 'Private Google Access', type: 'checkbox' },
+    ],
+    SecretManagerNode: [
+      { key: 'replication', label: 'Replication', type: 'select', options: ['automatic','user-managed'] },
+      { key: 'rotation_days', label: 'Rotation (days, 0=off)', type: 'number' },
+    ],
+    SubscriptionNode: [
+      { key: 'ack_deadline_seconds', label: 'Ack Deadline (sec)', type: 'number' },
+      { key: 'retain_acked_messages', label: 'Retain Acked Messages', type: 'checkbox' },
+      { key: 'filter_expr', label: 'Filter Expression', type: 'text', placeholder: 'attributes.env="prod"' },
+      { key: 'push_endpoint', label: 'Push Endpoint (empty = pull)', type: 'text', placeholder: 'https://...' },
+    ],
+    CloudFunctionNode: [
+      { key: 'runtime', label: 'Runtime', type: 'select', options: ['python311','python310','nodejs20','nodejs18','go121','java21'] },
+      { key: 'memory', label: 'Memory', type: 'select', options: ['128Mi','256Mi','512Mi','1Gi','2Gi','4Gi'] },
+      { key: 'timeout', label: 'Timeout (sec)', type: 'number' },
+      { key: 'trigger', label: 'Trigger', type: 'select', options: ['http','pubsub','storage'] },
+    ],
+    BigQueryNode: [
+      { key: 'location', label: 'Location', type: 'select', options: ['US','EU','asia-northeast1','europe-west1'] },
+      { key: 'dataset_id', label: 'Dataset ID', type: 'text', placeholder: 'my_dataset' },
+      { key: 'partition_by', label: 'Partition Field', type: 'text', placeholder: '_PARTITIONTIME' },
+      { key: 'expiration_ms', label: 'Table Expiration (ms, 0=never)', type: 'number' },
+    ],
+    FirestoreNode: [
+      { key: 'mode', label: 'Mode', type: 'select', options: ['NATIVE','DATASTORE_COMPAT'] },
+      { key: 'location', label: 'Location', type: 'select', options: ['us-central','us-east1','europe-west1','asia-east1'] },
+      { key: 'ttl_field', label: 'TTL Field', type: 'text', placeholder: 'expireAt' },
+    ],
+    MemorystoreNode: [
+      { key: 'tier', label: 'Tier', type: 'select', options: ['BASIC','STANDARD_HA'] },
+      { key: 'memory_size_gb', label: 'Memory (GB)', type: 'number' },
+      { key: 'redis_version', label: 'Redis Version', type: 'select', options: ['REDIS_7_0','REDIS_6_X','REDIS_5_0'] },
+      { key: 'region', label: 'Region', type: 'select', options: ['us-central1','us-east1','europe-west1','asia-east1'] },
+    ],
+    LoadBalancerNode: [
+      { key: 'lb_type', label: 'Type', type: 'select', options: ['EXTERNAL','INTERNAL'] },
+      { key: 'protocol', label: 'Protocol', type: 'select', options: ['HTTP','HTTPS','TCP','UDP'] },
+      { key: 'ssl_cert', label: 'SSL Certificate', type: 'text', placeholder: 'projects/.../sslCertificates/...' },
+      { key: 'cdn_enabled', label: 'Cloud CDN', type: 'checkbox' },
+    ],
+  };
+
+  const nodeFields = schema?.params_schema || fieldDefs[schema?.type] || [];
+
+  const renderField = (f) => (
+    <div key={f.key} className="modal-field-group">
+      <label className="modal-field-label">{f.label}</label>
+      {f.type === 'checkbox' ? (
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '8px 0' }}>
+          <div style={{ position: 'relative', width: 38, height: 22, flexShrink: 0 }}>
+            <input type="checkbox" checked={props[f.key] ?? false}
+              onChange={e => onChange(node.id, f.key, e.target.checked, true)}
+              style={{ opacity: 0, position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'pointer', zIndex: 1, margin: 0 }} />
+            <div style={{
+              position: 'absolute', inset: 0, borderRadius: 99,
+              background: (props[f.key]) ? 'var(--accent)' : 'var(--bg3)',
+              border: `1.5px solid ${(props[f.key]) ? 'var(--accent)' : 'var(--border)'}`,
+              transition: 'background .2s, border-color .2s',
+            }}>
+              <div style={{
+                position: 'absolute', top: 2, width: 14, height: 14, borderRadius: '50%',
+                background: '#fff', transition: 'left .2s',
+                left: (props[f.key]) ? 20 : 2,
+                boxShadow: '0 1px 3px rgba(0,0,0,.3)',
+              }} />
+            </div>
+          </div>
+          <span style={{ fontSize: 12, color: 'var(--text1)' }}>Enabled</span>
+        </label>
+      ) : f.type === 'select' ? (
+        <select className="modal-field-select" value={props[f.key] || ''}
+          onChange={e => onChange(node.id, f.key, e.target.value, true)}>
+          <option value="">— select —</option>
+          {f.options.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+      ) : (
+        <input className="modal-field-input" type={f.type || 'text'}
+          value={props[f.key] ?? ''}
+          placeholder={f.placeholder || ''}
+          onChange={e => onChange(node.id, f.key, f.type === 'number' ? +e.target.value : e.target.value, true)} />
+      )}
+    </div>
+  );
+
+  // Split fields into two columns
+  const checkboxFields = nodeFields.filter(f => f.type === 'checkbox');
+  const normalFields = nodeFields.filter(f => f.type !== 'checkbox');
+
+  const statusColors = { idle: 'var(--text2)', deployed: 'var(--green)', deploying: 'var(--yellow)', error: 'var(--red)', working: '#fff', failed: 'var(--red)' };
+  const currentStatus = node.data.status || 'idle';
+
+  return (
+    <div className="node-edit-modal-overlay" onClick={onClose}>
+      <div className="node-edit-modal" style={{ '--modal-accent': nodeColor }} onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="node-edit-modal-header">
+          {/* Node icon */}
+          <div style={{
+            width: 52, height: 52, borderRadius: 14, flexShrink: 0,
+            background: `linear-gradient(135deg, ${nodeColor}33, ${nodeColor}18)`,
+            color: nodeColor, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: `1.5px solid ${nodeColor}44`,
+            boxShadow: `0 4px 16px ${nodeColor}22`,
+          }}>
+            {schema && <GCPIcon nodeType={schema.type} fallbackIcon={schema.icon} color={nodeColor} size={26} />}
+          </div>
+          {/* Title & meta */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 17, color: 'var(--text0)', letterSpacing: '-.3px', marginBottom: 3 }}>
+              {node.data.label || schema?.label || 'Node'}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 10, color: 'var(--text2)', fontFamily: 'var(--font-mono)', background: 'var(--bg3)', padding: '1px 7px', borderRadius: 99 }}>
+                {schema?.type?.replace('Node', '') || node.type}
+              </span>
+              <span style={{ fontSize: 10, color: 'var(--text2)', fontFamily: 'var(--font-mono)' }}>
+                #{node.id.slice(0, 8)}
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <div style={{ width: 7, height: 7, borderRadius: '50%', background: statusColors[currentStatus] || 'var(--text2)', boxShadow: `0 0 6px ${statusColors[currentStatus] || 'var(--text2)'}` }} />
+                <span style={{ fontSize: 10, color: statusColors[currentStatus] || 'var(--text2)', textTransform: 'capitalize', fontFamily: 'var(--font-mono)' }}>{currentStatus}</span>
+              </div>
+            </div>
+          </div>
+          {/* Close */}
+          <button onClick={onClose} style={{
+            width: 32, height: 32, borderRadius: 8, border: '1px solid var(--border)',
+            background: 'var(--bg3)', color: 'var(--text2)', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            transition: 'all .15s',
+          }}
+            onMouseEnter={e => { e.currentTarget.style.color = 'var(--text0)'; e.currentTarget.style.background = 'var(--bg4)'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text2)'; e.currentTarget.style.background = 'var(--bg3)'; }}
+          >
+            {ICONS.close}
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="node-edit-modal-body">
+          {/* Label — full width */}
+          <div className="modal-field-group modal-full">
+            <label className="modal-field-label">Node Label</label>
+            <input className="modal-field-input" style={{ fontSize: 14, fontWeight: 600 }}
+              value={node.data.label || ''}
+              onChange={e => onChange(node.id, 'label', e.target.value)}
+              placeholder={schema?.label || 'Label'} />
+          </div>
+
+          {/* Configuration section */}
+          {nodeFields.length > 0 && (
+            <div className="modal-section-title">⚙ Configuration</div>
+          )}
+
+          {/* Normal fields — in 2 cols */}
+          {normalFields.map(f => renderField(f))}
+
+          {/* Checkbox fields — full width */}
+          {checkboxFields.length > 0 && (
+            <div className="modal-full" style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+              {checkboxFields.map(f => (
+                <div key={f.key} style={{ flex: '1 1 180px' }}>{renderField(f)}</div>
+              ))}
+            </div>
+          )}
+
+          {/* Ports section */}
+          {((schema?.inputs?.length > 0) || (schema?.outputs?.length > 0)) && (
+            <>
+              <div className="modal-section-title">🔌 Ports</div>
+              {schema?.inputs?.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 10, color: 'var(--text2)', marginBottom: 8, fontWeight: 700, letterSpacing: '.08em' }}>INPUTS</div>
+                  {schema.inputs.map(p => (
+                    <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '6px 10px', background: 'var(--bg2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                      <div style={{ width: 9, height: 9, borderRadius: '50%', background: p.color, flexShrink: 0, boxShadow: `0 0 5px ${p.color}` }} />
+                      <span style={{ fontSize: 12, color: 'var(--text1)', flex: 1 }}>{p.name.replace(/_/g,' ')}</span>
+                      <span className="port-type-badge" style={{ background: p.color + '22', color: p.color }}>{p.label}</span>
+                      {p.required && <span style={{ fontSize: 9, color: 'var(--red)', fontWeight: 700 }}>REQ</span>}
+                      {p.multi_in && <span style={{ fontSize: 9, color: '#34d399', background: '#34d39920', borderRadius: 99, padding: '1px 6px' }}>multi-in</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {schema?.outputs?.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 10, color: 'var(--text2)', marginBottom: 8, fontWeight: 700, letterSpacing: '.08em' }}>OUTPUTS</div>
+                  {schema.outputs.map(p => (
+                    <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '6px 10px', background: 'var(--bg2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                      <div style={{ width: 9, height: 9, borderRadius: '50%', background: p.color, flexShrink: 0, boxShadow: `0 0 5px ${p.color}` }} />
+                      <span style={{ fontSize: 12, color: 'var(--text1)', flex: 1 }}>{p.name.replace(/_/g,' ')}</span>
+                      <span className="port-type-badge" style={{ background: p.color + '22', color: p.color }}>{p.label}</span>
+                      {p.multi && <span style={{ fontSize: 9, color: 'var(--text2)' }}>multi</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Accent color picker — full width */}
+          <div className="modal-field-group modal-full">
+            <label className="modal-field-label">Accent Color</label>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {NODE_ACCENT_COLORS.map(c => (
+                <div key={c} onClick={() => onChange(node.id, 'accentColor', c)}
+                  style={{
+                    width: 26, height: 26, borderRadius: '50%', background: c, cursor: 'pointer',
+                    border: `3px solid ${nodeColor === c ? 'var(--text0)' : 'transparent'}`,
+                    transition: 'transform .1s, border-color .1s',
+                    boxShadow: nodeColor === c ? `0 0 12px ${c}88` : 'none',
+                  }}
+                  onMouseEnter={e => e.target.style.transform = 'scale(1.25)'}
+                  onMouseLeave={e => e.target.style.transform = 'scale(1)'}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="node-edit-modal-footer">
+          <span style={{ flex: 1, fontSize: 10, color: 'var(--text2)', fontFamily: 'var(--font-mono)' }}>
+            Changes apply immediately
+          </span>
+          <button onClick={onClose} className="btn btn-primary" style={{ padding: '8px 20px', fontSize: 12 }}>
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
 const VPCGroupNode = ({ data, selected, id }) => {
   const [dragOver, setDragOver] = React.useState(false);
   const { getNodes, setNodes } = useReactFlow();
@@ -1635,6 +2089,7 @@ function VCOApp() {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState(null);
+  const [editModalNode, setEditModalNode] = useState(null);
   const [logs, setLogs] = useState([]);
   const [logVisible, setLogVisible] = useState(false);
   const [logPanelH, setLogPanelH] = useState(160);
@@ -2007,7 +2462,10 @@ function VCOApp() {
   }, [defaultEdgeType, edges]);
 
   // Node selection
-  const onNodeClick = useCallback((_, node) => setSelectedNode(node), []);
+  const onNodeClick = useCallback((_, node) => {
+    setSelectedNode(node);
+    setEditModalNode(node);
+  }, []);
   const onPaneClick = useCallback(() => setSelectedNode(null), []);
 
   // Property change
@@ -2019,6 +2477,12 @@ function VCOApp() {
     }));
     // Keep selectedNode in sync
     setSelectedNode(prev => {
+      if (!prev || prev.id !== nodeId) return prev;
+      if (isProp) return { ...prev, data: { ...prev.data, props: { ...prev.data.props, [key]: value } } };
+      return { ...prev, data: { ...prev.data, [key]: value } };
+    });
+    // Keep editModalNode in sync
+    setEditModalNode(prev => {
       if (!prev || prev.id !== nodeId) return prev;
       if (isProp) return { ...prev, data: { ...prev.data, props: { ...prev.data.props, [key]: value } } };
       return { ...prev, data: { ...prev.data, [key]: value } };
@@ -2183,7 +2647,7 @@ function VCOApp() {
           </div>
 
           {/* Category accordion */}
-          <CategoryList filteredTypes={filteredTypes} />
+          <CategoryList filteredTypes={filteredTypes} isSearching={search.trim().length > 0} />
         </div>
         {/* Sidebar footer: port legend */}
         <div style={{ padding: '12px 12px', borderTop: '1px solid var(--border)' }}>
@@ -2522,6 +2986,13 @@ function VCOApp() {
       </div>
 
       <InfoModal type={infoModal} onClose={() => setInfoModal(null)} />
+      {editModalNode && (
+        <NodeEditModal
+          node={editModalNode}
+          onClose={() => setEditModalNode(null)}
+          onChange={handlePropChange}
+        />
+      )}
     </div>
     </VCOContext.Provider>
   );
