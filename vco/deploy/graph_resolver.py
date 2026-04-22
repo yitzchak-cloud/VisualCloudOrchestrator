@@ -1,22 +1,21 @@
 """
 deploy/graph_resolver.py
 ========================
-Two pure functions — no Pulumi, no I/O, no side effects:
+Generic graph resolution and DAG builder.
 
-  resolve_graph(nodes, edges) → ctx
-      Annotates each node with its relationships (topics it publishes to,
-      subscriptions that feed it, etc.).
+Both functions are now **completely resource-agnostic**.
+All edge-handling and dependency logic lives inside each node class
+(via resolve_edges / dag_deps).  Adding a new resource type
+requires ZERO changes here.
 
-  build_dag(nodes, ctx) → list[node_id]
+  resolve_graph(nodes, edges, node_registry) → ctx
+      Calls node.resolve_edges() for every (node, edge) pair.
+      Returns a per-node context dict populated by the nodes themselves.
+
+  build_dag(nodes, ctx, node_registry) → list[node_id]
       Topological sort (Kahn's algorithm).
+      Calls node.dag_deps(ctx) to learn each node's dependencies.
       Raises ValueError on cycles.
-
-Dependency rules (what must exist BEFORE deploying X):
-  PubsubTopicNode          → nothing
-  CloudRunNode             → PubsubTopics it publishes to   (needs topic name as env var)
-  PubsubPullSubscription   → its parent PubsubTopic
-  PubsubPushSubscription   → its parent PubsubTopic
-                           + the CloudRun whose URI it pushes to  (needs live URI)
 """
 from __future__ import annotations
 
@@ -27,29 +26,43 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-# ── Edge type constants ────────────────────────────────────────────────────────
+# ── helpers ───────────────────────────────────────────────────────────────────
 
-_CR   = "CloudRunNode"
-_TOP  = "PubsubTopicNode"
-_PULL = "PubsubPullSubscriptionNode"
-_PUSH = "PubsubPushSubscriptionNode"
+def _instantiate(node_dict: dict, node_registry: dict) -> Any | None:
+    """
+    Create a lightweight GCPNode instance from a raw node dict.
+    Returns None if the type is not registered (unknown / UI-only node).
+    """
+    cls = node_registry.get(node_dict.get("type", ""))
+    if cls is None:
+        return None
+    return cls(node_id=node_dict["id"], label=node_dict.get("label", ""))
 
 
 # ── 1. Graph resolver ─────────────────────────────────────────────────────────
 
-def resolve_graph(nodes: list[dict], edges: list[dict]) -> dict[str, Any]:
+def resolve_graph(
+    nodes:         list[dict],
+    edges:         list[dict],
+    node_registry: dict,
+) -> dict[str, Any]:
     """
-    Walk every edge and populate a per-node context dict with relationship keys:
+    Walk every edge and let each node annotate the context dict.
 
-      publishes_to_topics  : list[node_id]  (CR → Topic)
-      publisher_cr_ids     : list[node_id]  (Topic ← CR)
-      topic_id             : node_id        (Subscription → Topic)
-      consumer_cr_ids      : list[node_id]  (PullSub → CR)
-      receives_from_subs   : list[node_id]  (CR ← Sub)
-      push_target_cr_ids   : list[node_id]  (PushSub → CR)
+    ctx layout:
+        ctx[node_id]["node"]   → the raw node dict
+        ctx[node_id][*]        → keys added by node.resolve_edges()
+                                 (e.g. "topic_id", "publishes_to_topics", …)
     """
     by_id: dict[str, dict] = {n["id"]: n for n in nodes}
     ctx:   dict[str, dict] = {n["id"]: {"node": n} for n in nodes}
+
+    # Pre-instantiate all nodes once
+    instances: dict[str, Any] = {}
+    for n in nodes:
+        inst = _instantiate(n, node_registry)
+        if inst is not None:
+            instances[n["id"]] = inst
 
     for edge in edges:
         src      = edge["source"]
@@ -57,31 +70,20 @@ def resolve_graph(nodes: list[dict], edges: list[dict]) -> dict[str, Any]:
         src_type = by_id.get(src, {}).get("type", "")
         tgt_type = by_id.get(tgt, {}).get("type", "")
 
-        if src_type == _CR and tgt_type == _TOP:
-            # CR publishes to Topic
-            ctx[src].setdefault("publishes_to_topics", []).append(tgt)
-            ctx[tgt].setdefault("publisher_cr_ids",    []).append(src)
-            logger.debug("Edge: %s (CR) → %s (Topic)", src, tgt)
+        handled = False
+        # Give every registered node a chance to claim this edge
+        for node_id, inst in instances.items():
+            if inst.resolve_edges(src, tgt, src_type, tgt_type, ctx):
+                handled = True
+                # Don't break — multiple nodes may need to react to the same edge
+                # (e.g. both the source and target update their own ctx keys).
+                # resolve_edges must be idempotent if called for an unrelated edge.
 
-        elif src_type == _TOP and tgt_type in (_PULL, _PUSH):
-            # Topic owns Subscription
-            ctx[tgt]["topic_id"] = src
-            logger.debug("Edge: %s (Topic) → %s (Subscription)", src, tgt)
-
-        elif src_type == _PULL and tgt_type == _CR:
-            # PullSub feeds CR
-            ctx[src].setdefault("consumer_cr_ids",    []).append(tgt)
-            ctx[tgt].setdefault("receives_from_subs", []).append(src)
-            logger.debug("Edge: %s (PullSub) → %s (CR)", src, tgt)
-
-        elif src_type == _PUSH and tgt_type == _CR:
-            # PushSub pushes to CR endpoint
-            ctx[src].setdefault("push_target_cr_ids", []).append(tgt)
-            ctx[tgt].setdefault("receives_from_subs", []).append(src)
-            logger.debug("Edge: %s (PushSub) → %s (CR)", src, tgt)
-
-        else:
-            logger.debug("Edge ignored (no rule): %s (%s) → %s (%s)", src, src_type, tgt, tgt_type)
+        if not handled:
+            logger.debug(
+                "Edge ignored (no handler): %s (%s) → %s (%s)",
+                src, src_type, tgt, tgt_type,
+            )
 
     logger.info("resolve_graph: %d nodes, %d edges processed", len(nodes), len(edges))
     return ctx
@@ -89,7 +91,11 @@ def resolve_graph(nodes: list[dict], edges: list[dict]) -> dict[str, Any]:
 
 # ── 2. DAG builder ────────────────────────────────────────────────────────────
 
-def build_dag(nodes: list[dict], ctx: dict[str, Any]) -> list[str]:
+def build_dag(
+    nodes:         list[dict],
+    ctx:           dict[str, Any],
+    node_registry: dict,
+) -> list[str]:
     """
     Topological sort of nodes by deployment dependency.
     Returns a list of node IDs in safe deployment order.
@@ -97,25 +103,19 @@ def build_dag(nodes: list[dict], ctx: dict[str, Any]) -> list[str]:
     """
     deps: dict[str, list[str]] = {n["id"]: [] for n in nodes}
 
-    for node in nodes:
-        nid   = node["id"]
-        ntype = node.get("type", "")
-        nc    = ctx.get(nid, {})
-
-        if ntype == _CR:
-            deps[nid].extend(nc.get("publishes_to_topics", []))
-
-        elif ntype in (_PULL, _PUSH):
-            if nc.get("topic_id"):
-                deps[nid].append(nc["topic_id"])
-
-        if ntype == _PUSH:
-            deps[nid].extend(nc.get("push_target_cr_ids", []))
+    for n in nodes:
+        nid  = n["id"]
+        inst = node_registry.get(n.get("type", ""))
+        if inst is None:
+            continue   # unknown type — no deps, deploy last
+        # Instantiate just to call dag_deps (cheap — no I/O)
+        node_obj = inst(node_id=nid, label=n.get("label", ""))
+        deps[nid] = node_obj.dag_deps(ctx.get(nid, {}))
 
     # Kahn's algorithm
     in_degree = {n["id"]: len(deps[n["id"]]) for n in nodes}
     queue: deque[str] = deque(nid for nid, deg in in_degree.items() if deg == 0)
-    order: list[str] = []
+    order: list[str]  = []
 
     rdeps: dict[str, list[str]] = defaultdict(list)
     for nid, d_list in deps.items():

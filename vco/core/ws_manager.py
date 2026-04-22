@@ -163,7 +163,29 @@ class ConnectionManager:
             node_count : total nodes in the saved graph
         """
         await self.broadcast({"event": "graph_saved", "node_count": node_count})
+    
+    async def broadcast_graph_saved(self, node_count: int) -> None:
+        """
+        Payload:
+            event      : "graph_saved"
+            node_count : total nodes in the saved graph
+        """
+        await self.broadcast({"event": "graph_saved", "node_count": node_count})
 
+    # ── התוספת החדשה שעלייך להדביק כאן: ──────────────────────────────────────
+
+    async def broadcast_node_props_update(self, node_id: str, props: dict) -> None:
+        """
+        Notify all connected clients that a node's props have been updated
+        with live values from a freshly completed deploy.
+
+        Frontend should merge *props* into the matching node's data.props.
+        """
+        await self.broadcast({
+            "type":    "node_props_update",
+            "node_id": node_id,
+            "props":   props,
+        })
 
 # Singleton — import and use from anywhere
 manager = ConnectionManager()
