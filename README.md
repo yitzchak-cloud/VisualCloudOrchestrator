@@ -76,3 +76,9 @@ python -m http.server 3000
 
 טיפול במצב של מחיקה שימחק גם בענן 
 
+spec.securityContext:
+        runAsUser: 0 - נכשל טווח מותר הוא רק 1003350000 - 1003359999
+        fsGroup: 117932853 נכשל אסור 
+        privileged: true נכשל אסור    
+
+

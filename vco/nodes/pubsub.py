@@ -4,23 +4,16 @@ nodes/pubsub.py — Pub/Sub resource nodes (fully self-describing).
 from __future__ import annotations
 
 import logging
-import re
 from dataclasses import dataclass
 from typing import Any, Callable, ClassVar
 
 import pulumi
 import pulumi_gcp as gcp
 
-from nodes.base_node import GCPNode, LogSource, Port
+from nodes.base_node import GCPNode, LogSource, Port, _resource_name, _node_label
 from nodes.port_types import PortType
 
 logger = logging.getLogger(__name__)
-
-
-def _resource_name(node_dict: dict) -> str:
-    props = node_dict.get("props", {})
-    label = node_dict.get("label", node_dict.get("id", "resource"))
-    return props.get("name") or re.sub(r"[^a-z0-9-]", "-", label.lower()).strip("-")
 
 
 # ── PubSub Topic ──────────────────────────────────────────────────────────────

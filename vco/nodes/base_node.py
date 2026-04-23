@@ -29,6 +29,7 @@ Each GCPNode subclass declares:
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import Any, Callable, ClassVar
 
 from nodes.port_types import PortType, PORT_META
@@ -64,6 +65,23 @@ class LogSource:
     page_size: int = 50
     order:     str = "desc"
 
+
+def _resource_name(node_dict: dict) -> str:
+    props = node_dict.get("props", {})
+    label = node_dict.get("label", node_dict.get("id", "resource"))
+    return props.get("name") or re.sub(r"[^a-z0-9-]", "-", label.lower()).strip("-")
+
+def _node_label(all_nodes: list[dict], node_id: str) -> str:
+    for n in all_nodes:
+        if n["id"] == node_id:
+            return n.get("label", node_id)
+    return node_id
+
+def _node_name(all_nodes: list[dict], node_id: str) -> str:
+    for n in all_nodes:
+        if n["id"] == node_id:
+            return _resource_name(n)
+    return node_id
 
 # ── Base node ─────────────────────────────────────────────────────────────────
 
