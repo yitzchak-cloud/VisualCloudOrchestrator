@@ -682,7 +682,7 @@ const GCPIcon = ({ nodeType, fallbackIcon, color, size = 20 }) => {
 const NODE_ACCENT_COLORS = ['#6366f1','#3b82f6','#10b981','#f97316','#ec4899','#eab308','#8b5cf6','#ef4444','#06b6d4','#f43f5e'];
 
 // Global context so GCPNodeComponent can call openNodeLogs without prop-drilling
-const VCOContext = React.createContext({ openNodeLogs: null });
+const VCOContext = React.createContext({ openNodeLogs: null, openEditModal: null });
 
 const GCPNodeComponent = ({ data, selected, id }) => {
   const schema = data.schema;
@@ -691,7 +691,7 @@ const GCPNodeComponent = ({ data, selected, id }) => {
   const collapsed = data.collapsed || false;
   const nodeColor = data.accentColor || schema.color;
   const { setNodes, deleteElements, getEdges } = useReactFlow();
-  const { openNodeLogs: openNodeLogsCtx } = React.useContext(VCOContext);
+  const { openNodeLogs: openNodeLogsCtx, openEditModal: openEditModalCtx } = React.useContext(VCOContext);
 
   // ── חישוב חיבורים ──
   const allEdges = getEdges();
@@ -769,6 +769,16 @@ const GCPNodeComponent = ({ data, selected, id }) => {
               onMouseEnter={e=>e.target.style.transform='scale(1.3)'} onMouseLeave={e=>e.target.style.transform='scale(1)'}
             />
           ))}
+          <div className="node-toolbar-divider"/>
+          {/* Edit Params */}
+          <button
+            className="node-toolbar-btn"
+            title="Edit Parameters (double-click)"
+            onClick={e => { e.stopPropagation(); openEditModalCtx && openEditModalCtx(id); }}
+            style={{ color: 'var(--accent2)', fontWeight: 700, fontSize: 10, padding: '2px 7px', letterSpacing: '.03em' }}
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
           <div className="node-toolbar-divider"/>
           {/* Logs button */}
           <button
@@ -2462,8 +2472,12 @@ function VCOApp() {
     }
   }, [defaultEdgeType, edges]);
 
-  // Node selection
+  // Node selection — single click selects (shows toolbar), double click opens parameter modal
   const onNodeClick = useCallback((_, node) => {
+    setSelectedNode(node);
+    // Do NOT open editModalNode here — user must double-click for that
+  }, []);
+  const onNodeDoubleClick = useCallback((_, node) => {
     setSelectedNode(node);
     setEditModalNode(node);
   }, []);
@@ -2585,8 +2599,16 @@ function VCOApp() {
       t.description.toLowerCase().includes(search.toLowerCase())
     ), [nodeTypesData, search]);
 
+  const openEditModal = useCallback((nodeId) => {
+    const node = nodesRef.current.find(n => n.id === nodeId);
+    if (node) {
+      setSelectedNode(node);
+      setEditModalNode(node);
+    }
+  }, []);
+
   return (
-    <VCOContext.Provider value={{ openNodeLogs }}>
+    <VCOContext.Provider value={{ openNodeLogs, openEditModal }}>
     <div className="app">
       {/* Sidebar */}
       <div className="sidebar">
@@ -2783,6 +2805,7 @@ function VCOApp() {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onNodeClick={onNodeClick}
+            onNodeDoubleClick={onNodeDoubleClick}
             onPaneClick={(e) => { onPaneClick(e); closeCtxMenu(); }}
             onDrop={onDrop}
             onDragOver={onDragOver}
@@ -2809,6 +2832,7 @@ function VCOApp() {
               <div className="empty-sub">
                 Drag resources from the sidebar<br/>
                 Connect ports to define relationships<br/>
+                Single-click to select · Double-click to edit params<br/>
                 Hit Deploy to provision on GCP
               </div>
             </div>

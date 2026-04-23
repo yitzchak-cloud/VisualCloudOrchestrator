@@ -134,12 +134,25 @@ async def synthesize_and_deploy(
         await _log(f"Plugin install failed: {exc}", "error")
         return {"status": "error", "phase": "plugin", "output": str(exc)}
 
-    # ── Phase 2.5: destroy orphans ────────────────────────────────────────────
+    # ── Phase 2.5: destroy orphans + clean stale dirs ────────────────────────
     desired_ids = {n["id"] for n in nodes}
     actual      = read_actual_state(str(stack_dir), stack)
-    orphans     = [nid for nid in actual["node_ids"] if nid not in desired_ids]
-    if orphans:
-        await _log(f"Phase 2.5 — Destroying {len(orphans)} orphan resource(s)…")
+
+    # Nodes that were deployed previously but are no longer on the canvas
+    orphans = [nid for nid in actual["node_ids"] if nid not in desired_ids]
+
+    # Directories that exist on disk but have no valid Pulumi stack behind them
+    # (leftover from failed deploys, interrupted destroys, etc.)
+    stale_dirs = actual.get("stale_dirs", [])
+
+    if orphans or stale_dirs:
+        total_cleanup = len(orphans) + len(stale_dirs)
+        await _log(
+            f"Phase 2.5 — Cleaning up: "
+            f"{len(orphans)} orphan resource(s), {len(stale_dirs)} stale dir(s)…"
+        )
+
+        # Destroy real GCP resources for orphaned nodes
         for nid in orphans:
             await _log(f"Destroying orphan: {nid}", "warn", nid)
             await loop.run_in_executor(
@@ -148,6 +161,18 @@ async def synthesize_and_deploy(
                     n, stack, stack_dir, pulumi_cmd, backend_url, pulumi_home
                 ),
             )
+
+        # Just remove stale directories (no GCP resources to destroy)
+        import shutil
+        for safe_id in stale_dirs:
+            stale_path = stack_dir / safe_id
+            if stale_path.exists():
+                try:
+                    shutil.rmtree(stale_path)
+                    await _log(f"Removed stale directory: {safe_id}", "info")
+                    logger.info("orchestrator: removed stale dir %s", stale_path)
+                except Exception as exc:
+                    logger.warning("orchestrator: could not remove stale dir %s — %s", stale_path, exc)
 
     # ── Phase 3 ───────────────────────────────────────────────────────────────
     await _log("Phase 3 — Deploying resources…")
