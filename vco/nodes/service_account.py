@@ -76,7 +76,7 @@ class ServiceAccountNode(GCPNode):
     outputs: ClassVar = [Port("service_account", PortType.SERVICE_ACCOUNT, multi=True)]
 
     node_color:  ClassVar = "#a78bfa"
-    icon:        ClassVar = "serviceAccount"
+    icon:        ClassVar = "identity_and_access_management"
     category:    ClassVar = "IAM"
     description: ClassVar = "Service Account — create or reference for workload identity"
 

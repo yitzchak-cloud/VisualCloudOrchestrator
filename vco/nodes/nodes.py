@@ -289,37 +289,6 @@ class GCSBucketNode(GCPNode):
         )
 
 
-# ── Service Account ───────────────────────────────────────────────────────────
-
-@dataclass
-class ServiceAccountNode(GCPNode):
-    roles:          list = field(default_factory=list)
-    description_sa: str  = ""
-
-    inputs:  ClassVar = []
-    outputs: ClassVar = [Port("identity", PortType.SERVICE_ACCOUNT, multi=True)]
-    node_color:  ClassVar = "#8b5cf6"
-    icon:        ClassVar = "security"
-    category:    ClassVar = "Security"
-    description: ClassVar = "IAM service identity"
-
-    def resolve_edges(self, src_id, tgt_id, src_type, tgt_type, ctx) -> bool:
-        return False
-
-    def dag_deps(self, ctx) -> list[str]:
-        return []
-
-    def pulumi_program(self, ctx, project, region, all_nodes, deployed_outputs):
-        logger.warning("ServiceAccountNode: not yet implemented")
-        return None
-
-    def live_outputs(self, pulumi_outputs, project, region) -> dict:
-        return {"email": pulumi_outputs.get("email", "")}
-
-    def log_source(self, pulumi_outputs, project, region) -> LogSource | None:
-        return None  # SAs don't emit logs directly
-
-
 # ── Secret Manager ────────────────────────────────────────────────────────────
 
 @dataclass
@@ -359,37 +328,6 @@ class SecretManagerNode(GCPNode):
             project=project,
         )
 
-
-# ── VPC ───────────────────────────────────────────────────────────────────────
-
-@dataclass
-class VirtualPrivateCloudNode(GCPNode):
-    subnet_cidr:           str  = "10.0.0.0/24"
-    region:                str  = "us-central1"
-    private_google_access: bool = True
-
-    inputs:  ClassVar = []
-    outputs: ClassVar = [Port("subnet", PortType.NETWORK, multi=True)]
-    node_color:  ClassVar = "#2c10b9"
-    icon:        ClassVar = "VirtualPrivateCloud"
-    category:    ClassVar = "Networking"
-    description: ClassVar = "Virtual private network"
-
-    def resolve_edges(self, src_id, tgt_id, src_type, tgt_type, ctx) -> bool:
-        return False
-
-    def dag_deps(self, ctx) -> list[str]:
-        return []
-
-    def pulumi_program(self, ctx, project, region, all_nodes, deployed_outputs):
-        logger.warning("VirtualPrivateCloudNode: not yet implemented")
-        return None
-
-    def live_outputs(self, pulumi_outputs, project, region) -> dict:
-        return {}
-
-    def log_source(self, pulumi_outputs, project, region) -> LogSource | None:
-        return None  # VPCs don't have a direct log stream
 
 
 # ── Load Balancer ─────────────────────────────────────────────────────────────

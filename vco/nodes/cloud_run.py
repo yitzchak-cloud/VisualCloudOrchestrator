@@ -1,5 +1,21 @@
 """
 nodes/cloud_run.py — Cloud Run resource nodes (fully self-describing).
+
+VPC wiring
+----------
+  VpcNetworkNode ──► SubnetworkNode ──► CloudRunNode
+
+  CloudRunNode reads `subnetwork_id` from ctx (set by SubnetworkNode.resolve_edges),
+  then looks up the subnetwork's exported `network_path` and `subnetwork_path` from
+  deployed_outputs.  Falls back to the legacy vpc_network / vpc_subnetwork props if
+  no SubnetworkNode is connected.
+
+Service-Account wiring
+----------------------
+  ServiceAccountNode ──► CloudRunNode
+
+  CloudRunNode reads `service_account_id` from ctx (set by ServiceAccountNode.resolve_edges),
+  then looks up the SA email from deployed_outputs.
 """
 from __future__ import annotations
 
@@ -41,11 +57,23 @@ class CloudRunNode(GCPNode):
         {"key": "port",          "label": "Port",            "type": "number", "default": 8080},
         {"key": "region",        "label": "Region",          "type": "select", "options": ["me-west1","us-central1","us-east1"], "default": "me-west1"},
         {"key": "service_url",   "label": "Service URL",     "type": "text",   "default": "", "placeholder": "https://my-service.run.app"},
+        # ── Legacy fallback props (used when no SubnetworkNode is wired) ──────
+        {
+            "key": "vpc_network", "label": "VPC Network (fallback)",
+            "type": "text", "default": "",
+            "placeholder": "projects/HOST_PROJECT/global/networks/NETWORK",
+        },
+        {
+            "key": "vpc_subnetwork", "label": "VPC Subnetwork (fallback)",
+            "type": "text", "default": "",
+            "placeholder": "projects/HOST_PROJECT/regions/REGION/subnetworks/SUBNET",
+        },
     ]
     url_field: ClassVar = "service_url"
 
     inputs: ClassVar = [
-        Port("service_account", PortType.SERVICE_ACCOUNT, required=True),
+        Port("service_account", PortType.SERVICE_ACCOUNT, required=False),
+        Port("subnet",          PortType.NETWORK,         required=False),
         Port("secret",          PortType.SECRET,          multi=True, multi_in=True),
         Port("MESSAGE",         PortType.MESSAGE,         multi=True, multi_in=True),
     ]
@@ -58,19 +86,60 @@ class CloudRunNode(GCPNode):
     category:    ClassVar = "Compute"
     description: ClassVar = "Serverless container runtime"
 
+    # ------------------------------------------------------------------
+    # Edge wiring
+    # ------------------------------------------------------------------
+
     def resolve_edges(self, src_id, tgt_id, src_type, tgt_type, ctx) -> bool:
+        # CloudRunNode → PubsubTopicNode
         if src_id == self.node_id and src_type == "CloudRunNode" and tgt_type == "PubsubTopicNode":
             ctx[self.node_id].setdefault("publishes_to_topics", []).append(tgt_id)
             return True
         return False
 
     def dag_deps(self, ctx) -> list[str]:
-        return list(ctx.get("publishes_to_topics", []))
+        deps = list(ctx.get("publishes_to_topics", []))
+        if ctx.get("subnetwork_id"):
+            deps.append(ctx["subnetwork_id"])
+        if ctx.get("service_account_id"):
+            deps.append(ctx["service_account_id"])
+        return deps
+
+    # ------------------------------------------------------------------
+    # Pulumi program
+    # ------------------------------------------------------------------
 
     def pulumi_program(self, ctx, project, region, all_nodes, deployed_outputs):
         node_dict = ctx.get("node", {})
         props     = node_dict.get("props", {})
 
+        # ── Resolve VPC paths ─────────────────────────────────────────────────
+        subnet_id      = ctx.get("subnetwork_id", "")
+        subnet_outputs = deployed_outputs.get(subnet_id, {})
+
+        # Prefer node-wired paths; fall back to explicit props; last resort = empty
+        network_path    = (
+            subnet_outputs.get("network_path")
+            or props.get("vpc_network", "")
+        )
+        subnetwork_path = (
+            subnet_outputs.get("subnetwork_path")
+            or props.get("vpc_subnetwork", "")
+        )
+
+        if not network_path or not subnetwork_path:
+            logger.warning(
+                "CloudRunNode %s: no VPC network/subnetwork resolved — "
+                "connect a SubnetworkNode or fill the fallback props",
+                self.node_id,
+            )
+
+        # ── Resolve Service Account email ─────────────────────────────────────
+        sa_id      = ctx.get("service_account_id", "")
+        sa_outputs = deployed_outputs.get(sa_id, {})
+        sa_email   = sa_outputs.get("email", "")
+
+        # ── Resolve Pub/Sub env vars ──────────────────────────────────────────
         topic_envs = [
             gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
                 name="PUBSUB_TOPIC_" + re.sub(r"[^A-Z0-9]", "_", _node_name(all_nodes, tid).upper()),
@@ -88,6 +157,22 @@ class CloudRunNode(GCPNode):
         envs = topic_envs + sub_envs
 
         def program() -> None:
+            # ── VPC access block ──────────────────────────────────────────────
+            vpc_access: gcp.cloudrunv2.ServiceTemplateVpcAccessArgs | None = None
+            if network_path and subnetwork_path:
+                vpc_access = gcp.cloudrunv2.ServiceTemplateVpcAccessArgs(
+                    egress="PRIVATE_RANGES_ONLY",
+                    network_interfaces=[
+                        gcp.cloudrunv2.ServiceTemplateVpcAccessNetworkInterfaceArgs(
+                            network=network_path,
+                            subnetwork=subnetwork_path,
+                        )
+                    ],
+                )
+
+            # ── Service-account override ──────────────────────────────────────
+            service_account_arg: str | None = sa_email or None
+
             svc = gcp.cloudrunv2.Service(
                 self.node_id,
                 name=_resource_name(node_dict),
@@ -96,19 +181,12 @@ class CloudRunNode(GCPNode):
                 deletion_protection=False,
                 ingress="INGRESS_TRAFFIC_INTERNAL_ONLY",
                 template=gcp.cloudrunv2.ServiceTemplateArgs(
+                    service_account=service_account_arg,
                     containers=[gcp.cloudrunv2.ServiceTemplateContainerArgs(
                         image=props.get("image", "gcr.io/cloudrun/hello"),
                         envs=envs or None,
                     )],
-                    vpc_access=gcp.cloudrunv2.ServiceTemplateVpcAccessArgs(
-                        egress="PRIVATE_RANGES_ONLY",
-                        network_interfaces=[
-                            gcp.cloudrunv2.ServiceTemplateVpcAccessNetworkInterfaceArgs(
-                                network=props.get("vpc_network", "projects/hrz-endor-net-0/global/networks/endor-0"),
-                                subnetwork=props.get("vpc_subnetwork", "projects/hrz-endor-net-0/regions/me-west1/subnetworks/endor-1-subnet"),
-                            )
-                        ],
-                    ),
+                    vpc_access=vpc_access,
                 ),
             )
             pulumi.export("uri",  svc.uri)
@@ -116,6 +194,10 @@ class CloudRunNode(GCPNode):
             pulumi.export("id",   svc.id)
 
         return program
+
+    # ------------------------------------------------------------------
+    # Post-deploy
+    # ------------------------------------------------------------------
 
     def live_outputs(self, pulumi_outputs, project, region) -> dict:
         """Write the live service URL back into the service_url field on the canvas."""
