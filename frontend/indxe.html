@@ -1181,7 +1181,7 @@ const CategoryList = ({ filteredTypes, isSearching }) => {
 };
 
 // ── Node Edit Modal ───────────────────────────────────────────────────────────
-const NodeEditModal = ({ node, onClose, onChange }) => {
+const NodeEditModal = ({ node, onClose, onChange, nodeEvent }) => {
   if (!node) return null;
 
   const isGroup = node.type === 'vpcGroup' || node.type === 'groupBox';
@@ -1364,6 +1364,14 @@ const NodeEditModal = ({ node, onClose, onChange }) => {
 
         {/* Body */}
         <div className="node-edit-modal-body">
+          {/* Last deploy event — full width */}
+          {nodeEvent && (
+            <div className="modal-full">
+              <div className="modal-section-title" style={{ marginTop: 0 }}>🚀 Last Deploy</div>
+              <NodeEventCard event={nodeEvent} />
+            </div>
+          )}
+
           {/* Label — full width */}
           <div className="modal-field-group modal-full">
             <label className="modal-field-label">Node Label</label>
@@ -1594,7 +1602,7 @@ const VPCGroupNode = ({ data, selected, id }) => {
 };
 
 
-const PropertyPanel = ({ node, onClose, onChange }) => {
+const PropertyPanel = ({ node, onClose, onChange, nodeEvent }) => {
   if (!node) return null;
 
   // VPC Group / Visual Group panel
@@ -1749,6 +1757,14 @@ const PropertyPanel = ({ node, onClose, onChange }) => {
         <button className="panel-close" onClick={onClose}>{ICONS.close}</button>
       </div>
       <div className="panel-body">
+        {/* Last deploy event */}
+        {nodeEvent && (
+          <>
+            <div className="section-title" style={{ marginTop: 0 }}>Last Deploy</div>
+            <NodeEventCard event={nodeEvent} />
+          </>
+        )}
+
         <div className="field-group">
           <label className="field-label">Label</label>
           <input
@@ -1830,10 +1846,589 @@ const PropertyPanel = ({ node, onClose, onChange }) => {
 };
 
 // ── Log Panel ─────────────────────────────────────────────────────────────────
-const LogPanel = ({ logs, visible, onToggle, onClear, panelH, onResize }) => {
+// ── Smart log message renderer — handles JSON, long lines, errors ─────────────
+const LogMessage = ({ msg, level }) => {
+  const [expanded, setExpanded] = React.useState(false);
+
+  // Try to detect and pretty-print embedded JSON blocks
+  const renderMsg = (text) => {
+    if (!text) return null;
+
+    // ── Split on JSON blocks ──
+    // Matches { ... } or [ ... ] spanning multiple lines
+    const parts = [];
+    let lastIdx = 0;
+    const jsonRe = /(\{[\s\S]*?\}|\[[\s\S]*?\])/g;
+    let m;
+    const candidates = [];
+    while ((m = jsonRe.exec(text)) !== null) {
+      try {
+        const parsed = JSON.parse(m[0]);
+        if (typeof parsed === 'object' && parsed !== null) {
+          candidates.push({ start: m.index, end: m.index + m[0].length, parsed, raw: m[0] });
+        }
+      } catch {}
+    }
+
+    if (candidates.length === 0) {
+      // No JSON — just render as text, handle very long lines
+      return <PlainMsg text={text} level={level} />;
+    }
+
+    // Render mixed text + JSON blocks
+    const out = [];
+    let cursor = 0;
+    candidates.forEach((c, ci) => {
+      if (cursor < c.start) {
+        const pre = text.slice(cursor, c.start).trim();
+        if (pre) out.push(<PlainMsg key={`pre-${ci}`} text={pre} level={level} />);
+      }
+      out.push(<JsonBlock key={`json-${ci}`} data={c.parsed} />);
+      cursor = c.end;
+    });
+    if (cursor < text.length) {
+      const rest = text.slice(cursor).trim();
+      if (rest) out.push(<PlainMsg key="rest" text={rest} level={level} />);
+    }
+    return <>{out}</>;
+  };
+
+  return <div style={{ flex: 1, minWidth: 0 }}>{renderMsg(msg)}</div>;
+};
+
+const PlainMsg = ({ text, level }) => {
+  const [expanded, setExpanded] = React.useState(false);
+  const TRUNCATE = 200;
+  const isLong = text.length > TRUNCATE;
+  const shown = isLong && !expanded ? text.slice(0, TRUNCATE) + '…' : text;
+
+  // colour keywords
+  const highlight = (s) => {
+    // Bold the leading status token like "[1/3] ▶ CloudRun (CloudRunNode)"
+    const m = s.match(/^(\[\d+\/\d+\]\s*[▶✓✗⚠]\s*\S.*?\))/);
+    if (m) {
+      return <><strong style={{ color: 'var(--text0)' }}>{m[1]}</strong>{s.slice(m[1].length)}</>;
+    }
+    return s;
+  };
+
+  return (
+    <span style={{ wordBreak: 'break-word', whiteSpace: 'pre-wrap', fontSize: 11 }}>
+      {highlight(shown)}
+      {isLong && (
+        <button onClick={() => setExpanded(v => !v)} style={{
+          marginLeft: 6, fontSize: 9, color: 'var(--accent)', background: 'none',
+          border: 'none', cursor: 'pointer', padding: '0 4px', borderRadius: 3,
+          background: 'rgba(59,130,246,0.1)', fontFamily: 'var(--font-mono)',
+        }}>
+          {expanded ? 'less' : `+${text.length - TRUNCATE} more`}
+        </button>
+      )}
+    </span>
+  );
+};
+
+const JsonBlock = ({ data }) => {
+  const [open, setOpen] = React.useState(false);
+  // One-line preview
+  const preview = JSON.stringify(data);
+  const shortPreview = preview.length > 60 ? preview.slice(0, 60) + '…' : preview;
+  return (
+    <div style={{ margin: '3px 0', borderRadius: 6, overflow: 'hidden', border: '1px solid rgba(59,130,246,0.2)' }}>
+      <div
+        onClick={() => setOpen(v => !v)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '3px 8px', cursor: 'pointer', userSelect: 'none',
+          background: 'rgba(59,130,246,0.07)',
+          fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text1)',
+        }}
+      >
+        <span style={{ color: 'var(--accent)', fontSize: 9, fontWeight: 700, letterSpacing: '.05em' }}>JSON</span>
+        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text2)' }}>{shortPreview}</span>
+        <span style={{ color: 'var(--text2)', fontSize: 9 }}>{open ? '▲' : '▼'}</span>
+      </div>
+      {open && (
+        <pre style={{
+          margin: 0, padding: '8px 10px', fontSize: 10, lineHeight: 1.6,
+          background: 'rgba(8,11,18,0.6)', color: '#a5f3fc',
+          overflowX: 'auto', maxHeight: 200, overflowY: 'auto',
+          fontFamily: 'var(--font-mono)',
+          borderTop: '1px solid rgba(59,130,246,0.15)',
+        }}>
+          {JSON.stringify(data, null, 2)}
+        </pre>
+      )}
+    </div>
+  );
+};
+
+// ── Node Event Card — shown in PropertyPanel and NodeEditModal ────────────────
+// ── Raw log renderer — GCP Console style ─────────────────────────────────────
+const RawLogViewer = ({ raw, accentColor }) => {
+  if (!raw) return null;
+
+  // Split raw into lines and render each with colour + JSON collapsing
+  const lines = raw.split('\n');
+
+  return (
+    <div style={{
+      background: '#0a0e1a', borderRadius: 8,
+      fontFamily: 'var(--font-mono)', fontSize: 10.5,
+      lineHeight: 1.65, overflowY: 'auto', maxHeight: 340,
+      padding: '8px 0',
+    }}>
+      {lines.map((line, i) => {
+        const trimmed = line.trimStart();
+        const indent = line.length - trimmed.length;
+
+        // Detect colour
+        let color = '#94a3b8';
+        if (/error|failed|FAILED/i.test(trimmed)) color = '#f87171';
+        else if (/warning/i.test(trimmed))          color = '#fbbf24';
+        else if (/✓|created|updated|\+ /i.test(trimmed)) color = '#34d399';
+        else if (/\[|\]/.test(trimmed) && /\d+\/\d+/.test(trimmed)) color = '#60a5fa';
+        else if (trimmed.startsWith('"') || /^\w+:/.test(trimmed)) color = '#c4b5fd';
+        else if (/^\{|^\[|\}$|\]$/.test(trimmed)) color = '#7dd3fc';
+
+        // Detect inline JSON object/array
+        const jsonMatch = trimmed.match(/^(\{[\s\S]*\}|\[[\s\S]*\])$/);
+        if (jsonMatch) {
+          try {
+            const parsed = JSON.parse(jsonMatch[0]);
+            return <InlineJsonBlock key={i} data={parsed} indent={indent} />;
+          } catch {}
+        }
+
+        return (
+          <div key={i} style={{
+            display: 'flex', gap: 10, padding: '0 12px',
+            background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.018)',
+          }}>
+            <span style={{ color: '#334155', fontSize: 9, minWidth: 28, textAlign: 'right', flexShrink: 0, userSelect: 'none', paddingTop: 1 }}>
+              {i + 1}
+            </span>
+            <span style={{ color, whiteSpace: 'pre-wrap', wordBreak: 'break-all', flex: 1 }}>
+              {line}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const InlineJsonBlock = ({ data, indent = 0 }) => {
+  const [open, setOpen] = React.useState(false);
+  const preview = JSON.stringify(data);
+  const short = preview.length > 70 ? preview.slice(0, 70) + '…' : preview;
+  return (
+    <div style={{ padding: `0 12px 0 ${12 + indent * 6}px` }}>
+      <div onClick={() => setOpen(v => !v)} style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        cursor: 'pointer', padding: '1px 0', userSelect: 'none',
+      }}>
+        <span style={{ color: open ? '#7dd3fc' : '#60a5fa', fontSize: 9, fontWeight: 700, width: 12, flexShrink: 0 }}>
+          {open ? '▼' : '▶'}
+        </span>
+        {!open && (
+          <span style={{ color: '#7dd3fc', fontFamily: 'var(--font-mono)', fontSize: 10.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
+            {short}
+          </span>
+        )}
+        {!open && (
+          <span style={{ color: '#334155', fontSize: 9, flexShrink: 0 }}>
+            {Array.isArray(data) ? `[${data.length}]` : `{${Object.keys(data).length}}`}
+          </span>
+        )}
+      </div>
+      {open && (
+        <pre style={{
+          margin: '2px 0 4px 18px', padding: '6px 10px',
+          background: 'rgba(255,255,255,0.04)', borderRadius: 6,
+          fontSize: 10, color: '#a5f3fc', lineHeight: 1.6,
+          overflowX: 'auto', border: '1px solid rgba(99,102,241,0.2)',
+          whiteSpace: 'pre', wordBreak: 'normal',
+        }}>
+          {JSON.stringify(data, null, 2)}
+        </pre>
+      )}
+    </div>
+  );
+};
+
+const NodeEventCard = ({ event }) => {
+  const [showRaw, setShowRaw] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState('summary'); // summary | log | outputs
+  if (!event) return null;
+
+  const statusMeta = {
+    deployed:  { color: '#34d399', icon: '✓', label: 'Deployed',       bg: 'rgba(52,211,153,0.08)'  },
+    no_change: { color: '#60a5fa', icon: '≡', label: 'No Changes',     bg: 'rgba(96,165,250,0.08)'  },
+    failed:    { color: '#f87171', icon: '✗', label: 'Failed',         bg: 'rgba(248,113,113,0.1)'  },
+    skipped:   { color: '#fbbf24', icon: '⚠', label: 'Skipped',        bg: 'rgba(251,191,36,0.08)'  },
+  };
+  const meta = statusMeta[event.status] || statusMeta.skipped;
+  const tsStr = event.ts
+    ? new Date(event.ts).toLocaleString('he-IL', { hour12: false, timeZoneName: 'short' })
+    : '';
+
+  const hasOutputs = event.outputs && Object.keys(event.outputs).length > 0;
+  const hasRaw     = Boolean(event.raw && event.raw.length > 10);
+  const hasError   = Boolean(event.error);
+
+  const tabs = [
+    { id: 'summary', label: 'Summary' },
+    ...(hasRaw     ? [{ id: 'log',     label: 'Full Log' }] : []),
+    ...(hasOutputs ? [{ id: 'outputs', label: 'Outputs' }] : []),
+  ];
+
+  return (
+    <div style={{
+      borderRadius: 10, overflow: 'hidden',
+      border: `1px solid ${meta.color}44`,
+      background: 'var(--bg2)', marginBottom: 14,
+    }}>
+      {/* ── Header ── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+        background: meta.bg,
+        borderBottom: `1px solid ${meta.color}28`,
+      }}>
+        <div style={{
+          width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+          background: meta.color + '20', color: meta.color,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 14, fontWeight: 900,
+          boxShadow: `0 0 10px ${meta.color}44`,
+        }}>{meta.icon}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, color: meta.color }}>
+            {meta.label}
+          </div>
+          <div style={{ fontSize: 9, color: 'var(--text2)', fontFamily: 'var(--font-mono)', marginTop: 1 }}>
+            {tsStr || 'Unknown time'}
+          </div>
+        </div>
+        {/* Status dot with glow */}
+        <div style={{
+          width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+          background: meta.color, boxShadow: `0 0 8px ${meta.color}`,
+        }} />
+      </div>
+
+      {/* ── Tab bar ── */}
+      {tabs.length > 1 && (
+        <div style={{
+          display: 'flex', gap: 0,
+          borderBottom: '1px solid var(--border)',
+          background: 'var(--bg1)',
+        }}>
+          {tabs.map(t => (
+            <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
+              padding: '6px 14px', border: 'none', background: 'transparent',
+              cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600,
+              color: activeTab === t.id ? meta.color : 'var(--text2)',
+              borderBottom: activeTab === t.id ? `2px solid ${meta.color}` : '2px solid transparent',
+              transition: 'color .15s',
+              letterSpacing: '.04em',
+            }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ── Summary tab ── */}
+      {activeTab === 'summary' && (
+        <div style={{ padding: '10px 14px' }}>
+          {/* One-line summary */}
+          <div style={{
+            fontSize: 12, color: 'var(--text0)', lineHeight: 1.6,
+            fontWeight: 500, marginBottom: hasError ? 10 : 0,
+          }}>
+            {event.summary || '—'}
+          </div>
+
+          {/* Error block */}
+          {hasError && (
+            <div style={{
+              marginTop: 8, padding: '8px 12px',
+              background: 'rgba(248,113,113,0.08)',
+              border: '1px solid rgba(248,113,113,0.25)',
+              borderRadius: 8, fontFamily: 'var(--font-mono)',
+            }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#f87171', letterSpacing: '.08em', marginBottom: 5, textTransform: 'uppercase' }}>
+                Error Detail
+              </div>
+              {event.error.split('\n').map((line, i) => {
+                const isConstraint = line.startsWith('Org-policy');
+                const isURL = line.startsWith('http');
+                return (
+                  <div key={i} style={{
+                    fontSize: 10.5, lineHeight: 1.7,
+                    color: isConstraint ? '#fbbf24' : isURL ? '#60a5fa' : '#fca5a5',
+                    fontWeight: isConstraint ? 700 : 400,
+                  }}>
+                    {isURL
+                      ? <a href={line} target="_blank" style={{ color: '#60a5fa' }}>{line}</a>
+                      : line}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Full Log tab ── */}
+      {activeTab === 'log' && hasRaw && (
+        <div style={{ padding: '8px 0' }}>
+          <RawLogViewer raw={event.raw} accentColor={meta.color} />
+          <div style={{ padding: '4px 12px 0', display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => navigator.clipboard?.writeText(event.raw)}
+              style={{
+                fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '.06em',
+                background: 'none', border: '1px solid var(--border)', borderRadius: 5,
+                color: 'var(--text2)', cursor: 'pointer', padding: '2px 8px',
+              }}
+            >
+              ⎘ Copy log
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Outputs tab ── */}
+      {activeTab === 'outputs' && hasOutputs && (
+        <div style={{ padding: '10px 14px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {Object.entries(event.outputs).map(([k, v]) => {
+              const isUrl = typeof v === 'string' && v.startsWith('http');
+              const isId = k === 'id' || k === 'name';
+              return (
+                <div key={k} style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 8,
+                  padding: '6px 10px', borderRadius: 7,
+                  background: 'var(--bg1)', border: '1px solid var(--border)',
+                }}>
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, color: 'var(--text2)',
+                    fontFamily: 'var(--font-mono)', minWidth: 60, flexShrink: 0,
+                    letterSpacing: '.03em', paddingTop: 1,
+                  }}>{k}</span>
+                  <span style={{ flex: 1, fontSize: 11, fontFamily: 'var(--font-mono)', wordBreak: 'break-all', color: isUrl ? '#60a5fa' : isId ? '#c4b5fd' : 'var(--text0)' }}>
+                    {isUrl
+                      ? <a href={v} target="_blank" style={{ color: '#60a5fa', textDecoration: 'none' }}>{v}</a>
+                      : String(v)}
+                  </span>
+                  <button onClick={() => navigator.clipboard?.writeText(String(v))} style={{
+                    background: 'none', border: 'none', color: 'var(--text2)',
+                    cursor: 'pointer', fontSize: 10, flexShrink: 0, padding: '0 2px',
+                    opacity: 0.6,
+                  }} title="Copy">⎘</button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── OutcomeRow — expandable log row with full raw output drawer ───────────────
+const OutcomeRow = ({ l, lvlKey, cfg, nodeEvents }) => {
+  const [open, setOpen] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
+
+  // Get raw log from nodeEvents if available, fall back to msg
+  const event    = l.node_id ? nodeEvents[l.node_id] : null;
+  const raw      = event?.raw || null;
+  const hasRaw   = Boolean(raw && raw.length > 10);
+  const hasError = Boolean(event?.error);
+
+  const bgColor = lvlKey === 'ok'
+    ? 'rgba(52,211,153,0.07)'
+    : lvlKey === 'err'
+    ? 'rgba(248,113,113,0.09)'
+    : lvlKey === 'warn'
+    ? 'rgba(251,191,36,0.07)'
+    : 'rgba(255,255,255,0.03)';
+
+  const copyRaw = () => {
+    navigator.clipboard?.writeText(raw || l.msg || '');
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <div style={{ margin: '2px 0', borderRadius: 7, overflow: 'hidden', border: `1px solid ${open ? cfg.color + '44' : 'transparent'}` }}>
+      {/* ── Main row ── */}
+      <div
+        onClick={() => setOpen(v => !v)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '5px 8px', cursor: hasRaw ? 'pointer' : 'default',
+          background: bgColor,
+          borderLeft: `3px solid ${cfg.color}`,
+          userSelect: 'none',
+        }}
+      >
+        {/* Expand toggle */}
+        <span style={{
+          fontSize: 8, color: hasRaw ? cfg.color : 'transparent',
+          flexShrink: 0, width: 10, transition: 'transform .15s',
+          transform: open ? 'rotate(90deg)' : 'none',
+          display: 'inline-block',
+        }}>▶</span>
+
+        <span style={{ fontSize: 9, color: 'var(--text2)', fontFamily: 'var(--font-mono)', flexShrink: 0, minWidth: 62 }}>{l.ts || ''}</span>
+
+        <span style={{
+          fontSize: 9, fontWeight: 800, letterSpacing: '.06em',
+          padding: '2px 7px', borderRadius: 99,
+          background: cfg.bg, color: cfg.color, flexShrink: 0,
+        }}>{cfg.label}</span>
+
+        <span style={{
+          fontSize: 11.5, fontWeight: 600, color: cfg.color,
+          fontFamily: 'var(--font-mono)', flex: 1,
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        }}>
+          {l.msg || ''}
+        </span>
+
+        {hasRaw && (
+          <span style={{
+            fontSize: 8.5, color: 'var(--text2)', fontFamily: 'var(--font-mono)',
+            flexShrink: 0, letterSpacing: '.05em',
+            opacity: open ? 1 : 0.5,
+          }}>
+            {open ? 'hide' : 'details'}
+          </span>
+        )}
+      </div>
+
+      {/* ── Drawer ── */}
+      {open && hasRaw && (
+        <div style={{ background: '#070a12', borderTop: `1px solid ${cfg.color}22` }}>
+
+          {/* Error summary banner if failed */}
+          {hasError && (
+            <div style={{
+              padding: '7px 12px',
+              background: 'rgba(248,113,113,0.08)',
+              borderBottom: '1px solid rgba(248,113,113,0.15)',
+              display: 'flex', alignItems: 'flex-start', gap: 8,
+            }}>
+              <span style={{ fontSize: 10, color: '#f87171', fontWeight: 800, flexShrink: 0, marginTop: 1 }}>✗</span>
+              <div style={{ flex: 1 }}>
+                {event.error.split('\n').map((line, i) => (
+                  <div key={i} style={{
+                    fontSize: 10.5, fontFamily: 'var(--font-mono)', lineHeight: 1.6,
+                    color: line.startsWith('→') ? '#60a5fa'
+                         : line.startsWith('Org-policy') || line.startsWith('Auth') ? '#fbbf24'
+                         : '#fca5a5',
+                    fontWeight: line.startsWith('→') || i === 0 ? 600 : 400,
+                  }}>{line}</div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Toolbar */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '4px 10px', borderBottom: '1px solid rgba(255,255,255,0.05)',
+            background: 'rgba(255,255,255,0.02)',
+          }}>
+            <span style={{ fontSize: 9, color: '#334155', fontFamily: 'var(--font-mono)', flex: 1 }}>
+              raw pulumi output · {raw.split('\n').length} lines
+            </span>
+            <button onClick={copyRaw} style={{
+              fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '.05em',
+              background: copied ? 'rgba(52,211,153,0.15)' : 'rgba(255,255,255,0.05)',
+              border: `1px solid ${copied ? '#34d399' : 'rgba(255,255,255,0.1)'}`,
+              borderRadius: 4, color: copied ? '#34d399' : '#64748b',
+              cursor: 'pointer', padding: '2px 8px',
+            }}>
+              {copied ? '✓ copied' : '⎘ copy'}
+            </button>
+            <button onClick={() => {
+              const w = window.open('', '_blank', 'width=900,height=650,menubar=no,toolbar=no');
+              if (!w) return;
+              const lines = raw.split('\n');
+              const body = lines.map((line, i) => {
+                const isErr  = /error|failed/i.test(line);
+                const isOk   = /created|updated|✓|\+ /.test(line);
+                const isWarn = /warning/i.test(line);
+                const color  = isErr ? '#f87171' : isOk ? '#34d399' : isWarn ? '#fbbf24' : '#94a3b8';
+                const safe   = line.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                return `<div style="display:flex;gap:10px;padding:1px 0"><span style="color:#334155;min-width:32px;text-align:right;flex-shrink:0;user-select:none">${i+1}</span><span style="color:${color};white-space:pre-wrap;word-break:break-all">${safe}</span></div>`;
+              }).join('');
+              w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Pulumi Raw Log — ${l.msg?.slice(0,60) || ''}</title>
+<style>*{box-sizing:border-box;margin:0;padding:0}body{background:#070a12;color:#94a3b8;font-family:'JetBrains Mono',monospace;font-size:11px;padding:0}
+.toolbar{position:sticky;top:0;background:#0d1117;border-bottom:1px solid #1e3a5f;padding:8px 14px;display:flex;gap:10px;align-items:center}
+.title{font-size:12px;font-weight:700;color:#f0f6ff;flex:1}.meta{font-size:10px;color:#4a6080}
+.lines{padding:8px 14px}
+</style></head><body>
+<div class="toolbar"><span class="title">Pulumi Raw Output</span><span class="meta">${l.msg?.slice(0,80) || ''}</span><span class="meta">${lines.length} lines</span></div>
+<div class="lines">${body}</div>
+</body></html>`);
+              w.document.close();
+            }} style={{
+              fontSize: 9, fontFamily: 'var(--font-mono)',
+              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 4, color: '#64748b', cursor: 'pointer', padding: '2px 8px',
+            }}>
+              ⬡ popout
+            </button>
+          </div>
+
+          {/* Raw lines */}
+          <div style={{
+            overflowY: 'auto', maxHeight: 320,
+            fontFamily: 'var(--font-mono)', fontSize: 10.5, lineHeight: 1.65,
+            padding: '6px 0',
+          }}>
+            {raw.split('\n').map((line, i) => {
+              const isErr  = /error|failed|\*\*/i.test(line);
+              const isOk   = /created|updated|✓|\+ (?!.*error)/i.test(line) && !isErr;
+              const isWarn = /warning/i.test(line) && !isErr;
+              const color  = isErr  ? '#f87171'
+                           : isOk   ? '#34d399'
+                           : isWarn ? '#fbbf24'
+                           : line.trim().startsWith('"') || /^\s+\w+\s*:/.test(line) ? '#c4b5fd'
+                           : '#94a3b8';
+              if (!line.trim()) return <div key={i} style={{ height: 4 }} />;
+              return (
+                <div key={i} style={{
+                  display: 'flex', gap: 10, padding: '0 12px',
+                  background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.012)',
+                }}>
+                  <span style={{ color: '#1e2d42', fontSize: 9, minWidth: 28, textAlign: 'right', flexShrink: 0, userSelect: 'none', paddingTop: 2 }}>
+                    {i + 1}
+                  </span>
+                  <span style={{ color, whiteSpace: 'pre-wrap', wordBreak: 'break-all', flex: 1 }}>
+                    {line}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const LogPanel = ({ logs, visible, onToggle, onClear, panelH, onResize, nodeEvents = {} }) => {
   const levelConfig = {
     ok:   { color: 'var(--green)',  label: 'OK',   bg: 'rgba(16,185,129,0.08)'  },
     err:  { color: 'var(--red)',    label: 'ERR',  bg: 'rgba(239,68,68,0.08)'   },
+    error:{ color: 'var(--red)',    label: 'ERR',  bg: 'rgba(239,68,68,0.08)'   },
     info: { color: 'var(--accent)', label: 'INFO', bg: 'rgba(59,130,246,0.08)'  },
     warn: { color: 'var(--yellow)', label: 'WARN', bg: 'rgba(245,158,11,0.08)'  },
   };
@@ -1845,14 +2440,12 @@ const LogPanel = ({ logs, visible, onToggle, onClear, panelH, onResize }) => {
   const [autoScroll, setAutoScroll] = useState(true);
   const [copied, setCopied] = useState(false);
 
-  // auto-scroll when new logs arrive
   useEffect(() => {
     if (autoScroll && bodyRef.current && visible) {
       bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
     }
   }, [logs, autoScroll, visible]);
 
-  // resize drag
   const onResizeMouseDown = (e) => {
     e.preventDefault();
     dragRef.current = { dragging: true, startY: e.clientY, startH: panelH };
@@ -1871,7 +2464,6 @@ const LogPanel = ({ logs, visible, onToggle, onClear, panelH, onResize }) => {
     window.addEventListener('mouseup', onUp);
   };
 
-  // open in separate window
   const openPopout = () => {
     const filtered = getFiltered();
     const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Deploy Log</title>
@@ -1879,20 +2471,21 @@ const LogPanel = ({ logs, visible, onToggle, onClear, panelH, onResize }) => {
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#080b12;color:#f0f6ff;font-family:'JetBrains Mono',monospace;font-size:11px;padding:12px}
 h2{font-size:13px;font-weight:700;margin-bottom:10px;color:#94a3b8;letter-spacing:.1em;text-transform:uppercase}
-.entry{display:flex;gap:10px;padding:3px 6px;border-radius:4px;margin-bottom:1px}
+.entry{display:flex;gap:10px;padding:3px 6px;border-radius:4px;margin-bottom:1px;align-items:flex-start}
 .entry:nth-child(even){background:rgba(255,255,255,0.03)}
-.ts{color:#4a6080;min-width:65px;flex-shrink:0}
-.badge{font-size:9px;font-weight:700;padding:1px 5px;border-radius:99px;min-width:30px;text-align:center;flex-shrink:0}
+.ts{color:#4a6080;min-width:70px;flex-shrink:0;padding-top:1px}
+.badge{font-size:9px;font-weight:700;padding:1px 5px;border-radius:99px;min-width:32px;text-align:center;flex-shrink:0;margin-top:1px}
 .ok .badge{background:rgba(16,185,129,.15);color:#10b981}
 .err .badge{background:rgba(239,68,68,.15);color:#ef4444}
 .info .badge{background:rgba(59,130,246,.15);color:#3b82f6}
 .warn .badge{background:rgba(245,158,11,.15);color:#f59e0b}
 .ok .msg{color:#10b981}.err .msg{color:#ef4444}.info .msg{color:#3b82f6}.warn .msg{color:#f59e0b}
+.msg{white-space:pre-wrap;word-break:break-word;flex:1}
 </style></head><body>
 <h2>Deploy Log — ${filtered.length} entries</h2>
-${filtered.map((l,i) => `<div class="entry ${l.level||'info'}"><span class="ts">${l.ts}</span><span class="badge">${(l.level||'info').toUpperCase().slice(0,4)}</span><span class="msg">${l.msg}</span></div>`).join('')}
+${filtered.map((l,i) => `<div class="entry ${l.level||'info'}"><span class="ts">${l.ts||''}</span><span class="badge">${(l.level||'info').toUpperCase().slice(0,4)}</span><span class="msg">${(l.msg||'').replace(/</g,'&lt;')}</span></div>`).join('')}
 </body></html>`;
-    const w = window.open('', '_blank', 'width=800,height=600,menubar=no,toolbar=no');
+    const w = window.open('', '_blank', 'width=860,height=640,menubar=no,toolbar=no');
     if (w) { w.document.write(html); w.document.close(); }
   };
 
@@ -1903,7 +2496,8 @@ ${filtered.map((l,i) => `<div class="entry ${l.level||'info'}"><span class="ts">
 
   const getFiltered = () => {
     let result = logs;
-    if (filter !== 'all') result = result.filter(l => l.level === filter);
+    const lvl = filter === 'err' ? ['err','error'] : filter === 'all' ? null : [filter];
+    if (lvl) result = result.filter(l => lvl.includes(l.level));
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(l => l.msg?.toLowerCase().includes(q));
@@ -1912,7 +2506,7 @@ ${filtered.map((l,i) => `<div class="entry ${l.level||'info'}"><span class="ts">
   };
 
   const filtered = getFiltered();
-  const errCount = logs.filter(l => l.level === 'err').length;
+  const errCount = logs.filter(l => l.level === 'err' || l.level === 'error').length;
   const warnCount = logs.filter(l => l.level === 'warn').length;
 
   return (
@@ -1921,10 +2515,8 @@ ${filtered.map((l,i) => `<div class="entry ${l.level||'info'}"><span class="ts">
       className={`log-panel ${visible ? '' : 'hidden'}`}
       style={{ height: visible ? panelH : 36 }}
     >
-      {/* Resize handle */}
       {visible && <div className="log-resize-handle" onMouseDown={onResizeMouseDown} />}
 
-      {/* Header */}
       <div className="log-header">
         <div style={{ width: 6, height: 6, borderRadius: '50%', background: errCount > 0 ? 'var(--red)' : 'var(--green)', boxShadow: `0 0 6px ${errCount > 0 ? 'var(--red)' : 'var(--green)'}`, flexShrink: 0 }} />
         <div className="log-title">Deploy Log</div>
@@ -1932,33 +2524,27 @@ ${filtered.map((l,i) => `<div class="entry ${l.level||'info'}"><span class="ts">
         {warnCount > 0 && <span style={{ fontSize: 9, fontWeight: 700, background: 'rgba(245,158,11,0.15)', color: 'var(--yellow)', borderRadius: 99, padding: '1px 6px' }}>{warnCount} WARN</span>}
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 10, color: 'var(--text2)', fontFamily: 'var(--font-mono)' }}>{filtered.length}/{logs.length}</span>
-        {/* auto-scroll toggle */}
         <button title="Auto-scroll" onClick={() => setAutoScroll(v => !v)}
           style={{ background: autoScroll ? 'rgba(59,130,246,0.15)' : 'transparent', border: '1px solid ' + (autoScroll ? 'var(--accent)' : 'var(--border)'), borderRadius: 6, color: autoScroll ? 'var(--accent)' : 'var(--text2)', cursor: 'pointer', padding: '2px 6px', fontSize: 10, fontFamily: 'var(--font-mono)', marginLeft: 4 }}>
           ↓
         </button>
-        {/* popout */}
         <button title="Open in window" onClick={openPopout}
           style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text2)', cursor: 'pointer', padding: '2px 6px', fontSize: 10, lineHeight: 1 }}>
           ⬡
         </button>
-        {/* copy */}
         <button title="Copy all" onClick={copyAll}
           style={{ background: copied ? 'rgba(16,185,129,0.15)' : 'transparent', border: '1px solid ' + (copied ? 'var(--green)' : 'var(--border)'), borderRadius: 6, color: copied ? 'var(--green)' : 'var(--text2)', cursor: 'pointer', padding: '2px 6px', fontSize: 10 }}>
           {copied ? '✓' : '⎘'}
         </button>
-        {/* clear */}
         <button title="Clear logs" onClick={onClear}
           style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text2)', cursor: 'pointer', padding: '2px 6px', fontSize: 10 }}>
           ✕
         </button>
-        {/* toggle */}
         <button className="btn btn-ghost" style={{ padding: '2px 8px', fontSize: 10 }} onClick={onToggle}>
           {visible ? '▼' : '▲'}
         </button>
       </div>
 
-      {/* Toolbar: filter + search */}
       {visible && (
         <div className="log-toolbar">
           {['all','ok','info','warn','err'].map(f => (
@@ -1976,33 +2562,52 @@ ${filtered.map((l,i) => `<div class="entry ${l.level||'info'}"><span class="ts">
         </div>
       )}
 
-      {/* Log body */}
       {visible && (
         <div className="log-body" id="log-scroll" ref={bodyRef}>
           {filtered.length === 0 && (
-            <div style={{ color: 'var(--text2)', fontStyle: 'italic', padding: '4px 0' }}>
+            <div style={{ color: 'var(--text2)', fontStyle: 'italic', padding: '8px 0', textAlign: 'center', fontSize: 11 }}>
               {logs.length === 0 ? '— No activity yet —' : '— No matching entries —'}
             </div>
           )}
           {filtered.map((l, i) => {
-            const cfg = levelConfig[l.level] || levelConfig.info;
-            return (
-              <div key={i} style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '3px 8px', borderRadius: 6,
-                background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)',
-                marginBottom: 1,
-              }}>
-                <span style={{ fontSize: 10, color: 'var(--text2)', fontFamily: 'var(--font-mono)', flexShrink: 0, minWidth: 70 }}>{l.ts}</span>
-                <span style={{
-                  fontSize: 9, fontWeight: 700, letterSpacing: '.06em',
-                  padding: '1px 6px', borderRadius: 99,
-                  background: cfg.bg, color: cfg.color,
-                  minWidth: 32, textAlign: 'center', flexShrink: 0,
-                }}>{cfg.label}</span>
-                <span style={{ fontSize: 11, color: cfg.color, fontFamily: 'var(--font-mono)', flex: 1 }}>{l.msg}</span>
-              </div>
-            );
+            const lvlKey = l.level === 'error' ? 'err' : (l.level || 'info');
+            const cfg = levelConfig[lvlKey] || levelConfig.info;
+            const isOutcome = /[✓✗⚠▶]/.test(l.msg || '') && /\[\d+\/\d+\]/.test(l.msg || '');
+            const isPhase   = !isOutcome && (l.msg?.startsWith('Phase ') || l.msg?.startsWith('Deploy'));
+            const isNoise   = !isOutcome && !isPhase;
+
+            if (isNoise) {
+              return (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'baseline', gap: 6,
+                  padding: '0px 8px', opacity: 0.55,
+                }}>
+                  <span style={{ fontSize: 8.5, color: 'var(--text2)', fontFamily: 'var(--font-mono)', flexShrink: 0, minWidth: 62 }}>{l.ts || ''}</span>
+                  <span style={{ fontSize: 8.5, color: cfg.color, fontFamily: 'var(--font-mono)', flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {(l.msg || '').slice(0, 120)}
+                  </span>
+                </div>
+              );
+            }
+
+            if (isPhase) {
+              return (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '6px 8px 3px',
+                  borderTop: i > 0 ? '1px solid var(--border)' : 'none',
+                  marginTop: i > 0 ? 4 : 0,
+                }}>
+                  <span style={{ fontSize: 9, color: 'var(--text2)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>{l.ts || ''}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
+                    {l.msg}
+                  </span>
+                </div>
+              );
+            }
+
+            // isOutcome — expandable row with raw log drawer
+            return <OutcomeRow key={i} l={l} lvlKey={lvlKey} cfg={cfg} nodeEvents={nodeEvents} />;
           })}
         </div>
       )}
@@ -2104,6 +2709,7 @@ function VCOApp() {
   const [selectedNode, setSelectedNode] = useState(null);
   const [editModalNode, setEditModalNode] = useState(null);
   const [logs, setLogs] = useState([]);
+  const [nodeEvents, setNodeEvents] = useState({}); // node_id → last deploy event
   const [logVisible, setLogVisible] = useState(false);
   const [logPanelH, setLogPanelH] = useState(160);
   const [toasts, setToasts] = useState([]);
@@ -2160,7 +2766,19 @@ function VCOApp() {
         // 2. Then get the saved graph (schemas are now available in typesData)
         const stateRes = await fetch('http://localhost:8000/api/state');
         const state = await stateRes.json();
-        if (!state?.nodes?.length) { graphLoadedRef.current = true; return; }
+        if (!state?.nodes?.length) {
+          graphLoadedRef.current = true;
+          // Still load logs + events even if no nodes
+          try {
+            const logRes = await fetch('http://localhost:8000/api/deploy-logs/history?limit=500');
+            if (logRes.ok) { const d = await logRes.json(); if (d.entries?.length) setLogs(d.entries); }
+          } catch {}
+          try {
+            const evRes = await fetch('http://localhost:8000/api/deploy-logs/node-events');
+            if (evRes.ok) { const d = await evRes.json(); setNodeEvents(d || {}); }
+          } catch {}
+          return;
+        }
 
         const schemaSource = typesData?.length ? typesData : [];
         const restored = state.nodes.map(n => {
@@ -2190,7 +2808,31 @@ function VCOApp() {
         setNodes(restored);
         setEdges(restoredEdges);
         graphLoadedRef.current = true;
-        addLog(`Restored ${restored.length} node(s) from saved state`, 'info');
+
+        // 3. Load persisted log history FIRST (before addLog so we don't overwrite)
+        try {
+          const logRes = await fetch('http://localhost:8000/api/deploy-logs/history?limit=500');
+          if (logRes.ok) {
+            const logData = await logRes.json();
+            if (logData.entries?.length) {
+              // Set history directly — don't call addLog which would re-POST to server
+              setLogs(logData.entries);
+            }
+          }
+        } catch { /* silent */ }
+
+        // 4. Load per-node last-deploy events
+        try {
+          const evRes = await fetch('http://localhost:8000/api/deploy-logs/node-events');
+          if (evRes.ok) {
+            const evData = await evRes.json();
+            setNodeEvents(evData || {});
+          }
+        } catch { /* silent */ }
+
+        // 5. Add "session started" marker AFTER history is loaded (appends, doesn't replace)
+        addLog(`Session restored — ${restored.length} node(s)`, 'info');
+
       } catch (e) {
         graphLoadedRef.current = true; // allow saves even if restore fails
         addLog(`Failed to load saved state: ${e.message}`, 'warn');
@@ -2255,7 +2897,7 @@ function VCOApp() {
   const handleWsMessage = useCallback((msg) => {
     // Typed log line sent by the server
     if (msg.event === 'log') {
-      addLog(msg.msg, msg.level || 'info');
+      addLog(msg.msg, msg.level || 'info', msg.node_id || null);
     }
 
     if (msg.event === 'node_status') {
@@ -2272,6 +2914,15 @@ function VCOApp() {
         nodesRef.current = updated; // sync immediately, don't wait for useEffect
         return updated;
       });
+      // Refresh node events after status change
+      if (newStatus === 'deployed' || newStatus === 'failed') {
+        setTimeout(() => {
+          fetch('http://localhost:8000/api/deploy-logs/node-events')
+            .then(r => r.ok ? r.json() : null)
+            .then(data => { if (data) setNodeEvents(data); })
+            .catch(() => {});
+        }, 800);
+      }
     }
 
     if (msg.event === 'node_working') {
@@ -2311,7 +2962,13 @@ function VCOApp() {
         addLog(`Deploy complete — ${msg.changed} resource(s) changed`, 'ok');
         showToast('Deployment complete!', 'success');
       }
-      // 600ms gives React time to flush all WS-triggered setNodes before we read nodesRef
+      // Refresh node events after deploy
+      setTimeout(() => {
+        fetch('http://localhost:8000/api/deploy-logs/node-events')
+          .then(r => r.ok ? r.json() : null)
+          .then(data => { if (data) setNodeEvents(data); })
+          .catch(() => {});
+      }, 1000);
       setTimeout(() => autoSaveRef.current(), 600);
     }
 
@@ -2351,9 +3008,17 @@ function VCOApp() {
   }, []);
 
 
-  const addLog = (msg, level = 'info') => {
+  const addLog = (msg, level = 'info', node_id = null) => {
     const ts = new Date().toLocaleTimeString('en-US', { hour12: false });
-    setLogs(l => [...l.slice(-499), { ts, msg, level }]);
+    const entry = { ts, msg, level, node_id };
+    // Append to existing logs (history already loaded from server)
+    setLogs(l => [...l.slice(-1499), entry]);
+    // Persist to backend (fire-and-forget — don't await, don't block UI)
+    fetch('http://localhost:8000/api/deploy-logs/append', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entry),
+    }).catch(() => {});
     setTimeout(() => {
       const el = document.getElementById('log-scroll');
       if (el) el.scrollTop = el.scrollHeight;
@@ -2916,7 +3581,10 @@ function VCOApp() {
         )}
 
         {/* Log */}
-        <LogPanel logs={logs} visible={logVisible} onToggle={() => setLogVisible(v => !v)} onClear={() => setLogs([])} panelH={logPanelH} onResize={setLogPanelH} />
+        <LogPanel logs={logs} visible={logVisible} onToggle={() => setLogVisible(v => !v)} onClear={() => {
+          setLogs([]);
+          fetch('http://localhost:8000/api/deploy-logs/history', { method: 'DELETE' }).catch(() => {});
+        }} panelH={logPanelH} onResize={setLogPanelH} nodeEvents={nodeEvents} />
         {nodeLogsModal && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', zIndex:3000, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)' }}
           onClick={() => { nodeLogsEsRef.current?.close(); nodeLogsEsRef.current=null; setNodeLogsModal(null); }}>
@@ -3008,6 +3676,7 @@ function VCOApp() {
             node={selectedNode}
             onClose={() => setSelectedNode(null)}
             onChange={handlePropChange}
+            nodeEvent={nodeEvents[selectedNode?.id] || null}
           />
         )}
       </div>
@@ -3018,6 +3687,7 @@ function VCOApp() {
           node={editModalNode}
           onClose={() => setEditModalNode(null)}
           onChange={handlePropChange}
+          nodeEvent={nodeEvents[editModalNode?.id] || null}
         />
       )}
     </div>

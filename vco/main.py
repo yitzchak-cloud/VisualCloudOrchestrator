@@ -35,7 +35,8 @@ import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes import deploy, graph, nodes, realtime
+from api.routes import deploy, graph, nodes, realtime, logs
+
 
 # ── Logging setup ─────────────────────────────────────────────────────────────
 # One-liner config: DEBUG to stdout during development.
@@ -73,5 +74,6 @@ app.include_router(nodes.router)
 app.include_router(graph.router)
 app.include_router(deploy.router)
 app.include_router(realtime.router)
+app.include_router(logs.router)
 
 logger.info("VCO API ready — %d routes registered", len(app.routes))
