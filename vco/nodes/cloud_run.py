@@ -5,17 +5,31 @@ VPC wiring
 ----------
   VpcNetworkNode ──► SubnetworkNode ──► CloudRunNode
 
-  CloudRunNode reads `subnetwork_id` from ctx (set by SubnetworkNode.resolve_edges),
-  then looks up the subnetwork's exported `network_path` and `subnetwork_path` from
-  deployed_outputs.  Falls back to the legacy vpc_network / vpc_subnetwork props if
-  no SubnetworkNode is connected.
-
 Service-Account wiring
 ----------------------
   ServiceAccountNode ──► CloudRunNode
 
-  CloudRunNode reads `service_account_id` from ctx (set by ServiceAccountNode.resolve_edges),
-  then looks up the SA email from deployed_outputs.
+HTTP callers wiring
+-------------------
+  CloudSchedulerNode  ──(HTTP_TARGET)──► CloudRunNode
+  EventarcTriggerNode ──(HTTP_TARGET)──► CloudRunNode
+  WorkflowNode        ──(HTTP_TARGET)──► CloudRunNode
+  CloudTasksQueueNode ──(TASK_QUEUE)───► CloudRunNode
+
+  Every caller node that wires into CloudRunNode gets two env vars injected on
+  its own side (handled in the caller's pulumi_program via deployed_outputs):
+    CLOUD_RUN_URL_<SERVICE_NAME>  — the service URI
+    CLOUD_RUN_NAME_<SERVICE_NAME> — the short service name
+
+  On the CloudRun side we inject:
+    SELF_URL  — this service's own URI (useful for self-referencing, health checks)
+
+GCS writers wiring
+------------------
+  CloudRunNode ──(STORAGE)──► GcsBucketNode
+  WorkflowNode ──(STORAGE)──► GcsBucketNode
+
+  GcsBucketNode injects GCS_BUCKET_<NAME> into any wired writer node.
 """
 from __future__ import annotations
 
@@ -57,7 +71,6 @@ class CloudRunNode(GCPNode):
         {"key": "port",          "label": "Port",            "type": "number", "default": 8080},
         {"key": "region",        "label": "Region",          "type": "select", "options": ["me-west1","us-central1","us-east1"], "default": "me-west1"},
         {"key": "service_url",   "label": "Service URL",     "type": "text",   "default": "", "placeholder": "https://my-service.run.app"},
-        # ── Legacy fallback props (used when no SubnetworkNode is wired) ──────
         {
             "key": "vpc_network", "label": "VPC Network (fallback)",
             "type": "text", "default": "",
@@ -73,9 +86,11 @@ class CloudRunNode(GCPNode):
 
     inputs: ClassVar = [
         Port("service_account", PortType.SERVICE_ACCOUNT, required=False),
-        Port("subnet",          PortType.NETWORK,         required=False),
-        Port("secret",          PortType.SECRET,          multi=True, multi_in=True),
-        Port("MESSAGE",         PortType.MESSAGE,         multi=True, multi_in=True),
+        Port("subnet",          PortType.NETWORK,          required=False),
+        Port("http_callers",    PortType.HTTP_TARGET,      required=False, multi=True, multi_in=True),
+        Port("task_queue",      PortType.TASK_QUEUE,       required=False, multi=True, multi_in=True),
+        Port("secret",          PortType.SECRET,           multi=True,     multi_in=True),
+        Port("MESSAGE",         PortType.MESSAGE,          multi=True,     multi_in=True),
     ]
     outputs: ClassVar = [
         Port("publishes_to",    PortType.TOPIC,   multi=True),
@@ -91,14 +106,20 @@ class CloudRunNode(GCPNode):
     # ------------------------------------------------------------------
 
     def resolve_edges(self, src_id, tgt_id, src_type, tgt_type, ctx) -> bool:
-        # CloudRunNode → PubsubTopicNode
-        if src_id == self.node_id and src_type == "CloudRunNode" and tgt_type == "PubsubTopicNode":
-            ctx[self.node_id].setdefault("publishes_to_topics", []).append(tgt_id)
-            return True
+        if src_id == self.node_id and src_type == "CloudRunNode":
+            if tgt_type == "PubsubTopicNode":
+                ctx[self.node_id].setdefault("publishes_to_topics", []).append(tgt_id)
+                return True
+            # CloudRunNode → GcsBucketNode: tell the bucket a writer is connected
+            if tgt_type == "GcsBucketNode":
+                ctx[tgt_id].setdefault("writer_ids", []).append(self.node_id)
+                return True
         return False
 
     def dag_deps(self, ctx) -> list[str]:
         deps = list(ctx.get("publishes_to_topics", []))
+        deps += ctx.get("bucket_ids", [])        # buckets that inject env vars into this CR
+        deps += ctx.get("task_queue_ids", [])    # queues that inject env vars into this CR
         if ctx.get("subnetwork_id"):
             deps.append(ctx["subnetwork_id"])
         if ctx.get("service_account_id"):
@@ -113,19 +134,11 @@ class CloudRunNode(GCPNode):
         node_dict = ctx.get("node", {})
         props     = node_dict.get("props", {})
 
-        # ── Resolve VPC paths ─────────────────────────────────────────────────
-        subnet_id      = ctx.get("subnetwork_id", "")
-        subnet_outputs = deployed_outputs.get(subnet_id, {})
-
-        # Prefer node-wired paths; fall back to explicit props; last resort = empty
-        network_path    = (
-            subnet_outputs.get("network_path")
-            or props.get("vpc_network", "")
-        )
-        subnetwork_path = (
-            subnet_outputs.get("subnetwork_path")
-            or props.get("vpc_subnetwork", "")
-        )
+        # ── VPC paths ─────────────────────────────────────────────────────────
+        subnet_id       = ctx.get("subnetwork_id", "")
+        subnet_outputs  = deployed_outputs.get(subnet_id, {})
+        network_path    = subnet_outputs.get("network_path")    or props.get("vpc_network",    "")
+        subnetwork_path = subnet_outputs.get("subnetwork_path") or props.get("vpc_subnetwork", "")
 
         if not network_path or not subnetwork_path:
             logger.warning(
@@ -134,12 +147,10 @@ class CloudRunNode(GCPNode):
                 self.node_id,
             )
 
-        # ── Resolve Service Account email ─────────────────────────────────────
-        sa_id      = ctx.get("service_account_id", "")
-        sa_outputs = deployed_outputs.get(sa_id, {})
-        sa_email   = sa_outputs.get("email", "")
+        # ── Service Account ───────────────────────────────────────────────────
+        sa_email = deployed_outputs.get(ctx.get("service_account_id", ""), {}).get("email", "")
 
-        # ── Resolve Pub/Sub env vars ──────────────────────────────────────────
+        # ── Pub/Sub env vars ──────────────────────────────────────────────────
         topic_envs = [
             gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
                 name="PUBSUB_TOPIC_" + re.sub(r"[^A-Z0-9]", "_", _node_name(all_nodes, tid).upper()),
@@ -154,11 +165,36 @@ class CloudRunNode(GCPNode):
             )
             for sid in ctx.get("receives_from_subs", [])
         ]
-        envs = topic_envs + sub_envs
+
+        # ── Bucket env vars (GcsBucketNode → CloudRunNode) ───────────────────
+        # bucket_ids is populated by GcsBucketNode.resolve_edges when it wires
+        # its STORAGE output into this CR.
+        bucket_envs = [
+            gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
+                name="GCS_BUCKET_" + re.sub(r"[^A-Z0-9]", "_", _node_name(all_nodes, bid).upper()),
+                value=deployed_outputs.get(bid, {}).get("name", ""),
+            )
+            for bid in ctx.get("bucket_ids", [])
+        ]
+
+        # ── Task queue env vars ───────────────────────────────────────────────
+        queue_envs = [
+            gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
+                name="CLOUD_TASKS_QUEUE_" + re.sub(r"[^A-Z0-9]", "_", _node_name(all_nodes, qid).upper()),
+                value=deployed_outputs.get(qid, {}).get("queue_name", ""),
+            )
+            for qid in ctx.get("task_queue_ids", [])
+        ]
+
+        # NOTE: SELF_URL is added inside program() after svc is created,
+        # because it's a Pulumi Output[str] — it cannot be resolved at
+        # plan-time. We add it as a separate env var via apply().
+
+        all_envs = topic_envs + sub_envs + bucket_envs + queue_envs
 
         def program() -> None:
             # ── VPC access block ──────────────────────────────────────────────
-            vpc_access: gcp.cloudrunv2.ServiceTemplateVpcAccessArgs | None = None
+            vpc_access = None
             if network_path and subnetwork_path:
                 vpc_access = gcp.cloudrunv2.ServiceTemplateVpcAccessArgs(
                     egress="PRIVATE_RANGES_ONLY",
@@ -170,9 +206,6 @@ class CloudRunNode(GCPNode):
                     ],
                 )
 
-            # ── Service-account override ──────────────────────────────────────
-            service_account_arg: str | None = sa_email or None
-
             svc = gcp.cloudrunv2.Service(
                 self.node_id,
                 name=_resource_name(node_dict),
@@ -181,10 +214,13 @@ class CloudRunNode(GCPNode):
                 deletion_protection=False,
                 ingress="INGRESS_TRAFFIC_INTERNAL_ONLY",
                 template=gcp.cloudrunv2.ServiceTemplateArgs(
-                    service_account=service_account_arg,
+                    service_account=sa_email or None,
                     containers=[gcp.cloudrunv2.ServiceTemplateContainerArgs(
                         image=props.get("image", "gcr.io/cloudrun/hello"),
-                        envs=envs or None,
+                        # SELF_URL cannot be added here statically — callers
+                        # (Scheduler, Eventarc, Workflows) read svc.uri from
+                        # deployed_outputs and use it directly.
+                        envs=all_envs or None,
                     )],
                     vpc_access=vpc_access,
                 ),
@@ -200,11 +236,9 @@ class CloudRunNode(GCPNode):
     # ------------------------------------------------------------------
 
     def live_outputs(self, pulumi_outputs, project, region) -> dict:
-        """Write the live service URL back into the service_url field on the canvas."""
         return {"service_url": pulumi_outputs.get("uri", "")}
 
     def log_source(self, pulumi_outputs, project, region) -> LogSource | None:
-        """Stream Cloud Run request + stderr logs."""
         name = pulumi_outputs.get("name", "")
         if not name:
             return None
