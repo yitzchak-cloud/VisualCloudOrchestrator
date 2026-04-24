@@ -4,15 +4,15 @@ nodes/cloud_scheduler.py — Cloud Scheduler resource node (fully self-describin
 Topology
 --------
   CloudSchedulerNode ──(HTTP_TARGET)──► CloudRunNode
+  CloudSchedulerNode ──(RUN_JOB)──────► CloudRunJobNode
   CloudSchedulerNode ──(TOPIC)────────► PubsubTopicNode
 
-Two delivery modes:
-  • http  — POST to a Cloud Run URL on a cron schedule
-  • pubsub — publish a message to a Pub/Sub topic on a cron schedule
+Delivery modes (auto-detected from what is wired):
+  • http    — POST to a Cloud Run Service URL
+  • run_job — trigger a Cloud Run Job via the Jobs API (not HTTP)
+  • pubsub  — publish a message to a Pub/Sub topic
 
-The mode is chosen automatically based on what is wired:
-  - wire to CloudRunNode  → http mode
-  - wire to PubsubTopicNode → pubsub mode
+Multiple targets of different types can be wired simultaneously.
 """
 from __future__ import annotations
 
@@ -34,8 +34,9 @@ class CloudSchedulerNode(GCPNode):
     """
     Cloud Scheduler — managed cron job.
 
-    Connect to CloudRunNode  → triggers HTTP POST to the service URL.
-    Connect to PubsubTopicNode → publishes a message on schedule.
+    Connect to CloudRunNode    → HTTP POST trigger.
+    Connect to CloudRunJobNode → Cloud Run Jobs API trigger.
+    Connect to PubsubTopicNode → Pub/Sub publish trigger.
     """
 
     params_schema: ClassVar = [
@@ -52,12 +53,12 @@ class CloudSchedulerNode(GCPNode):
             "type": "text", "default": "UTC", "placeholder": "UTC",
         },
         {
-            "key": "http_method", "label": "HTTP Method",
+            "key": "http_method", "label": "HTTP Method (Service targets)",
             "type": "select", "options": ["POST", "GET", "PUT", "PATCH"],
             "default": "POST",
         },
         {
-            "key": "http_path", "label": "HTTP Path",
+            "key": "http_path", "label": "HTTP Path (Service targets)",
             "type": "text", "default": "/", "placeholder": "/tasks/run",
         },
         {
@@ -74,12 +75,13 @@ class CloudSchedulerNode(GCPNode):
         },
     ]
 
-    inputs:  ClassVar = [
+    inputs: ClassVar = [
         Port("service_account", PortType.SERVICE_ACCOUNT, required=False),
     ]
     outputs: ClassVar = [
-        Port("triggers",     PortType.HTTP_TARGET, multi=True),
-        Port("publishes_to", PortType.TOPIC,       multi=True),
+        Port("triggers",     PortType.HTTP_TARGET, multi=True),  # → CloudRunNode
+        Port("triggers_job", PortType.RUN_JOB,     multi=True),  # → CloudRunJobNode
+        Port("publishes_to", PortType.TOPIC,        multi=True),  # → PubsubTopicNode
     ]
 
     node_color:  ClassVar = "#0ea5e9"
@@ -97,18 +99,22 @@ class CloudSchedulerNode(GCPNode):
         if tgt_type == "CloudRunNode":
             ctx[self.node_id].setdefault("target_run_ids", []).append(tgt_id)
             return True
+        if tgt_type == "CloudRunJobNode":
+            ctx[self.node_id].setdefault("target_job_ids", []).append(tgt_id)
+            return True
         if tgt_type == "PubsubTopicNode":
             ctx[self.node_id].setdefault("target_topic_ids", []).append(tgt_id)
             return True
         return False
 
     def dag_deps(self, ctx) -> list[str]:
-        deps  = ctx.get("target_run_ids", [])
-        deps += ctx.get("target_topic_ids", [])
+        deps  = list(ctx.get("target_run_ids",   []))
+        deps += list(ctx.get("target_job_ids",   []))
+        deps += list(ctx.get("target_topic_ids", []))
         sa_id = ctx.get("service_account_id")
         if sa_id:
             deps.append(sa_id)
-        return list(deps)
+        return deps
 
     # ------------------------------------------------------------------
     # Pulumi program
@@ -122,20 +128,21 @@ class CloudSchedulerNode(GCPNode):
         sa_email = deployed_outputs.get(sa_id, {}).get("email", "")
 
         target_run_ids   = ctx.get("target_run_ids",   [])
+        target_job_ids   = ctx.get("target_job_ids",   [])
         target_topic_ids = ctx.get("target_topic_ids", [])
 
         def program() -> None:
-            job_name   = props.get("name") or _resource_name(node_dict)
-            schedule   = props.get("schedule",    "0 * * * *")
-            timezone   = props.get("timezone",    "UTC")
-            method     = props.get("http_method", "POST")
-            path       = props.get("http_path",   "/")
-            body       = props.get("http_body",   "{}")
-            retry      = int(props.get("retry_count", 3))
+            job_name  = props.get("name") or _resource_name(node_dict)
+            schedule  = props.get("schedule",    "0 * * * *")
+            timezone  = props.get("timezone",    "UTC")
+            method    = props.get("http_method", "POST")
+            path      = props.get("http_path",   "/")
+            body      = props.get("http_body",   "{}")
+            retry     = int(props.get("retry_count", 3))
 
             retry_cfg = gcp.cloudscheduler.JobRetryConfigArgs(retry_count=retry)
 
-            # ── HTTP target jobs (one per wired CloudRunNode) ──────────────────
+            # ── 1. HTTP target — Cloud Run Services ───────────────────────────
             for idx, run_id in enumerate(target_run_ids):
                 run_outputs = deployed_outputs.get(run_id, {})
                 service_url = run_outputs.get("uri", run_outputs.get("url", ""))
@@ -144,7 +151,6 @@ class CloudSchedulerNode(GCPNode):
                     continue
 
                 target_url = service_url.rstrip("/") + path
-
                 oidc = None
                 if sa_email:
                     oidc = gcp.cloudscheduler.JobHttpTargetOidcTokenArgs(
@@ -152,9 +158,9 @@ class CloudSchedulerNode(GCPNode):
                         audience=service_url,
                     )
 
-                suffix = f"-{idx}" if len(target_run_ids) > 1 else ""
+                suffix = f"-svc{idx}" if len(target_run_ids) > 1 else ""
                 gcp.cloudscheduler.Job(
-                    f"{self.node_id}-http{suffix}",
+                    f"{self.node_id}-http{idx}",
                     name=f"{job_name}{suffix}",
                     schedule=schedule,
                     time_zone=timezone,
@@ -169,10 +175,59 @@ class CloudSchedulerNode(GCPNode):
                         oidc_token=oidc,
                     ),
                 )
-                pulumi.export(f"job_name_{idx}", f"{job_name}{suffix}")
-                pulumi.export(f"target_url_{idx}", target_url)
+                pulumi.export(f"svc_job_name_{idx}", f"{job_name}{suffix}")
+                pulumi.export(f"svc_target_url_{idx}", target_url)
 
-            # ── Pub/Sub target jobs (one per wired topic) ──────────────────────
+            # ── 2. Cloud Run Job trigger ───────────────────────────────────────
+            # Cloud Scheduler triggers a Cloud Run Job via an HTTP POST to the
+            # Jobs run endpoint:
+            #   POST https://{region}-run.googleapis.com/apis/run.googleapis.com/v1/
+            #        namespaces/{project}/jobs/{job_name}:run
+            # Auth: OIDC token with the Jobs Runner role on the SA.
+            for idx, crun_job_id in enumerate(target_job_ids):
+                job_outputs  = deployed_outputs.get(crun_job_id, {})
+                crun_job_name = job_outputs.get("job_name", "")
+                if not crun_job_name:
+                    logger.warning(
+                        "CloudSchedulerNode: no job_name for CloudRunJobNode %s", crun_job_id
+                    )
+                    continue
+
+                # Cloud Run Jobs execution API endpoint
+                run_job_url = (
+                    f"https://{region}-run.googleapis.com"
+                    f"/apis/run.googleapis.com/v1"
+                    f"/namespaces/{project}/jobs/{crun_job_name}:run"
+                )
+
+                oidc = None
+                if sa_email:
+                    oidc = gcp.cloudscheduler.JobHttpTargetOidcTokenArgs(
+                        service_account_email=sa_email,
+                        audience=f"https://{region}-run.googleapis.com/",
+                    )
+
+                suffix = f"-job{idx}" if len(target_job_ids) > 1 else "-job"
+                gcp.cloudscheduler.Job(
+                    f"{self.node_id}-runjob{idx}",
+                    name=f"{job_name}{suffix}",
+                    schedule=schedule,
+                    time_zone=timezone,
+                    region=region,
+                    project=project,
+                    retry_config=retry_cfg,
+                    http_target=gcp.cloudscheduler.JobHttpTargetArgs(
+                        http_method="POST",
+                        uri=run_job_url,
+                        body=b"{}",
+                        headers={"Content-Type": "application/json"},
+                        oidc_token=oidc,
+                    ),
+                )
+                pulumi.export(f"run_job_scheduler_{idx}", f"{job_name}{suffix}")
+                pulumi.export(f"run_job_target_{idx}", crun_job_name)
+
+            # ── 3. Pub/Sub target ─────────────────────────────────────────────
             pubsub_message = props.get("pubsub_message", "{}")
             for idx, topic_id in enumerate(target_topic_ids):
                 topic_name = deployed_outputs.get(topic_id, {}).get("name", "")

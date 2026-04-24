@@ -17,6 +17,7 @@ class PortType(Enum):
     WORKFLOW            = "workflow"      # Workflow → callee / chaining
     EVENT               = "event"         # Eventarc trigger → CloudRun
     BUCKET              = "bucket"        # GCS Bucket ↔ Eventarc / CloudRun
+    RUN_JOB             = "run_job"       # Scheduler → CloudRunJob trigger
 
 
 PORT_META: dict[str, dict] = {
@@ -35,4 +36,5 @@ PORT_META: dict[str, dict] = {
     PortType.WORKFLOW.value:        {"color": "#c084fc", "label": "WF"},
     PortType.EVENT.value:           {"color": "#f97316", "label": "Event"},
     PortType.BUCKET.value:          {"color": "#facc15", "label": "Bucket"},
+    PortType.RUN_JOB.value:         {"color": "#a5b4fc", "label": "Job"},
 }

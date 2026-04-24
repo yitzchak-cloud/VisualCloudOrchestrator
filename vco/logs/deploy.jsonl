@@ -246,3 +246,14 @@
 {"ts": "13:56:06", "msg": "Connected CloudRun → GcsBucket [storage]", "level": "ok", "node_id": null}
 {"ts": "13:56:18", "msg": "Connected GcsBucket → GcsBucket [storage]", "level": "ok", "node_id": null}
 {"ts": "14:04:19", "msg": "Added CloudScheduler", "level": "info", "node_id": null}
+{"ts": "14:11:38", "msg": "WebSocket connected", "level": "ok", "node_id": null}
+{"ts": "14:11:51", "msg": "Session restored — 4 node(s)", "level": "info", "node_id": null}
+{"ts": "14:11:51", "msg": "WebSocket connected", "level": "ok", "node_id": null}
+{"ts": "14:13:17", "msg": "WebSocket connected", "level": "ok", "node_id": null}
+{"ts": "14:13:17", "msg": "Session restored — 4 node(s)", "level": "info", "node_id": null}
+{"ts": "14:13:32", "msg": "Added CloudRunJob", "level": "info", "node_id": null}
+{"ts": "14:13:47", "msg": "WebSocket connected", "level": "ok", "node_id": null}
+{"ts": "14:13:48", "msg": "Session restored — 4 node(s)", "level": "info", "node_id": null}
+{"ts": "14:13:49", "msg": "WebSocket connected", "level": "ok", "node_id": null}
+{"ts": "14:14:14", "msg": "WebSocket connected", "level": "ok", "node_id": null}
+{"ts": "14:14:21", "msg": "WebSocket connected", "level": "ok", "node_id": null}
