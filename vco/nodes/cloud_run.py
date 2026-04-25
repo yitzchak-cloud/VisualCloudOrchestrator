@@ -18,7 +18,7 @@ HTTP callers wiring
 
   Every caller node that wires into CloudRunNode gets two env vars injected on
   its own side (handled in the caller's pulumi_program via deployed_outputs):
-    CLOUD_RUN_URL_<SERVICE_NAME>  — the service URI
+    CLOUD_RUN_URL_<SERVICE _NAME>  — the service URI
     CLOUD_RUN_NAME_<SERVICE_NAME> — the short service name
 
   On the CloudRun side we inject:
@@ -57,7 +57,7 @@ class CloudRunNode(GCPNode):
     cpu:           str  = "1"
     min_instances: int  = 0
     max_instances: int  = 10
-    port:          int  = 8080
+    port:          int  = 8080   
     env_vars:      dict = field(default_factory=dict)
     service_url:   str  = ""
 

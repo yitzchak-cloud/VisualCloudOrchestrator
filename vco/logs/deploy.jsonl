@@ -257,3 +257,42 @@
 {"ts": "14:13:49", "msg": "WebSocket connected", "level": "ok", "node_id": null}
 {"ts": "14:14:14", "msg": "WebSocket connected", "level": "ok", "node_id": null}
 {"ts": "14:14:21", "msg": "WebSocket connected", "level": "ok", "node_id": null}
+{"ts": "14:15:26", "msg": "WebSocket connected", "level": "ok", "node_id": null}
+{"ts": "14:15:26", "msg": "Session restored — 4 node(s)", "level": "info", "node_id": null}
+{"ts": "14:15:30", "msg": "Added CloudRunJob", "level": "info", "node_id": null}
+{"ts": "14:15:43", "msg": "Added CloudScheduler", "level": "info", "node_id": null}
+{"ts": "14:15:49", "msg": "Connected CloudScheduler → CloudRunJob [run_job]", "level": "ok", "node_id": null}
+{"ts": "14:17:38", "msg": "Connected CloudScheduler → CloudRun [http_target]", "level": "ok", "node_id": null}
+{"ts": "14:53:40", "msg": "Connected VpcNetwork → CloudRun [network]", "level": "ok", "node_id": null}
+{"ts": "14:53:44", "msg": "Blocked: port CloudRun.subnet already connected", "level": "err", "node_id": null}
+{"ts": "15:21:15", "msg": "WebSocket connected", "level": "ok", "node_id": null}
+{"ts": "15:58:07", "msg": "WebSocket connected", "level": "ok", "node_id": null}
+{"ts": "18:47:12", "msg": "WebSocket connected", "level": "ok", "node_id": null}
+{"ts": "20:53:06", "msg": "WebSocket connected", "level": "ok", "node_id": null}
+{"ts": "22:05:32", "msg": "WebSocket connected", "level": "ok", "node_id": null}
+{"ts": "22:05:32", "msg": "Session restored — 4 node(s)", "level": "info", "node_id": null}
+{"ts": "22:11:59", "msg": "WebSocket connected", "level": "ok", "node_id": null}
+{"ts": "22:11:59", "msg": "Session restored — 4 node(s)", "level": "info", "node_id": null}
+{"ts": "22:12:01", "msg": "Disconnected VpcNetwork → Subnetwork [undefined→undefined]", "level": "warn", "node_id": null}
+{"ts": "22:12:07", "msg": "Connected VpcNetwork → Subnetwork [network]", "level": "ok", "node_id": null}
+{"ts": "22:12:19", "msg": "Disconnected Subnetwork → CloudRun [undefined→undefined]", "level": "warn", "node_id": null}
+{"ts": "22:12:24", "msg": "Initiating deployment...", "level": "warn", "node_id": null}
+{"ts": "22:12:24", "msg": "Deploy started — 4 create / 0 update / 0 destroy", "level": "info", "node_id": null}
+{"ts": "22:12:24", "msg": "Phase 1 — Analysing graph dependencies…", "level": "info", "node_id": null}
+{"ts": "22:12:24", "msg": "Deployment order (4 nodes): CloudRun → VpcNetwork → CloudRun → Subnetwork", "level": "info", "node_id": null}
+{"ts": "22:12:24", "msg": "Phase 2 — Installing Pulumi GCP plugin…", "level": "info", "node_id": null}
+{"ts": "22:12:31", "msg": "Phase 3 — Deploying resources…", "level": "info", "node_id": null}
+{"ts": "22:12:31", "msg": "[1/4] ▶ CloudRun  (CloudRunNode)", "level": "info", "node_id": "CloudRunNode-1776974409551"}
+{"ts": "22:12:40", "msg": "[1/4] ✗ CloudRun — Auth error: invalid_grant — reauth related error (invalid_rapt)", "level": "error", "node_id": "CloudRunNode-1776974409551"}
+{"ts": "22:12:40", "msg": "[2/4] ▶ VpcNetwork  (VpcNetworkNode)", "level": "info", "node_id": "VpcNetworkNode-1776974577303"}
+{"ts": "22:12:42", "msg": "[2/4] ✓ VpcNetwork — no changes", "level": "ok", "node_id": "VpcNetworkNode-1776974577303"}
+{"ts": "22:12:42", "msg": "[3/4] ▶ CloudRun  (CloudRunNode)", "level": "info", "node_id": "CloudRunNode-1776981348403"}
+{"ts": "22:12:47", "msg": "[3/4] ✗ CloudRun — Auth error: invalid_grant — reauth related error (invalid_rapt)", "level": "error", "node_id": "CloudRunNode-1776981348403"}
+{"ts": "22:12:47", "msg": "[4/4] ▶ Subnetwork  (SubnetworkNode)", "level": "info", "node_id": "SubnetworkNode-1776974576495"}
+{"ts": "22:12:48", "msg": "Deploy finished with 2 error(s): CloudRun, CloudRun", "level": "warn", "node_id": null}
+6495"}
+{"ts": "22:12:48", "msg": "Deploy complete — 2 resource(s) changed", "level": "ok", "node_id": null}
+{"ts": "22:12:53", "msg": "Graph saved (4 nodes)", "level": "ok", "node_id": null}
+{"ts": "22:12:53", "msg": "State auto-saved after deploy", "level": "ok", "node_id": null}
+{"ts": "22:13:11", "msg": "Disconnected VpcNetwork → Subnetwork [undefined→undefined]", "level": "warn", "node_id": null}
+{"ts": "22:13:19", "msg": "Connected VpcNetwork → Subnetwork [network]", "level": "ok", "node_id": null}
