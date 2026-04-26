@@ -14,8 +14,7 @@ import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes import deploy, graph, nodes, realtime, logs
-from api.routes import namespaces          # ← NEW
+from api.routes import deploy, graph, nodes, realtime, logs, namespaces, terraform
 
 
 logging.basicConfig(
@@ -48,6 +47,7 @@ app.include_router(graph.router)
 app.include_router(deploy.router)
 app.include_router(realtime.router)
 app.include_router(logs.router)
-app.include_router(namespaces.router)      # ← NEW
+app.include_router(namespaces.router)  
+app.include_router(terraform.router)
 
 logger.info("VCO API ready — %d routes registered", len(app.routes))
