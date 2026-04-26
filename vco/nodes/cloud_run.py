@@ -81,6 +81,9 @@ class CloudRunNode(GCPNode):
             "type": "text", "default": "",
             "placeholder": "projects/HOST_PROJECT/regions/REGION/subnetworks/SUBNET",
         },
+        # {"key": "workflow_yaml", "label": "Workflow Definition", "type": "yaml"},
+        # {"key": "source_code",   "label": "Cloud Function Code", "type": "code", "language": "python"},
+        # {"key": "config_json",   "label": "Config", "type": "json"},
     ]
     url_field: ClassVar = "service_url"
 

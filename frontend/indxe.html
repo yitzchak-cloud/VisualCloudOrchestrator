@@ -12,6 +12,21 @@
 <link rel="stylesheet" href="https://unpkg.com/reactflow@11/dist/style.css"/>
 <link rel="stylesheet" href="https://unpkg.com/@xyflow/react@12/dist/style.css"/>
 <link rel="stylesheet" href="https://unpkg.com/@xyflow/react@12/dist/style.css"/>
+<!-- CodeMirror 6 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/theme/dracula.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/mode/yaml/yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/addon/edit/matchbrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/addon/fold/foldcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/addon/fold/foldgutter.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/addon/fold/indent-fold.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/addon/lint/lint.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/addon/fold/foldgutter.min.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/addon/lint/lint.min.css"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <style>
@@ -590,6 +605,146 @@ html,body,#root{height:100%;width:100%;overflow:hidden;background:var(--bg0);col
 .vpc-child-badge-dot{
   width:6px;height:6px;border-radius:50%;background:#10b981;flex-shrink:0;
 }
+
+/* ── YAML / Code Editor Modal ── */
+.yaml-editor-overlay {
+  position: fixed; inset: 0; z-index: 4000;
+  background: rgba(0,0,0,0.82);
+  backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  animation: fade-in .15s ease;
+}
+.yaml-editor-modal {
+  background: #0d1117;
+  border: 1px solid #1e3a5f;
+  border-radius: 16px;
+  width: 820px; max-width: 96vw;
+  height: 580px; max-height: 90vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 48px 120px rgba(0,0,0,.9), 0 0 0 1px rgba(59,130,246,0.12);
+  overflow: hidden;
+  position: relative;
+}
+.yaml-editor-modal::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, #3b82f6, #6366f1, #10b981);
+  border-radius: 16px 16px 0 0;
+}
+.yaml-editor-header {
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid #1e3a5f;
+  display: flex; align-items: center; gap: 12px;
+  background: linear-gradient(135deg, #111827 0%, #0d1117 100%);
+  flex-shrink: 0;
+}
+.yaml-editor-body {
+  flex: 1; overflow: hidden; position: relative;
+  background: #0a0e1a;
+}
+.yaml-editor-footer {
+  padding: 10px 18px;
+  border-top: 1px solid #1e3a5f;
+  display: flex; align-items: center; gap: 10px;
+  background: #111827;
+  flex-shrink: 0;
+}
+/* CodeMirror overrides — dark VCO theme */
+.yaml-editor-body .CodeMirror {
+  height: 100% !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 13px !important;
+  line-height: 1.7 !important;
+  background: #0a0e1a !important;
+  color: #e2e8f0 !important;
+  border: none !important;
+}
+.yaml-editor-body .CodeMirror-scroll { height: 100% !important; }
+.yaml-editor-body .CodeMirror-gutters {
+  background: #080b12 !important;
+  border-right: 1px solid #1e3a5f !important;
+}
+.yaml-editor-body .CodeMirror-linenumber { color: #334155 !important; }
+.yaml-editor-body .CodeMirror-cursor { border-left: 2px solid #3b82f6 !important; }
+.yaml-editor-body .CodeMirror-selected { background: rgba(59,130,246,0.18) !important; }
+.yaml-editor-body .CodeMirror-line { padding-left: 4px !important; }
+/* YAML token colours */
+.yaml-editor-body .cm-atom    { color: #f97316 !important; }
+.yaml-editor-body .cm-string  { color: #86efac !important; }
+.yaml-editor-body .cm-number  { color: #fb923c !important; }
+.yaml-editor-body .cm-keyword { color: #60a5fa !important; }
+.yaml-editor-body .cm-tag     { color: #c084fc !important; }
+.yaml-editor-body .cm-comment { color: #475569 !important; font-style: italic !important; }
+.yaml-editor-body .cm-variable{ color: #e2e8f0 !important; }
+.yaml-editor-body .cm-def     { color: #f472b6 !important; }
+.yaml-editor-body .cm-meta    { color: #38bdf8 !important; }
+.yaml-editor-body .cm-property{ color: #34d399 !important; }
+.yaml-editor-body .CodeMirror-foldgutter { width: 16px; }
+.yaml-editor-body .CodeMirror-foldgutter-open,
+.yaml-editor-body .CodeMirror-foldgutter-folded { color: #475569 !important; cursor: pointer; }
+.yaml-editor-body .CodeMirror-foldgutter-open::after { content: '▾'; }
+.yaml-editor-body .CodeMirror-foldgutter-folded::after { content: '▸'; }
+.yaml-editor-body .CodeMirror-activeline-background { background: rgba(59,130,246,0.06) !important; }
+
+/* YAML inline trigger button */
+.yaml-field-trigger {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px;
+  background: #0a0e1a;
+  border: 1.5px solid #1e3a5f;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text1);
+  width: 100%;
+  transition: all .15s;
+  position: relative;
+  overflow: hidden;
+}
+.yaml-field-trigger:hover {
+  border-color: #3b82f6;
+  color: var(--text0);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+}
+.yaml-field-trigger::before {
+  content: '';
+  position: absolute; top:0; left:0; right:0; height:2px;
+  background: linear-gradient(90deg, #3b82f6, #6366f1);
+  border-radius: 8px 8px 0 0;
+}
+.yaml-field-preview {
+  flex: 1; min-width: 0;
+  font-size: 10px;
+  color: var(--text2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: 'JetBrains Mono', monospace;
+}
+.yaml-lang-tab {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #1e3a5f;
+  background: transparent;
+  color: #475569;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  cursor: pointer;
+  transition: all .12s;
+  font-weight: 600;
+}
+.yaml-lang-tab:hover { color: var(--text1); border-color: #243b55; }
+.yaml-lang-tab.active { background: rgba(59,130,246,0.15); border-color: #3b82f6; color: #60a5fa; }
+/* Validation indicator */
+.yaml-valid-badge {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 10px; font-family: 'JetBrains Mono', monospace;
+  padding: 3px 10px; border-radius: 99px; font-weight: 700;
+}
+.yaml-valid-badge.ok { background: rgba(16,185,129,0.12); color: #34d399; border: 1px solid rgba(16,185,129,0.3); }
+.yaml-valid-badge.err { background: rgba(239,68,68,0.12); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
 </style>
 </head>
 <body>
@@ -684,6 +839,326 @@ const GCPIcon = ({ nodeType, fallbackIcon, color, size = 20 }) => {
   }
   // fallback to inline SVG icon
   return <span style={{ color, display: 'flex', alignItems: 'center' }}>{ICONS[fallbackIcon] || ICONS.cloud}</span>;
+};
+
+// ── YAML / Code Editor Modal ──────────────────────────────────────────────────
+/**
+ * Full-featured CodeMirror editor modal for YAML, JSON, Python, JS fields.
+ * Triggered from any params_schema field with type "yaml", "code", "json".
+ *
+ * Props:
+ *   fieldLabel  — human name of the field being edited
+ *   language    — "yaml" | "javascript" | "python" | "json" (default: "yaml")
+ *   value       — current string value
+ *   onSave(val) — called with new string when user clicks Save
+ *   onClose()   — called when modal dismissed without saving
+ */
+const YamlCodeEditor = ({ fieldLabel, language: initLang = 'yaml', value = '', onSave, onClose }) => {
+  const editorRef = useRef(null);
+  const cmRef = useRef(null);
+  const [lang, setLang] = React.useState(initLang);
+  const [validation, setValidation] = React.useState({ ok: true, msg: '' });
+  const [lineCount, setLineCount] = React.useState(0);
+  const [charCount, setCharCount] = React.useState(0);
+  const [copied, setCopied] = React.useState(false);
+  const [hasChanges, setHasChanges] = React.useState(false);
+
+  // Detect mode from language
+  const modeFor = (l) => {
+    if (l === 'javascript' || l === 'json') return 'javascript';
+    if (l === 'python') return 'python';
+    return 'yaml';
+  };
+
+  // Validate current content
+  const validate = React.useCallback((content, l) => {
+    if (l === 'json') {
+      try { JSON.parse(content); return { ok: true, msg: 'Valid JSON' }; }
+      catch (e) { return { ok: false, msg: e.message.slice(0, 80) }; }
+    }
+    if (l === 'yaml') {
+      // Basic YAML checks: detect obvious indent errors
+      const lines = content.split('\n');
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.trimStart().startsWith('\t')) {
+          return { ok: false, msg: `Line ${i+1}: tabs not allowed in YAML` };
+        }
+      }
+      return { ok: true, msg: 'Valid YAML' };
+    }
+    return { ok: true, msg: `${l} mode` };
+  }, []);
+
+  // Init CodeMirror
+  useEffect(() => {
+    if (!editorRef.current || !window.CodeMirror) return;
+    const cm = window.CodeMirror(editorRef.current, {
+      value: value || '',
+      mode: modeFor(lang),
+      theme: 'dracula',
+      lineNumbers: true,
+      lineWrapping: false,
+      tabSize: 2,
+      indentWithTabs: false,
+      matchBrackets: true,
+      autoCloseBrackets: true,
+      foldGutter: true,
+      gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
+      extraKeys: {
+        'Tab': (cm) => { cm.execCommand('indentMore'); },
+        'Shift-Tab': (cm) => { cm.execCommand('indentLess'); },
+        'Ctrl-S': () => handleSave(),
+        'Cmd-S': () => handleSave(),
+        'Escape': () => onClose(),
+      },
+    });
+    cmRef.current = cm;
+
+    // Stats
+    const update = () => {
+      const v = cm.getValue();
+      setLineCount(cm.lineCount());
+      setCharCount(v.length);
+      setValidation(validate(v, lang));
+      setHasChanges(v !== value);
+    };
+    cm.on('change', update);
+    update();
+
+    // Focus
+    setTimeout(() => cm.refresh(), 50);
+    setTimeout(() => { cm.focus(); cm.setCursor(0, 0); }, 80);
+
+    return () => { cm.off('change', update); };
+  }, []); // only on mount
+
+  // Language switch
+  useEffect(() => {
+    if (!cmRef.current) return;
+    cmRef.current.setOption('mode', modeFor(lang));
+    const v = cmRef.current.getValue();
+    setValidation(validate(v, lang));
+  }, [lang]);
+
+  const handleSave = () => {
+    if (cmRef.current) onSave(cmRef.current.getValue());
+    onClose();
+  };
+
+  const handleCopy = () => {
+    if (cmRef.current) {
+      navigator.clipboard?.writeText(cmRef.current.getValue());
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }
+  };
+
+  const handleFormat = () => {
+    if (!cmRef.current) return;
+    const val = cmRef.current.getValue();
+    if (lang === 'json') {
+      try {
+        const formatted = JSON.stringify(JSON.parse(val), null, 2);
+        cmRef.current.setValue(formatted);
+      } catch { /* invalid JSON, skip */ }
+    }
+    // YAML auto-indent: normalize 2-space indentation
+    if (lang === 'yaml') {
+      const lines = val.split('\n');
+      const fixed = lines.map(l => {
+        const spaces = l.match(/^(\t+)/);
+        if (spaces) return l.replace(/\t/g, '  ');
+        return l;
+      }).join('\n');
+      if (fixed !== val) cmRef.current.setValue(fixed);
+    }
+  };
+
+  const LANGS = ['yaml', 'json', 'javascript', 'python'];
+
+  return (
+    <div className="yaml-editor-overlay" onClick={(e) => { if (e.target === e.currentTarget) { if (hasChanges && !confirm('Discard changes?')) return; onClose(); } }}>
+      <div className="yaml-editor-modal" onClick={e => e.stopPropagation()}>
+
+        {/* ── Header ── */}
+        <div className="yaml-editor-header">
+          {/* Field icon */}
+          <div style={{
+            width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+            background: 'linear-gradient(135deg, rgba(59,130,246,0.25), rgba(99,102,241,0.15))',
+            color: '#60a5fa', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: '1px solid rgba(59,130,246,0.35)',
+          }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+            </svg>
+          </div>
+          {/* Title */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14, color: '#f0f6ff', letterSpacing: '-.2px' }}>
+              {fieldLabel}
+            </div>
+            <div style={{ fontSize: 9, color: '#4a6080', fontFamily: 'JetBrains Mono', marginTop: 1, letterSpacing: '.04em' }}>
+              Code Editor · {lineCount} lines · {charCount} chars
+            </div>
+          </div>
+          {/* Language tabs */}
+          <div style={{ display: 'flex', gap: 4, background: '#080b12', borderRadius: 8, padding: 4, border: '1px solid #1e3a5f' }}>
+            {LANGS.map(l => (
+              <button key={l} className={`yaml-lang-tab ${lang === l ? 'active' : ''}`} onClick={() => setLang(l)}>
+                {l.toUpperCase()}
+              </button>
+            ))}
+          </div>
+          {/* Close */}
+          <button onClick={() => { if (hasChanges && !confirm('Discard changes?')) return; onClose(); }} style={{
+            width: 30, height: 30, borderRadius: 8, border: '1px solid #1e3a5f',
+            background: '#111827', color: '#475569', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'all .12s', flexShrink: 0,
+          }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#f87171'; e.currentTarget.style.borderColor = '#ef444466'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#475569'; e.currentTarget.style.borderColor = '#1e3a5f'; }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        {/* ── Editor ── */}
+        <div className="yaml-editor-body" ref={editorRef} />
+
+        {/* ── Footer ── */}
+        <div className="yaml-editor-footer">
+          {/* Validation badge */}
+          <div className={`yaml-valid-badge ${validation.ok ? 'ok' : 'err'}`}>
+            <span>{validation.ok ? '✓' : '✗'}</span>
+            <span>{validation.msg}</span>
+          </div>
+
+          <div style={{ flex: 1 }} />
+
+          {/* Keyboard hint */}
+          <span style={{ fontSize: 9, color: '#334155', fontFamily: 'JetBrains Mono', letterSpacing: '.04em' }}>
+            Ctrl+S to save · Esc to close
+          </span>
+
+          {/* Format */}
+          {(lang === 'json' || lang === 'yaml') && (
+            <button onClick={handleFormat} style={{
+              padding: '6px 12px', borderRadius: 7, border: '1px solid #1e3a5f',
+              background: '#111827', color: '#64748b', cursor: 'pointer',
+              fontFamily: 'JetBrains Mono', fontSize: 10, fontWeight: 600,
+              transition: 'all .12s',
+            }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#94a3b8'; e.currentTarget.style.borderColor = '#243b55'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.borderColor = '#1e3a5f'; }}
+            >
+              Format
+            </button>
+          )}
+
+          {/* Copy */}
+          <button onClick={handleCopy} style={{
+            padding: '6px 12px', borderRadius: 7,
+            border: `1px solid ${copied ? 'rgba(16,185,129,0.4)' : '#1e3a5f'}`,
+            background: copied ? 'rgba(16,185,129,0.1)' : '#111827',
+            color: copied ? '#34d399' : '#64748b', cursor: 'pointer',
+            fontFamily: 'JetBrains Mono', fontSize: 10, fontWeight: 600,
+            transition: 'all .15s',
+          }}>
+            {copied ? '✓ Copied' : '⎘ Copy'}
+          </button>
+
+          {/* Cancel */}
+          <button onClick={() => { if (hasChanges && !confirm('Discard changes?')) return; onClose(); }} style={{
+            padding: '7px 16px', borderRadius: 7, border: '1px solid #1e3a5f',
+            background: 'transparent', color: '#64748b', cursor: 'pointer',
+            fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 600,
+            transition: 'all .12s',
+          }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#94a3b8'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#64748b'; }}
+          >
+            Cancel
+          </button>
+
+          {/* Save */}
+          <button onClick={handleSave} style={{
+            padding: '7px 20px', borderRadius: 7, border: 'none',
+            background: validation.ok
+              ? 'linear-gradient(135deg, #3b82f6, #6366f1)'
+              : 'rgba(239,68,68,0.2)',
+            color: validation.ok ? '#fff' : '#f87171',
+            cursor: 'pointer',
+            fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 700,
+            boxShadow: validation.ok ? '0 4px 16px rgba(59,130,246,0.35)' : 'none',
+            transition: 'all .15s',
+          }}>
+            {hasChanges ? '💾 Save' : '✓ Close'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Inline trigger button shown instead of a raw <textarea> for yaml/code fields.
+ * Shows a compact preview of the current value with a "Open Editor" button.
+ */
+const YamlFieldTrigger = ({ label, fieldKey, language = 'yaml', value = '', onChange }) => {
+  const [editorOpen, setEditorOpen] = React.useState(false);
+  const lines = (value || '').split('\n');
+  const preview = lines[0]?.slice(0, 60) || '— empty —';
+  const extra = lines.length > 1 ? ` +${lines.length - 1} lines` : '';
+
+  return (
+    <>
+      <button
+        className="yaml-field-trigger"
+        onClick={() => setEditorOpen(true)}
+        title={`Edit ${label} in code editor`}
+      >
+        {/* Language badge */}
+        <span style={{
+          fontSize: 8, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase',
+          padding: '2px 7px', borderRadius: 99,
+          background: language === 'yaml' ? 'rgba(99,102,241,0.2)' : language === 'json' ? 'rgba(251,191,36,0.15)' : 'rgba(16,185,129,0.15)',
+          color: language === 'yaml' ? '#818cf8' : language === 'json' ? '#fbbf24' : '#34d399',
+          border: `1px solid ${language === 'yaml' ? 'rgba(99,102,241,0.35)' : language === 'json' ? 'rgba(251,191,36,0.3)' : 'rgba(16,185,129,0.3)'}`,
+          flexShrink: 0,
+        }}>
+          {language.toUpperCase()}
+        </span>
+        {/* Preview */}
+        <span className="yaml-field-preview">
+          {preview}{extra}
+        </span>
+        {/* Open button */}
+        <span style={{
+          fontSize: 9, fontWeight: 700, color: '#3b82f6',
+          display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0,
+          letterSpacing: '.04em',
+        }}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+          </svg>
+          Edit
+        </span>
+      </button>
+
+      {editorOpen && (
+        <YamlCodeEditor
+          fieldLabel={label}
+          language={language}
+          value={value}
+          onSave={(newVal) => { onChange(newVal); setEditorOpen(false); }}
+          onClose={() => setEditorOpen(false)}
+        />
+      )}
+    </>
+  );
 };
 
 // ── GCP Custom Node Component ─────────────────────────────────────────────────
@@ -1328,10 +1803,23 @@ const NodeEditModal = ({ node, onClose, onChange, nodeEvent }) => {
 
   const nodeFields = schema?.params_schema || fieldDefs[schema?.type] || [];
 
-  const renderField = (f) => (
-    <div key={f.key} className="modal-field-group">
+  // ── Field renderer — supports yaml / code / json in addition to standard types ──
+  const renderField = (f) => {
+    const isCodeField = f.type === 'yaml' || f.type === 'code' || f.type === 'json';
+    const codeLang = f.type === 'yaml' ? 'yaml' : f.type === 'json' ? 'json' : (f.language || 'yaml');
+
+    return (
+    <div key={f.key} className={`modal-field-group ${isCodeField ? 'modal-full' : ''}`}>
       <label className="modal-field-label">{f.label}</label>
-      {f.type === 'checkbox' ? (
+      {isCodeField ? (
+        <YamlFieldTrigger
+          label={f.label}
+          fieldKey={f.key}
+          language={codeLang}
+          value={props[f.key] ?? (f.default || '')}
+          onChange={(val) => onChange(node.id, f.key, val, true)}
+        />
+      ) : f.type === 'checkbox' ? (
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '8px 0' }}>
           <div style={{ position: 'relative', width: 38, height: 22, flexShrink: 0 }}>
             <input type="checkbox" checked={props[f.key] ?? false}
@@ -1366,9 +1854,10 @@ const NodeEditModal = ({ node, onClose, onChange, nodeEvent }) => {
           onChange={e => onChange(node.id, f.key, f.type === 'number' ? +e.target.value : e.target.value, true)} />
       )}
     </div>
-  );
+    );
+  };
 
-  // Split fields into two columns
+  // Split fields into two columns — code fields always go full-width
   const checkboxFields = nodeFields.filter(f => f.type === 'checkbox');
   const normalFields = nodeFields.filter(f => f.type !== 'checkbox');
 
@@ -1837,10 +2326,21 @@ const PropertyPanel = ({ node, onClose, onChange, nodeEvent }) => {
 
         <div className="section-title">Configuration</div>
 
-        {nodeFields.map(f => (
+        {nodeFields.map(f => {
+          const isCodeField = f.type === 'yaml' || f.type === 'code' || f.type === 'json';
+          const codeLang = f.type === 'yaml' ? 'yaml' : f.type === 'json' ? 'json' : (f.language || 'yaml');
+          return (
           <div key={f.key} className="field-group">
             <label className="field-label">{f.label}</label>
-            {f.type === 'checkbox' ? (
+            {isCodeField ? (
+              <YamlFieldTrigger
+                label={f.label}
+                fieldKey={f.key}
+                language={codeLang}
+                value={props[f.key] ?? (f.default || '')}
+                onChange={(val) => onChange(node.id, f.key, val, true)}
+              />
+            ) : f.type === 'checkbox' ? (
               <label className="field-checkbox">
                 <input
                   type="checkbox"
@@ -1868,7 +2368,8 @@ const PropertyPanel = ({ node, onClose, onChange, nodeEvent }) => {
               />
             )}
           </div>
-        ))}
+          );
+        })}
 
         <div className="section-title">Ports</div>
         {schema?.inputs?.length > 0 && (

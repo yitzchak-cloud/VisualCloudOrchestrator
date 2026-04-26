@@ -83,7 +83,7 @@ class WorkflowNode(GCPNode):
         },
         {
             "key": "source_yaml", "label": "Custom YAML (overrides auto-generated)",
-            "type": "textarea", "default": "",
+            "type": "yaml", "default": "",
             "placeholder": "main:\n  steps:\n  - ...",
         },
         {
