@@ -86,7 +86,7 @@ class CloudSchedulerNode(GCPNode):
 
     node_color:  ClassVar = "#0ea5e9"
     icon:        ClassVar = "cloudScheduler"
-    category:    ClassVar = "Orchestration"
+    category:    ClassVar = "Integration_Services"
     description: ClassVar = "Managed cron job service"
 
     # ------------------------------------------------------------------
@@ -219,7 +219,7 @@ class CloudSchedulerNode(GCPNode):
                     http_target=gcp.cloudscheduler.JobHttpTargetArgs(
                         http_method="POST",
                         uri=run_job_url,
-                        body=b"{}",
+                        body="{}",
                         headers={"Content-Type": "application/json"},
                         oidc_token=oidc,
                     ),

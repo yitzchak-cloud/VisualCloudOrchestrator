@@ -77,7 +77,7 @@ class CloudTasksQueueNode(GCPNode):
 
     node_color:  ClassVar = "#fb7185"
     icon:        ClassVar = "cloudTasks"
-    category:    ClassVar = "Orchestration"
+    category:    ClassVar = "Integration_Services"
     description: ClassVar = "Asynchronous task execution queue"
 
     # ------------------------------------------------------------------

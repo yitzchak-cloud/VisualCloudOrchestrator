@@ -101,7 +101,7 @@ class WorkflowNode(GCPNode):
 
     node_color:  ClassVar = "#c084fc"
     icon:        ClassVar = "workflows"
-    category:    ClassVar = "Orchestration"
+    category:    ClassVar = "Integration_Services"
     description: ClassVar = "HTTP services orchestration"
 
     # ------------------------------------------------------------------

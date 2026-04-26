@@ -93,7 +93,7 @@ class EventarcTriggerNode(GCPNode):
 
     node_color:  ClassVar = "#f97316"
     icon:        ClassVar = "eventarc"
-    category:    ClassVar = "Eventing"
+    category:    ClassVar = "Integration_Services"
     description: ClassVar = "Modern event delivery"
 
     # ------------------------------------------------------------------

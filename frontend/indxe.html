@@ -759,7 +759,7 @@ const {
   BackgroundVariant, addEdge, useNodesState, useEdgesState,
   Handle, Position, useReactFlow, Panel,
   getBezierPath, getStraightPath, getSmoothStepPath,
-  NodeResizer, NodeToolbar,
+  NodeResizer, NodeToolbar, useEdges,
 } = window.ReactFlow;
 
 // ── Icons (inline SVG) ────────────────────────────────────────────────────────
@@ -1541,7 +1541,7 @@ const CATEGORY_META = {
   Networking:    { color: '#0097a7', icon: 'Networking' },
   Observability: { color: '#0097a7', icon: 'Observability' },
   IAM :     { color: '#0097a7', icon: 'identity_and_access_management' },
-  IntegrationServices: { color: '#0097a7', icon: 'Integration_Services' },
+  Integration_Services: { color: '#0097a7', icon: 'Integration_Services' },
 };
 
 // ── Sidebar Navigation — Categories → Nodes two-level drill-down ─────────────
@@ -1803,14 +1803,76 @@ const NodeEditModal = ({ node, onClose, onChange, nodeEvent }) => {
 
   const nodeFields = schema?.params_schema || fieldDefs[schema?.type] || [];
 
-  // ── Field renderer — supports yaml / code / json in addition to standard types ──
+  // ── Edges: used for auto_from_port detection ──────────────────────────────
+  const allEdges = useEdges();
+
+  // For a cascade-select field: derive current options from the parent field value
+  const getCascadeOptions = (f) => {
+    if (!f.cascade_parent || !f.catalog) return f.options || [];
+    const parentVal = props[f.cascade_parent] || '';
+    return f.catalog[parentVal] || f.options || [];
+  };
+
+  // For auto_from_port: check if the 'source' input port has an incoming edge
+  // and if so, read the source node's schema type to map to a provider label
+  const getPortLockedValue = (f) => {
+    if (!f.auto_from_port) return null;
+    // Find any edge targeting this node's 'source' handle
+    const incomingEdge = allEdges.find(
+      e => e.target === node.id && e.targetHandle === 'source'
+    );
+    if (!incomingEdge) return null;
+    // The source node type is embedded in its id prefix (e.g. "FirestoreNode-abc123")
+    // or we read schema from data — but we only have edge here, not nodes.
+    // So we encode the provider in the edge's data.sourceType (set during onConnect).
+    // Fallback: parse the source id prefix.
+    const srcType = incomingEdge.data?.sourceType || incomingEdge.source.split('-')[0];
+    // Map node type → provider label using the catalog keys stored on the field
+    if (f.catalog) {
+      // catalog shape: { "Cloud Firestore": [...], ... }
+      // We stored the mapping in PORT_PROVIDER_MAP below
+    }
+    return incomingEdge.data?.detectedProvider || null;
+  };
+
+  // ── Field renderer — cascade / show_if / auto_from_port aware ────────────
   const renderField = (f) => {
+    // show_if: hide field when condition not met
+    if (f.show_if) {
+      const conditionMet = Object.entries(f.show_if).every(
+        ([k, v]) => (props[k] || '') === v
+      );
+      if (!conditionMet) return null;
+    }
+
     const isCodeField = f.type === 'yaml' || f.type === 'code' || f.type === 'json';
     const codeLang = f.type === 'yaml' ? 'yaml' : f.type === 'json' ? 'json' : (f.language || 'yaml');
 
+    // auto_from_port: lock a select to a value derived from the connected port
+    const portLockedValue = getPortLockedValue(f);
+    const isPortLocked = portLockedValue !== null;
+
+    // cascade select: options depend on sibling field value
+    const selectOptions = f.cascade_parent
+      ? getCascadeOptions(f)
+      : (f.options || []);
+
+    // When provider cascades, auto-pick first method if current method is no longer valid
+    const currentVal = props[f.key] ?? (isPortLocked ? portLockedValue : (f.default || ''));
+
     return (
     <div key={f.key} className={`modal-field-group ${isCodeField ? 'modal-full' : ''}`}>
-      <label className="modal-field-label">{f.label}</label>
+      <label className="modal-field-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        {f.label}
+        {isPortLocked && (
+          <span style={{
+            fontSize: 9, fontWeight: 700, letterSpacing: '.05em',
+            padding: '1px 6px', borderRadius: 99,
+            background: 'rgba(16,185,129,0.15)', color: '#34d399',
+            border: '1px solid rgba(16,185,129,0.3)',
+          }}>auto · from port</span>
+        )}
+      </label>
       {isCodeField ? (
         <YamlFieldTrigger
           label={f.label}
@@ -1842,10 +1904,25 @@ const NodeEditModal = ({ node, onClose, onChange, nodeEvent }) => {
           <span style={{ fontSize: 12, color: 'var(--text1)' }}>Enabled</span>
         </label>
       ) : f.type === 'select' ? (
-        <select className="modal-field-select" value={props[f.key] || ''}
-          onChange={e => onChange(node.id, f.key, e.target.value, true)}>
-          <option value="">— select —</option>
-          {f.options.map(o => <option key={o} value={o}>{o}</option>)}
+        <select
+          className="modal-field-select"
+          value={isPortLocked ? portLockedValue : (props[f.key] || (selectOptions[0] || ''))}
+          disabled={isPortLocked}
+          style={isPortLocked ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
+          onChange={e => {
+            const newVal = e.target.value;
+            onChange(node.id, f.key, newVal, true);
+            // If this field has a cascade_target, reset that child field to first option
+            if (f.cascade_target && f.catalog) {
+              const childOptions = f.catalog[newVal] || [];
+              if (childOptions.length > 0) {
+                onChange(node.id, f.cascade_target, childOptions[0], true);
+              }
+            }
+          }}
+        >
+          {!isPortLocked && <option value="">— select —</option>}
+          {selectOptions.map(o => <option key={o} value={o}>{o}</option>)}
         </select>
       ) : (
         <input className="modal-field-input" type={f.type || 'text'}
@@ -2294,6 +2371,79 @@ const PropertyPanel = ({ node, onClose, onChange, nodeEvent }) => {
 
   const nodeFields = schema?.params_schema || fields[schema?.type] || [];
 
+  // ── Edges for auto_from_port ──────────────────────────────────────────────
+  const allEdges = useEdges();
+
+  const getCascadeOptions = (f) => {
+    if (!f.cascade_parent || !f.catalog) return f.options || [];
+    return f.catalog[props[f.cascade_parent] || ''] || f.options || [];
+  };
+
+  const getPortLockedValue = (f) => {
+    if (!f.auto_from_port) return null;
+    const incomingEdge = allEdges.find(
+      e => e.target === node.id && e.targetHandle === 'source'
+    );
+    return incomingEdge?.data?.detectedProvider || null;
+  };
+
+  const renderPanelField = (f) => {
+    if (f.show_if) {
+      const conditionMet = Object.entries(f.show_if).every(([k, v]) => (props[k] || '') === v);
+      if (!conditionMet) return null;
+    }
+
+    const isCodeField = f.type === 'yaml' || f.type === 'code' || f.type === 'json';
+    const codeLang = f.type === 'yaml' ? 'yaml' : f.type === 'json' ? 'json' : (f.language || 'yaml');
+    const portLockedValue = getPortLockedValue(f);
+    const isPortLocked = portLockedValue !== null;
+    const selectOptions = f.cascade_parent ? getCascadeOptions(f) : (f.options || []);
+
+    return (
+      <div key={f.key} className="field-group">
+        <label className="field-label" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          {f.label}
+          {isPortLocked && (
+            <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 99, background: 'rgba(16,185,129,0.15)', color: '#34d399', border: '1px solid rgba(16,185,129,0.25)' }}>port</span>
+          )}
+        </label>
+        {isCodeField ? (
+          <YamlFieldTrigger label={f.label} fieldKey={f.key} language={codeLang}
+            value={props[f.key] ?? (f.default || '')}
+            onChange={(val) => onChange(node.id, f.key, val, true)} />
+        ) : f.type === 'checkbox' ? (
+          <label className="field-checkbox">
+            <input type="checkbox" checked={props[f.key] ?? false}
+              onChange={e => onChange(node.id, f.key, e.target.checked, true)} />
+            <span style={{ fontSize: 12, color: 'var(--text1)' }}>Enabled</span>
+          </label>
+        ) : f.type === 'select' ? (
+          <select className="field-select"
+            value={isPortLocked ? portLockedValue : (props[f.key] || (selectOptions[0] || ''))}
+            disabled={isPortLocked}
+            style={isPortLocked ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
+            onChange={e => {
+              const newVal = e.target.value;
+              onChange(node.id, f.key, newVal, true);
+              if (f.cascade_target && f.catalog) {
+                const childOptions = f.catalog[newVal] || [];
+                if (childOptions.length > 0) onChange(node.id, f.cascade_target, childOptions[0], true);
+              }
+            }}
+          >
+            {!isPortLocked && <option value="">— select —</option>}
+            {selectOptions.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+        ) : (
+          <input className="field-input" type={f.type}
+            value={props[f.key] ?? ''}
+            placeholder={f.placeholder || ''}
+            onChange={e => onChange(node.id, f.key, f.type === 'number' ? +e.target.value : e.target.value, true)} />
+        )}
+      </div>
+    );
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div className="panel-header">
@@ -2326,50 +2476,7 @@ const PropertyPanel = ({ node, onClose, onChange, nodeEvent }) => {
 
         <div className="section-title">Configuration</div>
 
-        {nodeFields.map(f => {
-          const isCodeField = f.type === 'yaml' || f.type === 'code' || f.type === 'json';
-          const codeLang = f.type === 'yaml' ? 'yaml' : f.type === 'json' ? 'json' : (f.language || 'yaml');
-          return (
-          <div key={f.key} className="field-group">
-            <label className="field-label">{f.label}</label>
-            {isCodeField ? (
-              <YamlFieldTrigger
-                label={f.label}
-                fieldKey={f.key}
-                language={codeLang}
-                value={props[f.key] ?? (f.default || '')}
-                onChange={(val) => onChange(node.id, f.key, val, true)}
-              />
-            ) : f.type === 'checkbox' ? (
-              <label className="field-checkbox">
-                <input
-                  type="checkbox"
-                  checked={props[f.key] ?? false}
-                  onChange={e => onChange(node.id, f.key, e.target.checked, true)}
-                />
-                <span style={{ fontSize: 12, color: 'var(--text1)' }}>Enabled</span>
-              </label>
-            ) : f.type === 'select' ? (
-              <select
-                className="field-select"
-                value={props[f.key] || ''}
-                onChange={e => onChange(node.id, f.key, e.target.value, true)}
-              >
-                <option value="">— select —</option>
-                {f.options.map(o => <option key={o} value={o}>{o}</option>)}
-              </select>
-            ) : (
-              <input
-                className="field-input"
-                type={f.type}
-                value={props[f.key] ?? ''}
-                placeholder={f.placeholder || ''}
-                onChange={e => onChange(node.id, f.key, f.type === 'number' ? +e.target.value : e.target.value, true)}
-              />
-            )}
-          </div>
-          );
-        })}
+        {nodeFields.map(f => renderPanelField(f))}
 
         <div className="section-title">Ports</div>
         {schema?.inputs?.length > 0 && (
@@ -3792,10 +3899,32 @@ function VCOApp() {
       }
 
       const color = sourcePort?.color || '#60a5fa';
+
+      // ── auto_from_port: embed detectedProvider when wiring into a direct_event input ──
+      let detectedProvider = null;
+      if (targetPort?.type === 'direct_event') {
+        const srcType = sourceNode.data.schema?.type || '';
+        // Map source node type → provider label (mirrors direct_event_trigger.py catalog)
+        const PORT_PROVIDER_MAP = {
+          FirestoreNode:   'Cloud Firestore',
+          FirebaseRTDBNode:'Firebase Realtime Database',
+          CloudBuildNode:  'Cloud Build',
+          GcsBucketNode:   'Cloud Storage',
+        };
+        detectedProvider = PORT_PROVIDER_MAP[srcType] || null;
+        if (detectedProvider) {
+          // Auto-write provider prop on the target node so it persists
+          setNodes(nds => nds.map(n => n.id === params.target
+            ? { ...n, data: { ...n.data, props: { ...n.data.props, provider: detectedProvider } } }
+            : n
+          ));
+        }
+      }
+
       setEdges(eds => addEdge({
         ...params,
         type: 'gcpEdge',
-        data: { color, edgeType: defaultEdgeType, animated: true, label: '' },
+        data: { color, edgeType: defaultEdgeType, animated: true, label: '', ...(detectedProvider ? { detectedProvider, sourceType: sourceNode.data.schema?.type } : {}) },
       }, eds));
       addLog(`Connected ${sourceNode.data.label} → ${targetNode.data.label}${sourcePort ? ' [' + sourcePort.type + ']' : ''}`, 'ok');
     } else {

@@ -44,7 +44,7 @@ def _resolve_graph_compat(nodes: list, edges: list) -> dict:
     sig = inspect.signature(resolve_graph)
     if len(sig.parameters) >= 3:
         return resolve_graph(nodes, edges, _get_node_registry())
-    return resolve_graph(nodes, edges)
+    return resolve_graph(nodes, edges)  # type: ignore
 
 
 def _build_dag_compat(nodes: list, ctx: dict) -> list:
@@ -52,7 +52,7 @@ def _build_dag_compat(nodes: list, ctx: dict) -> list:
     sig = inspect.signature(build_dag)
     if len(sig.parameters) >= 3:
         return build_dag(nodes, ctx, _get_node_registry())
-    return build_dag(nodes, ctx)
+    return build_dag(nodes, ctx)    # type: ignore
 
 
 def _save_node_event(
