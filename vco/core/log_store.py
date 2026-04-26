@@ -3,7 +3,12 @@ core/log_store.py
 =================
 Persistent log storage + per-node deploy-event extraction.
 
-Files (default ./logs/, override via VCO_LOGS_DIR env var):
+All file paths are now **namespace-scoped**.  Every public function that
+touches the filesystem accepts an optional *namespace* keyword argument
+(default ``"default"``).  Internal helpers that were already called with
+explicit paths continue to work unchanged.
+
+Files per namespace  (under logs_dir(namespace)/):
   deploy.jsonl       — rolling log, last MAX_LINES lines
   node_events.json   — per-node last-deploy summary (persists across restarts)
 
@@ -22,16 +27,15 @@ Node event structure:
 from __future__ import annotations
 
 import json
-import os
 import re
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-LOGS_DIR   = Path(os.environ.get("VCO_LOGS_DIR", "./logs"))
-LOG_FILE   = LOGS_DIR / "deploy.jsonl"
-EVENT_FILE = LOGS_DIR / "node_events.json"
-MAX_LINES  = 3000
+# Import namespace-aware path helpers
+from core.state import logs_dir as _logs_dir
+
+MAX_LINES = 3000
 
 _RE_GCP_ERROR  = re.compile(r"googleapi: Error \d+: (.+?)(?:\. See https?://|$)", re.DOTALL)
 _RE_CONSTRAINT = re.compile(r"Constraint (constraints/\S+) violated")
@@ -40,21 +44,30 @@ _RE_OAUTH2     = re.compile(r'oauth2: "([^"]+)" "([^"]+)"')
 _RE_OUTPUTS    = re.compile(r"Outputs:\s*\n((?:[ \t]+\S.*\n?)+)", re.MULTILINE)
 
 
-def ensure_dir() -> None:
-    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+# ── Path helpers ──────────────────────────────────────────────────────────────
+
+def _log_file(namespace: str = "default") -> Path:
+    return _logs_dir(namespace) / "deploy.jsonl"
 
 
-def append_log(entry: dict) -> None:
-    ensure_dir()
-    with open(LOG_FILE, "a", encoding="utf-8") as f:
+def _event_file(namespace: str = "default") -> Path:
+    return _logs_dir(namespace) / "node_events.json"
+
+
+# ── Log CRUD ──────────────────────────────────────────────────────────────────
+
+def append_log(entry: dict, namespace: str = "default") -> None:
+    lf = _log_file(namespace)
+    with open(lf, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-    _maybe_rotate()
+    _maybe_rotate(namespace)
 
 
-def read_logs(limit: int = MAX_LINES) -> list[dict]:
-    if not LOG_FILE.exists():
+def read_logs(limit: int = MAX_LINES, namespace: str = "default") -> list[dict]:
+    lf = _log_file(namespace)
+    if not lf.exists():
         return []
-    lines = LOG_FILE.read_text(encoding="utf-8").splitlines()
+    lines = lf.read_text(encoding="utf-8").splitlines()
     out = []
     for raw in lines[-limit:]:
         try:
@@ -64,28 +77,31 @@ def read_logs(limit: int = MAX_LINES) -> list[dict]:
     return out
 
 
-def clear_logs() -> None:
-    ensure_dir()
-    LOG_FILE.write_text("", encoding="utf-8")
+def clear_logs(namespace: str = "default") -> None:
+    _log_file(namespace).write_text("", encoding="utf-8")
 
 
-def read_node_events() -> Dict[str, Any]:
-    if not EVENT_FILE.exists():
+# ── Node events CRUD ──────────────────────────────────────────────────────────
+
+def read_node_events(namespace: str = "default") -> Dict[str, Any]:
+    ef = _event_file(namespace)
+    if not ef.exists():
         return {}
     try:
-        return json.loads(EVENT_FILE.read_text(encoding="utf-8"))
+        return json.loads(ef.read_text(encoding="utf-8"))
     except Exception:
         return {}
 
 
-def upsert_node_event(node_id: str, event: dict) -> None:
-    ensure_dir()
-    events = read_node_events()
+def upsert_node_event(node_id: str, event: dict, namespace: str = "default") -> None:
+    events = read_node_events(namespace)
     events[node_id] = event
-    EVENT_FILE.write_text(
+    _event_file(namespace).write_text(
         json.dumps(events, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
+
+# ── Event builder ─────────────────────────────────────────────────────────────
 
 def build_node_event(
     node_id: str,
@@ -99,26 +115,20 @@ def build_node_event(
 
     error_msg: Optional[str] = None
     if status == "failed":
-        # Priority 1: oauth2 / auth errors — most actionable
         m_oauth = _RE_OAUTH2.search(raw_log)
         if m_oauth:
-            err_code = m_oauth.group(1)
-            err_desc = m_oauth.group(2)
-            error_msg = f"Auth error: {err_code} — {err_desc}\n→ Run: gcloud auth application-default login"
-
-        # Priority 2: org-policy constraint
+            error_msg = (
+                f"Auth error: {m_oauth.group(1)} — {m_oauth.group(2)}\n"
+                "→ Run: gcloud auth application-default login"
+            )
         if not error_msg:
             mc = _RE_CONSTRAINT.search(raw_log)
             if mc:
                 error_msg = f"Org-policy constraint: {mc.group(1)}"
-
-        # Priority 3: GCP API error
         if not error_msg:
             m = _RE_GCP_ERROR.search(raw_log)
             if m:
                 error_msg = m.group(1).strip().rstrip(".")
-
-        # Priority 4: Pulumi SDK error
         if not error_msg:
             m = _RE_PULUMI_ERR.search(raw_log)
             if m:
@@ -174,12 +184,13 @@ def infer_node_event_from_line(
     return None
 
 
-def _maybe_rotate() -> None:
+# ── Rotation ──────────────────────────────────────────────────────────────────
+
+def _maybe_rotate(namespace: str = "default") -> None:
     try:
-        lines = LOG_FILE.read_text(encoding="utf-8").splitlines()
+        lf = _log_file(namespace)
+        lines = lf.read_text(encoding="utf-8").splitlines()
         if len(lines) > MAX_LINES * 1.2:
-            LOG_FILE.write_text(
-                "\n".join(lines[-MAX_LINES:]) + "\n", encoding="utf-8"
-            )
+            lf.write_text("\n".join(lines[-MAX_LINES:]) + "\n", encoding="utf-8")
     except Exception:
         pass

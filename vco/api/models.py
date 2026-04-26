@@ -2,7 +2,10 @@
 api/models.py
 =============
 Pydantic request / response models for all VCO API routes.
-Keep models here so routes stay thin and models can be imported anywhere.
+
+All payload models now include an optional *namespace* field (default "default").
+Routes pass this field down to core helpers so every piece of data
+(graph YAML, Pulumi stacks, logs, node events) is fully isolated per namespace.
 """
 from __future__ import annotations
 
@@ -13,23 +16,17 @@ from pydantic import BaseModel, Field
 
 class GraphPayload(BaseModel):
     """Save the current canvas state (nodes + edges)."""
-    nodes: list[dict] = Field(..., description="List of node objects from the canvas")
-    edges: list[dict] = Field(..., description="List of edge objects from the canvas")
-    # project: str = Field(
-    #     default_factory=lambda: os.getenv("DEFAULT_GCP_PROJECT", "hrz-geo-dig-res-endor-1"),
-    #     description="GCP project to deploy to (optional, defaults to server env var or hardcoded default)"
-    # )
-    # region: str = Field(
-    #     default_factory=lambda: os.getenv("DEFAULT_GCP_REGION", "me-west1"),
-    #     description="GCP region to deploy to (optional, defaults to server env var or hardcoded default)"
-    # )
+    nodes:     list[dict] = Field(..., description="List of node objects from the canvas")
+    edges:     list[dict] = Field(..., description="List of edge objects from the canvas")
+    namespace: str        = Field(default="default", description="Namespace for this graph")
 
 
 class SynthPayload(BaseModel):
     """Preview what *would* be deployed without touching GCP."""
-    nodes:   list[dict]
-    edges:   list[dict]
-    project: str = Field(
+    nodes:     list[dict]
+    edges:     list[dict]
+    namespace: str = Field(default="default")
+    project:   str = Field(
         default_factory=lambda: os.getenv("DEFAULT_GCP_PROJECT", "hrz-geo-dig-res-endor-1")
     )
     region: str = Field(
@@ -39,9 +36,10 @@ class SynthPayload(BaseModel):
 
 class DeployPayload(BaseModel):
     """Full deploy: synthesise + run Pulumi up."""
-    nodes:   list[dict]
-    edges:   list[dict]
-    project: str = Field(
+    nodes:     list[dict]
+    edges:     list[dict]
+    namespace: str = Field(default="default")
+    project:   str = Field(
         default_factory=lambda: os.getenv("DEFAULT_GCP_PROJECT", "hrz-geo-dig-res-endor-1")
     )
     region: str = Field(

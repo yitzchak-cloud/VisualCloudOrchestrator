@@ -294,6 +294,8 @@ html,body,#root{height:100%;width:100%;overflow:hidden;background:var(--bg0);col
 .empty-title{font-family:var(--font-display);font-size:22px;font-weight:800;color:var(--text2);letter-spacing:-.5px;margin-bottom:8px}
 .empty-sub{font-size:12px;color:var(--text2);line-height:1.6}
 .empty-grid{position:absolute;inset:0;background-image:radial-gradient(circle,var(--border) 1px,transparent 1px);background-size:28px 28px;opacity:.3;pointer-events:none}
+/* ── Namespace tag in log panel ── */
+.ns-tag{font-size:9px;font-weight:700;padding:1px 7px;border-radius:99px;background:rgba(99,102,241,0.15);color:#818cf8;border:1px solid rgba(99,102,241,0.3);font-family:var(--font-mono);letter-spacing:.04em}
 
 /* ── Badge ── */
 .port-type-badge{display:inline-flex;align-items:center;padding:1px 7px;border-radius:99px;font-size:9px;font-weight:600;letter-spacing:.05em}
@@ -2783,6 +2785,14 @@ function VCOApp() {
   const [ctxMenu, setCtxMenu] = useState(null);
   const [edgeCtxMenu, setEdgeCtxMenu] = useState(null);
   const [defaultEdgeType, setDefaultEdgeType] = useState('bezier');
+  // ── Namespaces ──────────────────────────────────────────────────────────────
+  const [namespace, setNamespace] = useState('default');
+  const [namespaces, setNamespaces] = useState(['default']);
+  const [nsModalOpen, setNsModalOpen] = useState(false);
+  const [nsNewName, setNsNewName] = useState('');
+  const [nsLoading, setNsLoading] = useState(false);
+  const namespaceRef = useRef('default');
+  useEffect(() => { namespaceRef.current = namespace; }, [namespace]);
   const wsRef = useRef(null);
   const nodesRef = useRef(nodes);
   const [nodeLogsModal, setNodeLogsModal] = useState(null); // { nodeId, label }
@@ -2790,6 +2800,118 @@ function VCOApp() {
   useEffect(() => { nodesRef.current = nodes; }, [nodes]);
   const reactFlowWrapper = useRef(null);
   const { screenToFlowPosition, deleteElements, fitView } = useReactFlow();
+
+
+
+  const addLog = (msg, level = 'info', node_id = null) => {
+    const ts = new Date().toLocaleTimeString('en-US', { hour12: false });
+    const entry = { ts, msg, level, node_id };
+    // Append to existing logs (history already loaded from server)
+    setLogs(l => [...l.slice(-1499), entry]);
+    // Persist to backend (fire-and-forget — don't await, don't block UI)
+    fetch('http://localhost:8000/api/deploy-logs/append', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...entry, namespace: namespaceRef.current }),
+    }).catch(() => {});
+    setTimeout(() => {
+      const el = document.getElementById('log-scroll');
+      if (el) el.scrollTop = el.scrollHeight;
+    }, 50);
+  };
+
+  const showToast = (msg, type = 'info') => {
+    const id = Date.now();
+    setToasts(t => [...t, { id, msg, type }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3000);
+  };
+
+
+  // ── Load namespace list on mount ──────────────────────────────────────────
+  useEffect(() => {
+    fetch('http://localhost:8000/api/namespaces')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.namespaces) setNamespaces(d.namespaces); })
+      .catch(() => {});
+  }, []);
+
+  // ── Switch to a different namespace (reset canvas + reload data) ──────────
+  const switchNamespace = useCallback(async (ns) => {
+    if (ns === namespaceRef.current) return;
+    setNamespace(ns);
+    namespaceRef.current = ns;
+    setNodes([]);
+    setEdges([]);
+    setSelectedNode(null);
+    setLogs([]);
+    setNodeEvents({});
+    graphLoadedRef.current = false;
+    try {
+      const stateRes = await fetch(`http://localhost:8000/api/state?namespace=${encodeURIComponent(ns)}`);
+      const state = await stateRes.json();
+      if (state?.nodes?.length) {
+        const schemaSource = nodeTypesData;
+        const restored = state.nodes.map(n => {
+          const schema = schemaSource.find(s => s.type === n.type);
+          return {
+            id: n.id, type: 'gcpNode',
+            position: n.position || { x: Math.random() * 600, y: Math.random() * 400 },
+            data: { label: n.label, schema, status: n.status || (n.deployed ? 'deployed' : 'idle'), props: n.props || {} },
+          };
+        });
+        const restoredEdges = (state.edges || []).map(e => ({
+          id: e.id || `e-${e.source}-${e.target}`,
+          source: e.source, sourceHandle: e.sourceHandle,
+          target: e.target, targetHandle: e.targetHandle,
+          type: 'gcpEdge', animated: true,
+          data: { color: e.color || '#60a5fa' },
+        }));
+        setNodes(restored);
+        setEdges(restoredEdges);
+      }
+    } catch (e) { /* silent */ }
+    try {
+      const logRes = await fetch(`http://localhost:8000/api/deploy-logs/history?limit=500&namespace=${encodeURIComponent(ns)}`);
+      if (logRes.ok) { const d = await logRes.json(); if (d.entries?.length) setLogs(d.entries); }
+    } catch {}
+    try {
+      const evRes = await fetch(`http://localhost:8000/api/deploy-logs/node-events?namespace=${encodeURIComponent(ns)}`);
+      if (evRes.ok) { const d = await evRes.json(); setNodeEvents(d || {}); }
+    } catch {}
+    graphLoadedRef.current = true;
+    addLog(`Switched to namespace "${ns}"`, 'info');
+  }, [nodeTypesData]);
+
+  // ── Create namespace ──────────────────────────────────────────────────────
+  const createNamespace = useCallback(async (name) => {
+    setNsLoading(true);
+    try {
+      const res = await fetch('http://localhost:8000/api/namespaces', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) { const err = await res.json(); showToast(err.detail || 'Failed', 'error'); return; }
+      const updated = [...namespaces, name].sort();
+      setNamespaces(updated);
+      setNsNewName('');
+      showToast(`Namespace "${name}" created`, 'success');
+      await switchNamespace(name);
+    } catch (e) { showToast(`Error: ${e.message}`, 'error'); }
+    finally { setNsLoading(false); }
+  }, [namespaces, switchNamespace]);
+
+  // ── Delete namespace ──────────────────────────────────────────────────────
+  const deleteNamespace = useCallback(async (name) => {
+    if (name === 'default') { showToast('Cannot delete the default namespace', 'error'); return; }
+    if (!confirm(`Delete namespace "${name}" and ALL its data?`)) return;
+    try {
+      const res = await fetch(`http://localhost:8000/api/namespaces/${encodeURIComponent(name)}`, { method: 'DELETE' });
+      if (!res.ok) { const err = await res.json(); showToast(err.detail || 'Failed', 'error'); return; }
+      setNamespaces(namespaces.filter(n => n !== name));
+      showToast(`Namespace "${name}" deleted`, 'success');
+      if (namespaceRef.current === name) await switchNamespace('default');
+    } catch (e) { showToast(`Error: ${e.message}`, 'error'); }
+  }, [namespaces, switchNamespace]);
 
   // Apply theme to document
   useEffect(() => {
@@ -2827,17 +2949,17 @@ function VCOApp() {
         if (typesData?.length) setNodeTypesData(typesData);
 
         // 2. Then get the saved graph (schemas are now available in typesData)
-        const stateRes = await fetch('http://localhost:8000/api/state');
+        const stateRes = await fetch(`http://localhost:8000/api/state?namespace=${encodeURIComponent(namespaceRef.current)}`);
         const state = await stateRes.json();
         if (!state?.nodes?.length) {
           graphLoadedRef.current = true;
           // Still load logs + events even if no nodes
           try {
-            const logRes = await fetch('http://localhost:8000/api/deploy-logs/history?limit=500');
+            const logRes = await fetch(`http://localhost:8000/api/deploy-logs/history?limit=500&namespace=${encodeURIComponent(namespaceRef.current)}`);
             if (logRes.ok) { const d = await logRes.json(); if (d.entries?.length) setLogs(d.entries); }
           } catch {}
           try {
-            const evRes = await fetch('http://localhost:8000/api/deploy-logs/node-events');
+            const evRes = await fetch(`http://localhost:8000/api/deploy-logs/node-events?namespace=${encodeURIComponent(namespaceRef.current)}`);
             if (evRes.ok) { const d = await evRes.json(); setNodeEvents(d || {}); }
           } catch {}
           return;
@@ -2874,7 +2996,7 @@ function VCOApp() {
 
         // 3. Load persisted log history FIRST (before addLog so we don't overwrite)
         try {
-          const logRes = await fetch('http://localhost:8000/api/deploy-logs/history?limit=500');
+          const logRes = await fetch(`http://localhost:8000/api/deploy-logs/history?limit=500&namespace=${encodeURIComponent(namespaceRef.current)}`);
           if (logRes.ok) {
             const logData = await logRes.json();
             if (logData.entries?.length) {
@@ -2886,7 +3008,7 @@ function VCOApp() {
 
         // 4. Load per-node last-deploy events
         try {
-          const evRes = await fetch('http://localhost:8000/api/deploy-logs/node-events');
+          const evRes = await fetch(`http://localhost:8000/api/deploy-logs/node-events?namespace=${encodeURIComponent(namespaceRef.current)}`);
           if (evRes.ok) {
             const evData = await evRes.json();
             setNodeEvents(evData || {});
@@ -2927,7 +3049,9 @@ function VCOApp() {
   const autoSaveAfterDeploy = useCallback(async () => {
     const currentNodes = nodesRef.current;
     const currentEdges = edgesRef.current;
+    const ns = namespaceRef.current;
     const payload = {
+      namespace: ns,
       nodes: currentNodes.map(n => ({
         id: n.id,
         type: n.data.schema?.type,
@@ -2980,7 +3104,7 @@ function VCOApp() {
       // Refresh node events after status change
       if (newStatus === 'deployed' || newStatus === 'failed') {
         setTimeout(() => {
-          fetch('http://localhost:8000/api/deploy-logs/node-events')
+          fetch(`http://localhost:8000/api/deploy-logs/node-events?namespace=${encodeURIComponent(namespaceRef.current)}`)
             .then(r => r.ok ? r.json() : null)
             .then(data => { if (data) setNodeEvents(data); })
             .catch(() => {});
@@ -3027,7 +3151,7 @@ function VCOApp() {
       }
       // Refresh node events after deploy
       setTimeout(() => {
-        fetch('http://localhost:8000/api/deploy-logs/node-events')
+        fetch(`http://localhost:8000/api/deploy-logs/node-events?namespace=${encodeURIComponent(namespaceRef.current)}`)
           .then(r => r.ok ? r.json() : null)
           .then(data => { if (data) setNodeEvents(data); })
           .catch(() => {});
@@ -3069,30 +3193,6 @@ function VCOApp() {
       setNodeLogsModal(m => m ? { ...m, connecting: false, lines: [{ text: `Cannot connect to log stream: ${err.message}`, level: 'error', ts: new Date().toLocaleTimeString('en-US',{hour12:false}) }] } : m);
     }
   }, []);
-
-
-  const addLog = (msg, level = 'info', node_id = null) => {
-    const ts = new Date().toLocaleTimeString('en-US', { hour12: false });
-    const entry = { ts, msg, level, node_id };
-    // Append to existing logs (history already loaded from server)
-    setLogs(l => [...l.slice(-1499), entry]);
-    // Persist to backend (fire-and-forget — don't await, don't block UI)
-    fetch('http://localhost:8000/api/deploy-logs/append', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(entry),
-    }).catch(() => {});
-    setTimeout(() => {
-      const el = document.getElementById('log-scroll');
-      if (el) el.scrollTop = el.scrollHeight;
-    }, 50);
-  };
-
-  const showToast = (msg, type = 'info') => {
-    const id = Date.now();
-    setToasts(t => [...t, { id, msg, type }]);
-    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3000);
-  };
 
   // Drag from sidebar → drop on canvas
   const onDragOver = useCallback(e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }, []);
@@ -3284,6 +3384,7 @@ function VCOApp() {
 
     // Ask server what will change before marking nodes as deploying
     const payload = {
+      namespace: namespaceRef.current,
       nodes: nodes.map(n => ({ id: n.id, type: n.data.schema?.type, label: n.data.label, props: n.data.props || {} })),
       edges: edges.map(e => ({ source: e.source, target: e.target, sourceHandle: e.sourceHandle, targetHandle: e.targetHandle })),
     };
@@ -3342,7 +3443,7 @@ function VCOApp() {
     };
     try {
       await fetch('http://localhost:8000/api/graph', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, namespace: namespaceRef.current }),
       });
       showToast('Saved to desired.yaml', 'success');
       addLog('Graph saved to desired.yaml', 'ok');
@@ -3361,7 +3462,7 @@ function VCOApp() {
     try {
       await fetch('http://localhost:8000/api/graph', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodes: [], edges: [] }),
+        body: JSON.stringify({ nodes: [], edges: [], namespace: namespaceRef.current }),
       });
     } catch { /* silent */ }
   };
@@ -3466,9 +3567,9 @@ function VCOApp() {
       </div>
 
       {/* Canvas */}
-      <div className="canvas-wrap" ref={reactFlowWrapper} onClick={() => { closeCtxMenu(); setMenuOpen(false); }}>
+      <div className="canvas-wrap" ref={reactFlowWrapper} onClick={() => { closeCtxMenu(); setMenuOpen(false); setNsModalOpen(false); }}>
         {/* Topbar */}
-        <div className="topbar">
+        <div className="topbar" onClick={e => e.stopPropagation()}>
           <div className="topbar-menu">
             <button
               id="topbar-menu-button"
@@ -3516,7 +3617,105 @@ function VCOApp() {
               </div>
             )}
           </div>
-          <div style={{ width: 260 }} />
+          {/* ── Namespace Selector ── */}
+          <div onClick={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
+            {/* namespace pill */}
+            <button
+              onClick={e => { e.stopPropagation(); setNsModalOpen(v => !v); }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '4px 10px 4px 8px',
+                borderRadius: 99,
+                border: '1.5px solid var(--accent2)',
+                background: 'rgba(99,102,241,0.12)',
+                color: 'var(--text0)',
+                cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11,
+                fontWeight: 700, letterSpacing: '.04em',
+                transition: 'all .15s', maxWidth: 200,
+              }}
+              title="Switch namespace"
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+              </svg>
+              <span style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{namespace}</span>
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: .7 }}><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            {/* Dropdown */}
+            {nsModalOpen && (
+              <div onClick={e => e.stopPropagation()} style={{
+                position: 'absolute', top: 'calc(100% + 6px)', left: 0,
+                minWidth: 220, background: 'var(--bg1)',
+                border: '1px solid var(--border2)', borderRadius: 'var(--r12)',
+                boxShadow: '0 16px 40px rgba(0,0,0,.35)', zIndex: 200,
+                padding: 6, animation: 'fade-in .12s ease',
+              }}>
+                {/* Title */}
+                <div style={{ padding: '4px 8px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--text2)', letterSpacing: '.12em', textTransform: 'uppercase' }}>Namespaces</span>
+                  <span style={{ fontSize: 9, color: 'var(--text2)' }}>{namespaces.length} total</span>
+                </div>
+                {/* List */}
+                <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+                  {namespaces.map(ns => (
+                    <div key={ns} style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '7px 10px', borderRadius: 8, cursor: 'pointer',
+                      background: ns === namespace ? 'rgba(99,102,241,0.15)' : 'transparent',
+                      border: `1px solid ${ns === namespace ? 'rgba(99,102,241,0.4)' : 'transparent'}`,
+                      marginBottom: 2,
+                    }}
+                      onMouseEnter={e => { if (ns !== namespace) e.currentTarget.style.background = 'var(--bg3)'; }}
+                      onMouseLeave={e => { if (ns !== namespace) e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      <div style={{ width: 7, height: 7, borderRadius: '50%', background: ns === namespace ? '#818cf8' : 'var(--text2)', flexShrink: 0 }}/>
+                      <span onClick={() => { switchNamespace(ns); setNsModalOpen(false); }}
+                        style={{ flex: 1, fontSize: 12, fontFamily: 'var(--font-mono)', color: ns === namespace ? '#c7d2fe' : 'var(--text1)', fontWeight: ns === namespace ? 700 : 400 }}>
+                        {ns}
+                      </span>
+                      {ns !== 'default' && (
+                        <button onClick={() => { deleteNamespace(ns); setNsModalOpen(false); }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)', fontSize: 12, padding: '0 2px', borderRadius: 3, lineHeight: 1 }}
+                          title="Delete namespace"
+                          onMouseEnter={e => e.currentTarget.style.color = 'var(--red)'}
+                          onMouseLeave={e => e.currentTarget.style.color = 'var(--text2)'}
+                        >✕</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {/* Create new */}
+                <div style={{ borderTop: '1px solid var(--border)', marginTop: 4, paddingTop: 8, padding: '8px 6px 4px' }}>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <input
+                      value={nsNewName}
+                      onChange={e => setNsNewName(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ''))}
+                      onKeyDown={e => { if (e.key === 'Enter' && nsNewName.trim()) { createNamespace(nsNewName.trim()); setNsModalOpen(false); } }}
+                      placeholder="new-namespace"
+                      style={{
+                        flex: 1, background: 'var(--bg2)', border: '1px solid var(--border)',
+                        borderRadius: 6, padding: '5px 8px', color: 'var(--text0)',
+                        fontFamily: 'var(--font-mono)', fontSize: 11, outline: 'none',
+                      }}
+                    />
+                    <button
+                      disabled={!nsNewName.trim() || nsLoading}
+                      onClick={() => { if (nsNewName.trim()) { createNamespace(nsNewName.trim()); setNsModalOpen(false); } }}
+                      style={{
+                        background: 'var(--accent2)', color: '#fff', border: 'none',
+                        borderRadius: 6, padding: '5px 10px', cursor: 'pointer',
+                        fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 700,
+                        opacity: nsNewName.trim() ? 1 : 0.4,
+                      }}
+                    >+ New</button>
+                  </div>
+                  <div style={{ fontSize: 9, color: 'var(--text2)', marginTop: 4, paddingLeft: 2 }}>
+                    Letters, digits, - and _ only
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
           <div className="topbar-spacer"/>
 
           {/* Edge type selector */}
@@ -3683,6 +3882,7 @@ function VCOApp() {
                   await fetch('http://localhost:8000/api/graph', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
+                      namespace: namespaceRef.current,
                       nodes: currentNodes.map(n => ({ id: n.id, type: n.data.schema?.type, label: n.data.label, props: n.data.props || {}, position: n.position, status: n.data.status || 'idle' })),
                       edges: currentEdges.map(e => ({ id: e.id, source: e.source, sourceHandle: e.sourceHandle, target: e.target, targetHandle: e.targetHandle, color: e.data?.color || null })),
                     }),
@@ -3758,7 +3958,7 @@ function VCOApp() {
         {/* Log */}
         <LogPanel logs={logs} visible={logVisible} onToggle={() => setLogVisible(v => !v)} onClear={() => {
           setLogs([]);
-          fetch('http://localhost:8000/api/deploy-logs/history', { method: 'DELETE' }).catch(() => {});
+          fetch(`http://localhost:8000/api/deploy-logs/history?namespace=${encodeURIComponent(namespaceRef.current)}`, { method: 'DELETE' }).catch(() => {});
         }} panelH={logPanelH} onResize={setLogPanelH} nodeEvents={nodeEvents} />
         {nodeLogsModal && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', zIndex:3000, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)' }}

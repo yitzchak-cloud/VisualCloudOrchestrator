@@ -1,7 +1,5 @@
 # Visual Cloud Orchestrator (VCO)
 
-GCP infrastructure canvas — draw your cloud, deploy it.
-
 ## Structure
 
 ```

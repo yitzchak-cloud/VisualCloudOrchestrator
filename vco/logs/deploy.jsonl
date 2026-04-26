@@ -296,3 +296,7 @@
 {"ts": "22:12:53", "msg": "State auto-saved after deploy", "level": "ok", "node_id": null}
 {"ts": "22:13:11", "msg": "Disconnected VpcNetwork → Subnetwork [undefined→undefined]", "level": "warn", "node_id": null}
 {"ts": "22:13:19", "msg": "Connected VpcNetwork → Subnetwork [network]", "level": "ok", "node_id": null}
+{"ts": "23:30:31", "msg": "Session restored — 4 node(s)", "level": "info", "node_id": null}
+{"ts": "23:30:31", "msg": "WebSocket connected", "level": "ok", "node_id": null}
+{"ts": "01:28:25", "msg": "WebSocket connected", "level": "ok", "node_id": null}
+{"ts": "03:12:40", "msg": "WebSocket connected", "level": "ok", "node_id": null}
