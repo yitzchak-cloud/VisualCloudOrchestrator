@@ -1,0 +1,6 @@
+{
+    "yaml.schemas": {
+        "kubernetes": "*.yaml",
+        "https://www.schemastore.org/cloudify.json": "file:///c%3A/Users/isaac/source/repos/VisualCloudOrchestrator/vco/codegen/overlays/_TEMPLATE.yaml"
+    }
+}

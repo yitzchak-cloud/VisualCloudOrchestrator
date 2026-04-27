@@ -1,0 +1,89 @@
+# codegen/overlays/_TEMPLATE.yaml
+# ─────────────────────────────────
+# Copy this file to  <module>_<Resource>.yaml  (all lowercase snake_case)
+# and fill in the sections you need.
+#
+# Filename convention:
+#   Pulumi type             →  overlay filename
+#   pubsub.Topic            →  pubsub_topic.yaml
+#   storage.Bucket          →  storage_bucket.yaml
+#   bigquery.Dataset        →  bigquery_dataset.yaml
+#   cloudscheduler.Job      →  cloudscheduler_job.yaml
+#
+# Minimum required: class_name, description, category, node_color, icon
+# Everything else is optional — the codegen fills in sensible defaults.
+
+# ── Identity ──────────────────────────────────────────────────────────────────
+class_name:  MyResourceNode       # Python class name (must end with Node)
+description: One-line description shown in the sidebar tooltip
+category:    General              # Compute | Messaging | Storage | Integration_Services | Security | Networking | Orchestration
+node_color:  "#1e293b"            # hex accent colour
+icon:        box                  # icon name matching /icons/<name>/<name>.svg
+url_field:                        # prop key to show as clickable URL, or leave blank
+
+# ── params_schema (Phase 2 — your controlled params) ─────────────────────────
+# List only params you want to control (type, options, default, order).
+# Every other inputProperty from the Pulumi schema is appended automatically.
+#
+# Supported types: text | number | select | boolean | yaml | json | textarea
+params_schema:
+  - key: region
+    label: Region
+    type: select
+    options: [me-west1, us-central1, us-east1, europe-west1]
+    default: me-west1
+  # - key: some_enum_prop
+  #   label: Some Enum
+  #   type: select
+  #   options: [VALUE_A, VALUE_B]
+  #   default: VALUE_A
+
+# ── Ports (Phase 2 — what connects to this node) ─────────────────────────────
+# port_type values: SERVICE_ACCOUNT | NETWORK | HTTP_TARGET | TASK_QUEUE |
+#                   SECRET | MESSAGE | TOPIC | STORAGE | RUN_JOB |
+#                   SUBSCRIPTION | BUCKET | EVENT | SCHEMA
+inputs:
+  - name: service_account
+    port_type: SERVICE_ACCOUNT
+    required: false
+  # - name: subnet
+  #   port_type: NETWORK
+  #   required: false
+
+outputs:
+  []
+  # - name: publishes_to
+  #   port_type: TOPIC
+  #   multi: true
+
+# ── resolve_edges_body ────────────────────────────────────────────────────────
+# Python body of resolve_edges().  Indent with 8 spaces (2 extra levels).
+# Available vars: src_id, tgt_id, src_type, tgt_type, ctx, self
+resolve_edges_body: |
+        return False
+
+# ── dag_deps_body ─────────────────────────────────────────────────────────────
+# Python body of dag_deps().  Indent with 8 spaces.
+# Available vars: ctx, self
+dag_deps_body: |
+        return []
+
+# ── pulumi_program_extra ──────────────────────────────────────────────────────
+# Code injected BEFORE def program() inside pulumi_program().
+# Use it to build env var lists, resolve outputs, etc.
+# If you need to completely replace the generated program(), use extra_methods.
+pulumi_program_extra: ""
+
+# ── live_outputs_body ─────────────────────────────────────────────────────────
+live_outputs_body: |
+        return dict(pulumi_outputs)
+
+# ── log_source_body ───────────────────────────────────────────────────────────
+log_source_body: |
+        return None
+
+# ── extra_methods ─────────────────────────────────────────────────────────────
+# Verbatim Python methods appended to the class body.
+# Indent with 4 spaces (one class level).
+# Use this to completely override pulumi_program() or add helpers.
+extra_methods: ""

@@ -10,13 +10,9 @@ Changes vs previous version:
 """
 from __future__ import annotations
 
-import asyncio
-import logging
-import os
-import tempfile
+import asyncio, logging, os, tempfile
 from pathlib import Path
 from typing import Any, Callable
-
 from pulumi import automation as auto
 
 from deploy.graph_resolver import build_dag, resolve_graph
