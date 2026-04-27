@@ -1,0 +1,108 @@
+VCO Node Triage Report
+Total resources selected: 55
+───────────────────────────────────────────────────────
+
+[aiplatform]  (3 resources)
+  aiplatform.Dataset                                  4 props
+  aiplatform.Endpoint                                 4 props
+  aiplatform.FeatureStore                             2 props
+
+[artifactregistry]  (1 resources)
+  artifactregistry.Repository                         5 props
+
+[bigquery]  (3 resources)
+  bigquery.Connection                                 3 props
+  bigquery.Dataset                                    4 props
+  bigquery.Table                                      5 props
+
+[cloudfunctionsv2]  (1 resources)
+  cloudfunctionsv2.Function                           3 props
+
+[cloudrunv2]  (2 resources)
+  cloudrunv2.Job                                      2 props
+  cloudrunv2.Service                                  2 props
+
+[cloudscheduler]  (1 resources)
+  cloudscheduler.Job                                  4 props
+
+[cloudtasks]  (1 resources)
+  cloudtasks.Queue                                    2 props
+
+[composer]  (1 resources)
+  composer.Environment                                2 props
+
+[compute]  (15 resources)
+  compute.Address                                     5 props
+  compute.BackendService                              4 props
+  compute.Firewall                                    4 props
+  compute.GlobalAddress                               5 props
+  compute.GlobalForwardingRule                        5 props
+  compute.HealthCheck                                 3 props
+  compute.Instance                                    3 props
+  compute.InstanceGroupManager                        4 props
+  compute.InstanceTemplate                            2 props
+  compute.Network                                     4 props
+  compute.Router                                      3 props
+  compute.RouterNat                                   5 props
+  compute.SecurityPolicy                              3 props
+  compute.Subnetwork                                  5 props
+  compute.UrlMap                                      2 props
+
+[container]  (2 resources)
+  container.Cluster                                   5 props
+  container.NodePool                                  3 props
+
+[dataflow]  (1 resources)
+  dataflow.Job                                        5 props
+
+[dns]  (2 resources)
+  dns.ManagedZone                                     3 props
+  dns.RecordSet                                       4 props
+
+[eventarc]  (1 resources)
+  eventarc.Trigger                                    4 props
+
+[firestore]  (1 resources)
+  firestore.Database                                  5 props
+
+[iam]  (1 resources)
+  iam.ServiceAccount                                  4 props
+
+[kms]  (2 resources)
+  kms.CryptoKey                                       4 props
+  kms.KeyRing                                         2 props
+
+[logging]  (2 resources)
+  logging.LogSink                                     4 props
+  logging.Metric                                      3 props
+
+[monitoring]  (3 resources)
+  monitoring.AlertPolicy                              4 props
+  monitoring.Dashboard                                3 props
+  monitoring.NotificationChannel                      4 props
+
+[pubsub]  (3 resources)
+  pubsub.Schema                                       3 props
+  pubsub.Subscription                                 5 props
+  pubsub.Topic                                        3 props
+
+[redis]  (1 resources)
+  redis.Instance                                      7 props
+
+[secretmanager]  (1 resources)
+  secretmanager.Secret                                3 props
+
+[spanner]  (2 resources)
+  spanner.Database                                    3 props
+  spanner.Instance                                    5 props
+
+[sql]  (3 resources)
+  sql.Database                                        4 props
+  sql.DatabaseInstance                                4 props
+  sql.User                                            4 props
+
+[storage]  (1 resources)
+  storage.Bucket                                      3 props
+
+[workflows]  (1 resources)
+  workflows.Workflow                                  5 props
