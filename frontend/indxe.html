@@ -2662,295 +2662,282 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
     };
 
     // ── Terraform Export Modal ────────────────────────────────────────────────────
-    const TerraformExportModal = ({ nodes, edges, namespace, project, region, onClose }) => {
+    const TerraformExportModal = ({ nodes, edges, namespace, defaultProject, defaultRegion, onClose }) => {
       const [preview, setPreview] = React.useState(null);
       const [loading, setLoading] = React.useState(false);
       const [downloading, setDownloading] = React.useState(false);
+      const [redownloading, setRedownloading] = React.useState(false);
       const [error, setError] = React.useState(null);
-      const [projOverride, setProjOverride] = React.useState(project || 'my-gcp-project');
-      const [regionOverride, setRegionOverride] = React.useState(region || 'us-central1');
+      const [project, setProject] = React.useState(defaultProject || 'my-gcp-project');
+      const [region, setRegion] = React.useState(defaultRegion || 'us-central1');
 
-      // Load preview on mount
-      React.useEffect(() => {
-        fetchPreview();
-      }, []);
+      React.useEffect(() => { fetchPreview(); }, []);
+
+      const API = 'http://localhost:8000/api/terraform';
 
       const fetchPreview = async () => {
-        setLoading(true);
-        setError(null);
+        setLoading(true); setError(null);
         try {
-          const res = await fetch('http://localhost:8000/api/terraform/preview', {
+          const res = await fetch(`${API}/preview`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              nodes,
-              edges,
-              namespace,
-              project: projOverride,
-              region: regionOverride,
-            }),
+            body: JSON.stringify({ nodes, edges, namespace, project, region }),
           });
           if (!res.ok) throw new Error(`Server error ${res.status}`);
           setPreview(await res.json());
-        } catch (e) {
-          setError(e.message);
-        } finally {
-          setLoading(false);
-        }
+        } catch (e) { setError(e.message); }
+        finally { setLoading(false); }
       };
 
-      const handleDownload = async () => {
-        setDownloading(true);
-        setError(null);
+      // Generate new workspace → save on server → download zip
+      const handleGenerate = async () => {
+        setDownloading(true); setError(null);
         try {
-          const res = await fetch('http://localhost:8000/api/terraform/generate', {
+          const res = await fetch(`${API}/generate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              nodes,
-              edges,
-              namespace,
-              project: projOverride,
-              region: regionOverride,
-            }),
+            body: JSON.stringify({ nodes, edges, namespace, project, region }),
           });
           if (!res.ok) throw new Error(`Server error ${res.status}`);
-          // Trigger browser download
           const blob = await res.blob();
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = 'vco-terraform.zip';
-          a.click();
-          URL.revokeObjectURL(url);
-        } catch (e) {
-          setError(e.message);
-        } finally {
-          setDownloading(false);
-        }
+          triggerDownload(blob, 'vco-terraform.zip');
+          // Refresh preview to show new saved_at
+          await fetchPreview();
+        } catch (e) { setError(e.message); }
+        finally { setDownloading(false); }
       };
 
-      const statusColor = { supported: 'var(--green)', skipped: 'var(--yellow)' };
+      // Re-download last saved workspace from server (no regeneration)
+      const handleRedownload = async () => {
+        setRedownloading(true); setError(null);
+        try {
+          const res = await fetch(`${API}/download?namespace=${encodeURIComponent(namespace)}`);
+          if (res.status === 404) throw new Error('No saved workspace — generate first');
+          if (!res.ok) throw new Error(`Server error ${res.status}`);
+          const blob = await res.blob();
+          triggerDownload(blob, `vco-terraform-${namespace}.zip`);
+        } catch (e) { setError(e.message); }
+        finally { setRedownloading(false); }
+      };
+
+      const triggerDownload = (blob, filename) => {
+        const url = URL.createObjectURL(blob);
+        const a = Object.assign(document.createElement('a'), { href: url, download: filename });
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+
+      const accent = '#7c3aed';
 
       return (
-        <div
-          onClick={onClose}
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)',
-            zIndex: 3500, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            backdropFilter: 'blur(6px)',
-          }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              background: 'var(--bg1)', border: '1px solid var(--border2)',
-              borderRadius: 18, width: 580, maxWidth: '94vw', maxHeight: '88vh',
-              display: 'flex', flexDirection: 'column',
-              boxShadow: '0 40px 100px rgba(0,0,0,.85)',
-              animation: 'modal-in .18s cubic-bezier(.2,.8,.2,1)',
-              overflow: 'hidden',
-              position: 'relative',
-            }}
-          >
-            {/* Accent bar */}
+        <div onClick={onClose} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)',
+          zIndex: 3500, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          backdropFilter: 'blur(6px)',
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--bg1)', border: '1px solid var(--border2)',
+            borderRadius: 18, width: 580, maxWidth: '94vw', maxHeight: '88vh',
+            display: 'flex', flexDirection: 'column',
+            boxShadow: '0 40px 100px rgba(0,0,0,.85)',
+            animation: 'modal-in .18s cubic-bezier(.2,.8,.2,1)',
+            overflow: 'hidden', position: 'relative',
+          }}>
+
+            {/* accent top bar */}
             <div style={{
               position: 'absolute', top: 0, left: 0, right: 0, height: 3,
               background: 'linear-gradient(90deg,#7c3aed,#4f46e5,#2563eb)',
-              borderRadius: '18px 18px 0 0',
+              borderRadius: '18px 18px 0 0'
             }} />
 
             {/* Header */}
             <div style={{
               padding: '22px 24px 16px', borderBottom: '1px solid var(--border)',
               display: 'flex', alignItems: 'center', gap: 14,
-              background: 'linear-gradient(135deg,var(--bg2),var(--bg1))',
+              background: 'linear-gradient(135deg,var(--bg2),var(--bg1))'
             }}>
               <div style={{
                 width: 44, height: 44, borderRadius: 12, flexShrink: 0,
                 background: 'rgba(124,58,237,0.18)', color: '#a78bfa',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                border: '1.5px solid rgba(124,58,237,0.35)',
-                fontSize: 22,
-              }}>𝕋𝔽</div>
+                border: '1.5px solid rgba(124,58,237,0.35)', fontSize: 20, fontWeight: 900
+              }}>
+                TF
+              </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16, color: 'var(--text0)' }}>
                   Export Terraform
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text2)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>
-                  Generates standard HCL workspace · versions.tf · variables.tf · main.tf · outputs.tf
+                  Generates HCL workspace · saved to server · download anytime
                 </div>
               </div>
               <button onClick={onClose} style={{
                 width: 30, height: 30, borderRadius: 8, border: '1px solid var(--border)',
                 background: 'var(--bg3)', color: 'var(--text2)', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15,
               }}>✕</button>
             </div>
 
             {/* Config row */}
-            <div style={{ padding: '14px 24px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 12 }}>
+            <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 10 }}>
               <div style={{ flex: 2 }}>
-                <label style={{ fontSize: 9, fontWeight: 700, color: 'var(--text2)', letterSpacing: '.1em', textTransform: 'uppercase', display: 'block', marginBottom: 5 }}>
-                  GCP Project ID
-                </label>
-                <input
-                  value={projOverride}
-                  onChange={e => setProjOverride(e.target.value)}
+                <label style={{ fontSize: 9, fontWeight: 700, color: 'var(--text2)', letterSpacing: '.1em', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>GCP Project ID</label>
+                <input value={project} onChange={e => setProject(e.target.value)} placeholder="my-gcp-project"
                   style={{
                     width: '100%', background: 'var(--bg2)', border: '1px solid var(--border)',
                     borderRadius: 8, padding: '7px 10px', color: 'var(--text0)',
-                    fontFamily: 'var(--font-mono)', fontSize: 12, outline: 'none',
-                  }}
-                  placeholder="my-gcp-project"
-                />
+                    fontFamily: 'var(--font-mono)', fontSize: 12, outline: 'none'
+                  }} />
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 9, fontWeight: 700, color: 'var(--text2)', letterSpacing: '.1em', textTransform: 'uppercase', display: 'block', marginBottom: 5 }}>
-                  Region
-                </label>
-                <select
-                  value={regionOverride}
-                  onChange={e => setRegionOverride(e.target.value)}
+                <label style={{ fontSize: 9, fontWeight: 700, color: 'var(--text2)', letterSpacing: '.1em', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>Region</label>
+                <select value={region} onChange={e => setRegion(e.target.value)}
                   style={{
                     width: '100%', background: 'var(--bg2)', border: '1px solid var(--border)',
                     borderRadius: 8, padding: '7px 10px', color: 'var(--text0)',
-                    fontFamily: 'var(--font-mono)', fontSize: 12, outline: 'none',
-                  }}
-                >
-                  {['me-west1', 'us-central1', 'us-east1', 'europe-west1', 'asia-east1', 'asia-northeast1'].map(r => (
+                    fontFamily: 'var(--font-mono)', fontSize: 12, outline: 'none'
+                  }}>
+                  {['me-west1', 'us-central1', 'us-east1', 'europe-west1', 'asia-east1'].map(r => (
                     <option key={r} value={r}>{r}</option>
                   ))}
                 </select>
               </div>
               <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                <button
-                  onClick={fetchPreview}
-                  style={{
-                    padding: '7px 14px', borderRadius: 8, border: '1px solid var(--border2)',
-                    background: 'var(--bg3)', color: 'var(--text1)', cursor: 'pointer',
-                    fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600,
-                  }}
-                >
-                  Refresh
-                </button>
+                <button onClick={fetchPreview} style={{
+                  padding: '7px 12px', borderRadius: 8, border: '1px solid var(--border2)',
+                  background: 'var(--bg3)', color: 'var(--text1)', cursor: 'pointer',
+                  fontFamily: 'var(--font-mono)', fontSize: 11,
+                }}>↻</button>
               </div>
             </div>
 
-            {/* Preview body */}
+            {/* Body */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
-              {loading && (
-                <div style={{ textAlign: 'center', color: 'var(--text2)', padding: 32 }}>
-                  <div style={{ fontSize: 24, marginBottom: 8 }}>⏳</div>
-                  Analysing graph…
-                </div>
-              )}
+
+              {loading && <div style={{ textAlign: 'center', color: 'var(--text2)', padding: 32 }}>⏳ Analysing graph…</div>}
               {error && (
                 <div style={{
                   background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
-                  borderRadius: 8, padding: '12px 16px', color: '#f87171', fontSize: 12,
-                  fontFamily: 'var(--font-mono)',
+                  borderRadius: 8, padding: '10px 14px', color: '#f87171', fontSize: 12,
+                  fontFamily: 'var(--font-mono)', marginBottom: 12
                 }}>
                   ✗ {error}
                 </div>
               )}
-              {preview && !loading && (
-                <>
-                  {/* Summary chips */}
-                  <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-                    {[
-                      { label: 'Total', value: preview.total, color: 'var(--accent)' },
-                      { label: 'Supported', value: preview.supported, color: 'var(--green)' },
-                      { label: 'Skipped', value: preview.skipped, color: 'var(--yellow)' },
-                    ].map(c => (
-                      <div key={c.label} style={{
-                        flex: 1, textAlign: 'center', padding: '10px 8px',
-                        background: c.color + '14', border: `1px solid ${c.color}44`,
-                        borderRadius: 10,
-                      }}>
-                        <div style={{ fontSize: 22, fontWeight: 800, color: c.color, fontFamily: 'var(--font-display)' }}>{c.value}</div>
-                        <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 2, letterSpacing: '.06em', textTransform: 'uppercase' }}>{c.label}</div>
-                      </div>
-                    ))}
-                  </div>
 
-                  {/* File list */}
-                  <div style={{ marginBottom: 14 }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 8 }}>
-                      Generated Files
-                    </div>
-                    {['versions.tf', 'variables.tf', 'terraform.tfvars', 'main.tf', 'outputs.tf', 'README.md'].map(f => (
-                      <div key={f} style={{
-                        display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px',
-                        background: 'var(--bg2)', borderRadius: 6, marginBottom: 4,
-                        border: '1px solid var(--border)',
-                      }}>
-                        <span style={{ fontSize: 11, color: '#818cf8', fontFamily: 'var(--font-mono)' }}>📄</span>
-                        <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text0)', flex: 1 }}>{f}</span>
-                        <span style={{ fontSize: 9, color: 'var(--green)', background: 'rgba(16,185,129,0.1)', borderRadius: 99, padding: '1px 6px' }}>included</span>
-                      </div>
-                    ))}
-                  </div>
+              {preview && !loading && (<>
 
-                  {/* Node list */}
-                  <div>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 8 }}>
-                      Nodes
-                    </div>
-                    {preview.nodes.map(n => (
-                      <div key={n.node_id} style={{
-                        display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px',
-                        background: 'var(--bg2)', borderRadius: 6, marginBottom: 4,
-                        border: `1px solid ${n.supported ? 'var(--border)' : 'rgba(245,158,11,0.3)'}`,
-                      }}>
-                        <div style={{
-                          width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-                          background: n.supported ? 'var(--green)' : 'var(--yellow)',
-                        }} />
-                        <span style={{ fontSize: 11, color: 'var(--text0)', flex: 1 }}>{n.label}</span>
-                        <span style={{ fontSize: 9, color: 'var(--text2)', fontFamily: 'var(--font-mono)' }}>
-                          {n.type.replace('Node', '')}
-                        </span>
-                        {!n.supported && (
-                          <span style={{ fontSize: 9, color: 'var(--yellow)', background: 'rgba(245,158,11,0.1)', borderRadius: 99, padding: '1px 6px' }}>
-                            no TF generator
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Quick start hint */}
+                {/* Last saved banner */}
+                {preview.saved_at && (
                   <div style={{
-                    marginTop: 14, padding: '10px 14px',
-                    background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.25)',
-                    borderRadius: 8, fontFamily: 'var(--font-mono)', fontSize: 10.5,
-                    color: '#a5b4fc', lineHeight: 1.8,
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
+                    background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.25)',
+                    borderRadius: 8, marginBottom: 14
                   }}>
-                    <strong style={{ color: '#c7d2fe' }}>After download:</strong><br />
-                    unzip vco-terraform.zip · edit terraform.tfvars · terraform init && terraform apply
+                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--green)', flexShrink: 0 }} />
+                    <span style={{ fontSize: 11, color: 'var(--green)', fontFamily: 'var(--font-mono)', flex: 1 }}>
+                      Last saved: {new Date(preview.saved_at).toLocaleString()}
+                    </span>
+                    <button
+                      onClick={handleRedownload}
+                      disabled={redownloading}
+                      style={{
+                        padding: '4px 12px', borderRadius: 6, border: '1px solid rgba(16,185,129,0.4)',
+                        background: 'rgba(16,185,129,0.1)', color: 'var(--green)', cursor: 'pointer',
+                        fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700
+                      }}>
+                      {redownloading ? '…' : '⬇ Re-download'}
+                    </button>
                   </div>
-                </>
-              )}
+                )}
+
+                {/* Summary chips */}
+                <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+                  {[
+                    { label: 'Total', value: preview.total, color: 'var(--accent)' },
+                    { label: 'Supported', value: preview.supported, color: 'var(--green)' },
+                    { label: 'Skipped', value: preview.skipped, color: 'var(--yellow)' },
+                  ].map(c => (
+                    <div key={c.label} style={{
+                      flex: 1, textAlign: 'center', padding: '10px 8px',
+                      background: c.color + '14', border: `1px solid ${c.color}44`, borderRadius: 10
+                    }}>
+                      <div style={{ fontSize: 22, fontWeight: 800, color: c.color, fontFamily: 'var(--font-display)' }}>{c.value}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 2, letterSpacing: '.06em', textTransform: 'uppercase' }}>{c.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Files that will be generated */}
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 6 }}>Generated Files</div>
+                  {['versions.tf', 'variables.tf', 'terraform.tfvars', 'main.tf', 'outputs.tf', 'README.md'].map(f => (
+                    <div key={f} style={{
+                      display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px',
+                      background: 'var(--bg2)', borderRadius: 6, marginBottom: 3,
+                      border: '1px solid var(--border)'
+                    }}>
+                      <span style={{ fontSize: 11, color: '#818cf8' }}>📄</span>
+                      <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text0)', flex: 1 }}>{f}</span>
+                      <span style={{ fontSize: 9, color: 'var(--green)', background: 'rgba(16,185,129,0.1)', borderRadius: 99, padding: '1px 6px' }}>included</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Server storage path */}
+                <div style={{
+                  padding: '8px 12px', background: 'rgba(99,102,241,0.07)',
+                  border: '1px solid rgba(99,102,241,0.25)', borderRadius: 8, marginBottom: 14
+                }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: '#818cf8', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 4 }}>Server Storage Path</div>
+                  <code style={{ fontSize: 11, color: '#c7d2fe', fontFamily: 'var(--font-mono)' }}>
+                    state/namespaces/{namespace}/terraform/
+                  </code>
+                </div>
+
+                {/* Node list */}
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 6 }}>Nodes</div>
+                  {preview.nodes.map(n => (
+                    <div key={n.node_id} style={{
+                      display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px',
+                      background: 'var(--bg2)', borderRadius: 6, marginBottom: 3,
+                      border: `1px solid ${n.supported ? 'var(--border)' : 'rgba(245,158,11,0.3)'}`
+                    }}>
+                      <div style={{
+                        width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                        background: n.supported ? 'var(--green)' : 'var(--yellow)'
+                      }} />
+                      <span style={{ fontSize: 11, color: 'var(--text0)', flex: 1 }}>{n.label}</span>
+                      <span style={{ fontSize: 9, color: 'var(--text2)', fontFamily: 'var(--font-mono)' }}>{n.type.replace('Node', '')}</span>
+                      {!n.supported && (
+                        <span style={{ fontSize: 9, color: 'var(--yellow)', background: 'rgba(245,158,11,0.1)', borderRadius: 99, padding: '1px 6px' }}>no TF generator</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>)}
             </div>
 
             {/* Footer */}
             <div style={{
               padding: '14px 24px', borderTop: '1px solid var(--border)',
-              display: 'flex', alignItems: 'center', gap: 10, background: 'var(--bg2)',
+              display: 'flex', alignItems: 'center', gap: 10, background: 'var(--bg2)'
             }}>
               <span style={{ flex: 1, fontSize: 10, color: 'var(--text2)', fontFamily: 'var(--font-mono)' }}>
-                namespace: {namespace} · project: {projOverride}
+                ns: {namespace} · {project} · {region}
               </span>
               <button onClick={onClose} style={{
                 padding: '7px 16px', borderRadius: 8, border: '1px solid var(--border)',
                 background: 'transparent', color: 'var(--text1)', cursor: 'pointer',
-                fontFamily: 'var(--font-mono)', fontSize: 11,
+                fontFamily: 'var(--font-mono)', fontSize: 11
               }}>
                 Cancel
               </button>
               <button
-                onClick={handleDownload}
+                onClick={handleGenerate}
                 disabled={downloading || loading || !preview}
                 style={{
                   padding: '8px 22px', borderRadius: 8, border: 'none',
@@ -2959,16 +2946,14 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
                   fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700,
                   boxShadow: '0 4px 16px rgba(124,58,237,0.4)',
                   opacity: (!preview || loading) ? 0.5 : 1,
-                }}
-              >
-                {downloading ? '⏳ Generating…' : '⬇ Download .zip'}
+                }}>
+                {downloading ? '⏳ Generating…' : '⬇ Generate & Download'}
               </button>
             </div>
           </div>
         </div>
       );
     };
-
 
     // ── Main App ──────────────────────────────────────────────────────────────────
     const nodeTypes = { gcpNode: GCPNodeComponent, vpcGroup: VPCGroupNode, groupBox: VPCGroupNode };
@@ -4322,8 +4307,8 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
                   targetHandle: e.targetHandle,
                 }))}
                 namespace={namespace}
-                project={namespace}
-                region="me-west1"
+                defaultProject={namespace}
+                defaultRegion="me-west1"
                 onClose={() => setTfModalOpen(false)}
               />
             )}

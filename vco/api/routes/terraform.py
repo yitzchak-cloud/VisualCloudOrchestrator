@@ -1,41 +1,121 @@
 """
 api/routes/terraform.py
 ========================
-Two endpoints — completely isolated from the existing Pulumi deploy flow.
+Endpoints for Terraform code generation — fully isolated from Pulumi flow.
 
 POST /api/terraform/preview
     Body: { nodes, edges, namespace, project, region }
-    Returns a summary of what *would* be generated (no file creation).
+    Returns JSON summary (no files written).
 
 POST /api/terraform/generate
     Body: { nodes, edges, namespace, project, region }
-    Returns a zip archive with all .tf files as a binary download.
+    - Generates HCL files
+    - Saves them to  state/namespaces/<ns>/terraform/
+    - Returns the zip as a binary download
 
-The route is registered in main.py with:
+GET  /api/terraform/files?namespace=<ns>
+    Returns metadata about the last saved TF workspace for a namespace.
+
+GET  /api/terraform/download?namespace=<ns>
+    Re-downloads the last saved TF workspace zip WITHOUT regenerating.
+
+Register in main.py:
+    from api.routes import terraform
     app.include_router(terraform.router)
-
-No changes required to any existing file.
 """
 from __future__ import annotations
 
 import io
+import json
 import logging
 import zipfile
-from typing import Optional
+from datetime import datetime, timezone
+from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 import os
 
-# ── Import the TF engine (pure module, no Pulumi dependency) ─────────────────
 from terraform_gen import generate_terraform, generate_terraform_summary
+from core.state import ns_dir   # reuses existing namespace path helper
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/terraform", tags=["terraform"])
 
 
-# ── Request model — mirrors DeployPayload but is independent ─────────────────
+# ── Path helper ───────────────────────────────────────────────────────────────
+
+def _tf_dir(namespace: str) -> Path:
+    """
+    state/namespaces/<ns>/terraform/
+    Created on first access — consistent with logs_dir() / stack_dir().
+    """
+    d = ns_dir(namespace) / "terraform"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+# ── Disk I/O ──────────────────────────────────────────────────────────────────
+
+def _save_tf_files(namespace: str, files: dict[str, str], meta: dict) -> None:
+    """
+    Write every .tf file to state/namespaces/<ns>/terraform/
+    and a manifest.json with generation metadata.
+    Subsequent calls overwrite the previous workspace.
+    """
+    tf_dir = _tf_dir(namespace)
+    for filename, content in files.items():
+        (tf_dir / filename).write_text(content, encoding="utf-8")
+
+    manifest = {
+        **meta,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "files": list(files.keys()),
+    }
+    (tf_dir / "manifest.json").write_text(
+        json.dumps(manifest, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    logger.info(
+        "TF workspace saved: namespace=%s  path=%s  files=%d",
+        namespace, tf_dir, len(files),
+    )
+
+
+def _load_tf_files(namespace: str) -> tuple[dict[str, str], dict]:
+    """
+    Load previously saved .tf files.
+    Raises FileNotFoundError if no workspace exists yet.
+    """
+    tf_dir = _tf_dir(namespace)
+    manifest_path = tf_dir / "manifest.json"
+
+    if not manifest_path.exists():
+        raise FileNotFoundError(
+            f"No Terraform workspace found for namespace '{namespace}'"
+        )
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    files: dict[str, str] = {}
+    for fname in manifest.get("files", []):
+        fp = tf_dir / fname
+        if fp.exists():
+            files[fname] = fp.read_text(encoding="utf-8")
+
+    return files, manifest
+
+
+def _build_zip(files: dict[str, str], folder: str = "vco-terraform") -> io.BytesIO:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for filename, content in files.items():
+            zf.writestr(f"{folder}/{filename}", content.encode("utf-8"))
+    buf.seek(0)
+    return buf
+
+
+# ── Request model ─────────────────────────────────────────────────────────────
 
 class TerraformPayload(BaseModel):
     nodes:     list[dict]
@@ -54,62 +134,57 @@ class TerraformPayload(BaseModel):
 @router.post("/preview")
 async def terraform_preview(payload: TerraformPayload):
     """
-    Return a JSON summary of what Terraform files would contain.
-    No files are created; useful for showing a "what will be generated" panel.
+    Analyse the graph and return a JSON summary of what would be generated.
+    Does NOT write any files to disk.
     """
     ns = payload.namespace
-    logger.info(
-        "TF preview: namespace=%s nodes=%d project=%s region=%s",
-        ns, len(payload.nodes), payload.project, payload.region,
-    )
-    summary = generate_terraform_summary(
-        nodes=payload.nodes,
-        edges=payload.edges,
-    )
+    logger.info("TF preview: namespace=%s nodes=%d", ns, len(payload.nodes))
+
+    summary = generate_terraform_summary(nodes=payload.nodes, edges=payload.edges)
+
+    # Include last-saved metadata if a workspace already exists
+    saved_at = None
+    try:
+        _, manifest = _load_tf_files(ns)
+        saved_at = manifest.get("generated_at")
+    except FileNotFoundError:
+        pass
+
     return {
         "namespace": ns,
         "project":   payload.project,
         "region":    payload.region,
+        "saved_at":  saved_at,
         **summary,
     }
 
 
-# ── Generate + Download ───────────────────────────────────────────────────────
+# ── Generate + Save + Download ────────────────────────────────────────────────
 
 @router.post("/generate")
 async def terraform_generate(payload: TerraformPayload):
     """
-    Generate a complete Terraform workspace and return it as a zip download.
+    Generate a complete Terraform workspace, persist it to
+    state/namespaces/<ns>/terraform/, then stream it as a zip download.
 
-    The zip contains:
-      vco-terraform/
-        versions.tf
-        variables.tf
-        terraform.tfvars
-        main.tf
-        outputs.tf
-        README.md
-
-    The caller (browser) receives it as  vco-terraform.zip.
+    Subsequent calls for the same namespace overwrite the saved workspace.
     """
     ns = payload.namespace
+    node_count = sum(
+        1 for n in payload.nodes
+        if n.get("type") not in ("vpcGroup", "groupBox", "")
+    )
     logger.info(
         "TF generate: namespace=%s nodes=%d project=%s region=%s",
-        ns, len(payload.nodes), payload.project, payload.region,
+        ns, node_count, payload.project, payload.region,
     )
 
-    # ── Generate HCL files ────────────────────────────────────────────────────
+    # ── Generate HCL ─────────────────────────────────────────────────────────
     files: dict[str, str] = generate_terraform(
         nodes=payload.nodes,
         edges=payload.edges,
         project=payload.project,
         region=payload.region,
-    )
-
-    # ── Add README ────────────────────────────────────────────────────────────
-    node_count = sum(
-        1 for n in payload.nodes
-        if n.get("type") not in ("vpcGroup", "groupBox", "")
     )
     files["README.md"] = _readme(
         project=payload.project,
@@ -118,20 +193,24 @@ async def terraform_generate(payload: TerraformPayload):
         node_count=node_count,
     )
 
-    # ── Zip all files ─────────────────────────────────────────────────────────
-    zip_buffer = io.BytesIO()
-    folder = "vco-terraform"
+    # ── Save to disk under namespace directory ────────────────────────────────
+    _save_tf_files(
+        namespace=ns,
+        files=files,
+        meta={
+            "namespace":  ns,
+            "project":    payload.project,
+            "region":     payload.region,
+            "node_count": node_count,
+        },
+    )
 
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        for filename, content in files.items():
-            zf.writestr(f"{folder}/{filename}", content.encode("utf-8"))
-
-    zip_buffer.seek(0)
-
-    logger.info("TF zip created: %d files  %d bytes", len(files), zip_buffer.getbuffer().nbytes)
+    # ── Stream zip to browser ─────────────────────────────────────────────────
+    zip_buf = _build_zip(files)
+    logger.info("TF zip streamed: %d bytes", zip_buf.getbuffer().nbytes)
 
     return StreamingResponse(
-        zip_buffer,
+        zip_buf,
         media_type="application/zip",
         headers={
             "Content-Disposition": 'attachment; filename="vco-terraform.zip"',
@@ -141,31 +220,104 @@ async def terraform_generate(payload: TerraformPayload):
     )
 
 
-# ── README template ───────────────────────────────────────────────────────────
+# ── Metadata endpoint ─────────────────────────────────────────────────────────
+
+@router.get("/files")
+async def terraform_files(namespace: str = "default"):
+    """
+    Return metadata + per-file sizes for the last saved workspace.
+    Useful for showing "last generated at …" in the UI without a full download.
+    """
+    try:
+        _, manifest = _load_tf_files(namespace)
+    except FileNotFoundError:
+        return {
+            "namespace":    namespace,
+            "generated_at": None,
+            "files":        [],
+            "tf_dir":       str(_tf_dir(namespace)),
+        }
+
+    tf_dir = _tf_dir(namespace)
+    file_info = [
+        {
+            "name":  fname,
+            "bytes": (tf_dir / fname).stat().st_size if (tf_dir / fname).exists() else 0,
+        }
+        for fname in manifest.get("files", [])
+    ]
+    return {
+        "namespace":    namespace,
+        "generated_at": manifest.get("generated_at"),
+        "project":      manifest.get("project"),
+        "region":       manifest.get("region"),
+        "node_count":   manifest.get("node_count"),
+        "tf_dir":       str(tf_dir),
+        "files":        file_info,
+    }
+
+
+# ── Re-download without regeneration ─────────────────────────────────────────
+
+@router.get("/download")
+async def terraform_download(namespace: str = "default"):
+    """
+    Stream the last saved Terraform workspace as a zip.
+    Returns 404 if nothing has been generated yet for this namespace.
+    Use this to re-download without running the full generator again.
+    """
+    try:
+        files, manifest = _load_tf_files(namespace)
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"No Terraform workspace found for namespace '{namespace}'. "
+                f"POST /api/terraform/generate first."
+            ),
+        )
+
+    zip_buf  = _build_zip(files)
+    ns_clean = namespace.replace("/", "_")
+
+    return StreamingResponse(
+        zip_buf,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="vco-terraform-{ns_clean}.zip"',
+            "X-VCO-Namespace":     namespace,
+            "X-VCO-Generated-At":  manifest.get("generated_at", ""),
+        },
+    )
+
+
+# ── README ────────────────────────────────────────────────────────────────────
 
 def _readme(project: str, region: str, namespace: str, node_count: int) -> str:
+    tf_path = f"state/namespaces/{namespace}/terraform/"
     return f"""\
 # VCO — Generated Terraform Workspace
 
 Generated by **Visual Cloud Orchestrator** from namespace `{namespace}`.
 
-| Field     | Value           |
-|-----------|-----------------|
-| Project   | `{project}`     |
-| Region    | `{region}`      |
-| Resources | {node_count}    |
+| Field       | Value                     |
+|-------------|---------------------------|
+| Project     | `{project}`               |
+| Region      | `{region}`                |
+| Resources   | {node_count}              |
+| Server path | `{tf_path}`               |
 
 ## Quick Start
 
 ```bash
-# 1. Install Terraform ≥ 1.5
+# 1. Install Terraform >= 1.5
 # 2. Authenticate with GCP
 gcloud auth application-default login
 
-# 3. Edit terraform.tfvars — set project_id and region
+# 3. Edit terraform.tfvars
 nano terraform.tfvars
 
-# 4. Initialise and deploy
+# 4. Run
 terraform init
 terraform plan
 terraform apply
@@ -173,17 +325,29 @@ terraform apply
 
 ## File Layout
 
-| File                | Purpose                                          |
-|---------------------|--------------------------------------------------|
-| `versions.tf`       | Terraform + provider version constraints         |
-| `variables.tf`      | All input variable declarations                  |
-| `terraform.tfvars`  | Default values — **edit before running**         |
-| `main.tf`           | All GCP resource and data-source blocks          |
-| `outputs.tf`        | Exported values (URLs, names, IDs)               |
+| File                | Purpose                               |
+|---------------------|---------------------------------------|
+| `versions.tf`       | Provider + Terraform version          |
+| `variables.tf`      | All input variable declarations       |
+| `terraform.tfvars`  | Default values — edit before running  |
+| `main.tf`           | All GCP resource blocks               |
+| `outputs.tf`        | Exported URLs, names, IDs             |
 
-## State Backend (Recommended)
+## Server-Side Storage
 
-For team use, add a remote backend to `versions.tf`:
+The files are also saved on the VCO server at:
+
+    {tf_path}
+
+Re-download the saved workspace without regenerating:
+
+    GET /api/terraform/download?namespace={namespace}
+
+View workspace metadata:
+
+    GET /api/terraform/files?namespace={namespace}
+
+## Recommended Remote State Backend
 
 ```hcl
 terraform {{
@@ -193,12 +357,4 @@ terraform {{
   }}
 }}
 ```
-
-## Notes
-
-- Resources tagged with `# Uncomment ...` are optional and commented out.
-- Cloud Run services default to `INGRESS_TRAFFIC_INTERNAL_ONLY`.
-  Change to `INGRESS_TRAFFIC_ALL` if you need public access.
-- Service accounts are created by Terraform. Ensure the executor has
-  `roles/iam.serviceAccountAdmin` in the target project.
 """
