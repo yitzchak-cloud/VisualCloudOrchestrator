@@ -1,0 +1,182 @@
+gcloud services enable \
+  workflows.googleapis.com \
+  workflowexecutions.googleapis.com \
+  eventarc.googleapis.com \
+  tasks.googleapis.com \
+  cloudscheduler.googleapis.com \
+  storage.googleapis.com \
+  vision.googleapis.com \
+  run.googleapis.com \
+  cloudfunctions.googleapis.com \
+  firestore.googleapis.com \
+  appengine.googleapis.com \
+  cloudbuild.googleapis.com \
+  artifactregistry.googleapis.com
+
+
+
+gcloud storage buckets create \
+  --location=set at lab start gs://${UPLOAD_BUCKET}
+
+gcloud storage buckets update \
+  gs://${UPLOAD_BUCKET} --uniform-bucket-level-access
+
+gcloud storage buckets add-iam-policy-binding \
+  gs://${UPLOAD_BUCKET} \
+  --member=allUsers --role=roles/storage.objectViewer
+
+
+gcloud storage buckets create \
+ --location=set at lab start gs://${GENERATED_BUCKET}
+
+gcloud storage buckets update \ 
+  gs://${GENERATED_BUCKET} --uniform-bucket-level-access
+
+gcloud storage buckets add-iam-policy-binding \
+  gs://${GENERATED_BUCKET} \
+  --member=allUsers --role=roles/storage.objectViewer
+
+
+gcloud firestore databases create \
+  --location=${FIRESTORE_LOCATION} \
+  --type=firestore-native
+
+gcloud firestore indexes composite create \
+  --collection-group=images \
+  --field-config field-path=thumbnail,order=descending \
+  --field-config field-path=created,order=descending \
+  --async
+
+
+gcloud tasks queues create thumbnail-task-queue \
+  --location=${QUEUE_REGION}
+
+
+gcloud artifacts repositories create ${REPO_NAME} \
+  --location=${REPO_REGION} --repository-format=docker
+
+
+
+gcloud run deploy ${THUMBNAIL_SERVICE_NAME} \
+  --image ${REPO_REGION}-docker.pkg.dev/${GOOGLE_CLOUD_PROJECT}/${REPO_NAME}/${THUMBNAIL_SERVICE_NAME} \
+  --no-allow-unauthenticated \
+  --memory=1Gi \
+  --max-instances=1 \
+  --update-env-vars GENERATED_IMAGES_BUCKET=${GENERATED_IMAGES_BUCKET}
+
+
+gcloud run deploy ${COLLAGE_SERVICE_NAME} \
+  --image ${REPO_REGION}-docker.pkg.dev/${GOOGLE_CLOUD_PROJECT}/${REPO_NAME}/${COLLAGE_SERVICE_NAME} \
+  --no-allow-unauthenticated \
+  --memory=1Gi \
+  --max-instances=1 \
+  --update-env-vars GENERATED_IMAGES_BUCKET=${GENERATED_IMAGES_BUCKET}
+
+gcloud run deploy ${DELETE_SERVICE_NAME} \
+  --source . \
+  --no-allow-unauthenticated \
+  --max-instances=1 \
+  --update-env-vars GENERATED_IMAGES_BUCKET=${GENERATED_IMAGES_BUCKET}
+
+
+gcloud functions deploy ${EXTRACT_FUNCTION_NAME} \
+      --gen2 \
+      --source . \
+      --runtime=nodejs20 \
+      --entry-point=extract_image_metadata \
+      --trigger-http \
+      --no-allow-unauthenticated
+
+
+
+gcloud iam 
+, create ${WORKFLOWS_SA}
+
+gcloud projects add-iam-policy-binding ${GOOGLE_CLOUD_PROJECT} \
+  --member="serviceAccount:${WORKFLOWS_SA}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
+  --role="roles/datastore.user"
+
+gcloud projects add-iam-policy-binding ${GOOGLE_CLOUD_PROJECT} \
+  --member="serviceAccount:${WORKFLOWS_SA}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
+  --role="roles/cloudtasks.enqueuer"
+
+gcloud projects add-iam-policy-binding ${GOOGLE_CLOUD_PROJECT} \
+  --member="serviceAccount:${WORKFLOWS_SA}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
+  --role="roles/logging.logWriter"
+
+gcloud projects add-iam-policy-binding ${GOOGLE_CLOUD_PROJECT} \
+  --member="serviceAccount:${WORKFLOWS_SA}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
+  --role="roles/iam.serviceAccountUser"
+
+
+gcloud functions add-iam-policy-binding ${EXTRACT_FUNCTION_NAME} \
+  --member="serviceAccount:${WORKFLOWS_SA}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
+  --role="roles/cloudfunctions.invoker"
+
+gcloud run services add-iam-policy-binding ${THUMBNAIL_SERVICE_NAME} \
+  --region=${THUMBNAIL_SERVICE_REGION} \
+  --member="serviceAccount:${WORKFLOWS_SA}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
+  --role="roles/run.viewer"
+
+gcloud run services add-iam-policy-binding ${THUMBNAIL_SERVICE_NAME} \
+  --region=${THUMBNAIL_SERVICE_REGION} \
+  --member="serviceAccount:${WORKFLOWS_SA}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
+  --role="roles/run.invoker"
+
+gcloud workflows deploy ${WORKFLOW_NAME} \
+  --source=${WORKFLOW_NAME}.yaml \
+  --location=${WORKFLOW_REGION} \
+  --service-account="${WORKFLOWS_SA}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com"
+
+
+gcloud iam service-accounts create ${WORKFLOW_TRIGGER_SA}
+
+gcloud projects add-iam-policy-binding ${GOOGLE_CLOUD_PROJECT} \
+  --member="serviceAccount:${WORKFLOW_TRIGGER_SA}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
+  --role="roles/workflows.invoker"
+
+gcloud projects add-iam-policy-binding ${GOOGLE_CLOUD_PROJECT} \
+  --member "serviceAccount:${WORKFLOW_TRIGGER_SA}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
+  --role="roles/eventarc.eventReceiver"
+
+export CLOUD_STORAGE_SA="$(gcloud storage service-agent)"
+
+gcloud projects add-iam-policy-binding ${GOOGLE_CLOUD_PROJECT} \
+  --member="serviceAccount:${CLOUD_STORAGE_SA}" \
+  --role="roles/pubsub.publisher"
+
+
+gcloud eventarc triggers create image-add-trigger \
+  --location=${WORKFLOW_TRIGGER_REGION} \
+  --destination-workflow=${WORKFLOW_NAME} \
+  --destination-workflow-location=${WORKFLOW_REGION} \
+  --event-filters="type=google.cloud.storage.object.v1.finalized" \
+  --event-filters="bucket=${UPLOAD_BUCKET}" \
+  --service-account="${WORKFLOW_TRIGGER_SA}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com"
+
+
+
+gcloud iam service-accounts create ${COLLAGE_SCHED_SA}
+gcloud run services add-iam-policy-binding ${COLLAGE_SERVICE} \
+  --region=${COLLAGE_SERVICE_REGION} \
+  --member="serviceAccount:${COLLAGE_SCHED_SA}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
+  --role="roles/run.invoker"
+
+gcloud run services describe ${SERVICE_NAME} \
+  --platform managed \
+  --region ${SERVICE_REGION} \
+  --format 'value(status.url)'
+
+
+
+
+gcloud iam service-accounts create ${DELETE_TRIGGER_SA}
+
+gcloud projects add-iam-policy-binding ${GOOGLE_CLOUD_PROJECT} \
+  --member "serviceAccount:${DELETE_TRIGGER_SA}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
+  --role="roles/eventarc.eventReceiver"
+  
+gcloud run services add-iam-policy-binding ${DELETE_SERVICE} \
+  --region=${DELETE_SERVICE_REGION} \
+  --member="serviceAccount:${DELETE_TRIGGER_SA}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
+  --role="roles/run.invoker"
