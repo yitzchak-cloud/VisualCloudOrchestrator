@@ -1,108 +1,295 @@
 VCO Node Triage Report
-Total resources selected: 55
+Total resources selected: 230
 ───────────────────────────────────────────────────────
 
-[aiplatform]  (3 resources)
-  aiplatform.Dataset                                  4 props
-  aiplatform.Endpoint                                 4 props
-  aiplatform.FeatureStore                             2 props
+[appengine]  (4 resources)
+  appengine.Application                               5 props
+  appengine.DomainMapping                             2 props
+  appengine.EngineSplitTraffic                        2 props
+  appengine.FirewallRule                              4 props
 
-[artifactregistry]  (1 resources)
-  artifactregistry.Repository                         5 props
+[artifactregistry]  (2 resources)
+  artifactregistry.Repository                         7 props
+  artifactregistry.VpcscConfig                        2 props
 
-[bigquery]  (3 resources)
-  bigquery.Connection                                 3 props
-  bigquery.Dataset                                    4 props
-  bigquery.Table                                      5 props
+[bigquery]  (14 resources)
+  bigquery.AppProfile                                 6 props
+  bigquery.BiReservation                              2 props
+  bigquery.CapacityCommitment                         7 props
+  bigquery.Connection                                 5 props
+  bigquery.DataTransferConfig                         9 props
+  bigquery.Datapolicyv2DataPolicy                     3 props
+  bigquery.Dataset                                    11 props
+  bigquery.DatasetAccess                              7 props
+  bigquery.Job                                        4 props
+  bigquery.Reservation                                9 props
+  bigquery.ReservationAssignment                      4 props
+  bigquery.Routine                                    11 props
+  bigquery.RowAccessPolicy                            4 props
+  bigquery.Table                                      10 props
+
+[bigtable]  (8 resources)
+  bigtable.AppProfile                                 6 props
+  bigtable.AuthorizedView                             2 props
+  bigtable.GCPolicy                                   7 props
+  bigtable.Instance                                   3 props
+  bigtable.LogicalView                                3 props
+  bigtable.MaterializedView                           3 props
+  bigtable.SchemaBundle                               4 props
+  bigtable.Table                                      3 props
+
+[cloudfunctions]  (1 resources)
+  cloudfunctions.Function                             22 props
 
 [cloudfunctionsv2]  (1 resources)
   cloudfunctionsv2.Function                           3 props
 
-[cloudrunv2]  (2 resources)
-  cloudrunv2.Job                                      2 props
-  cloudrunv2.Service                                  2 props
+[cloudrunv2]  (3 resources)
+  cloudrunv2.Job                                      6 props
+  cloudrunv2.Service                                  9 props
+  cloudrunv2.WorkerPool                               5 props
 
 [cloudscheduler]  (1 resources)
-  cloudscheduler.Job                                  4 props
+  cloudscheduler.Job                                  6 props
 
 [cloudtasks]  (1 resources)
   cloudtasks.Queue                                    2 props
 
-[composer]  (1 resources)
-  composer.Environment                                2 props
+[composer]  (2 resources)
+  composer.UserWorkloadsConfigMap                     2 props
+  composer.UserWorkloadsSecret                        2 props
 
-[compute]  (15 resources)
-  compute.Address                                     5 props
-  compute.BackendService                              4 props
-  compute.Firewall                                    4 props
-  compute.GlobalAddress                               5 props
-  compute.GlobalForwardingRule                        5 props
-  compute.HealthCheck                                 3 props
-  compute.Instance                                    3 props
-  compute.InstanceGroupManager                        4 props
-  compute.InstanceTemplate                            2 props
-  compute.Network                                     4 props
-  compute.Router                                      3 props
-  compute.RouterNat                                   5 props
-  compute.SecurityPolicy                              3 props
-  compute.Subnetwork                                  5 props
-  compute.UrlMap                                      2 props
+[compute]  (31 resources)
+  compute.Address                                     12 props
+  compute.Autoscaler                                  3 props
+  compute.BackendService                              18 props
+  compute.Disk                                        21 props
+  compute.ExternalVpnGateway                          2 props
+  compute.Firewall                                    6 props
+  compute.FirewallPolicy                              3 props
+  compute.FirewallPolicyRule                          9 props
+  compute.ForwardingRule                              20 props
+  compute.GlobalAddress                               7 props
+  compute.GlobalForwardingRule                        14 props
+  compute.HaVpnGateway                                5 props
+  compute.HealthCheck                                 5 props
+  compute.Instance                                    12 props
+  compute.InstanceGroupManager                        9 props
+  compute.InstanceTemplate                            11 props
+  compute.ManagedSslCertificate                       2 props
+  compute.Network                                     13 props
+  compute.NetworkPeeringRoutesConfig                  6 props
+  compute.RegionAutoscaler                            3 props
+  compute.RegionBackendService                        15 props
+  compute.RegionHealthCheck                           6 props
+  compute.RegionInstanceGroupManager                  10 props
+  compute.RegionUrlMap                                3 props
+  compute.Router                                      5 props
+  compute.RouterNat                                   16 props
+  compute.SecurityPolicy                              2 props
+  compute.Snapshot                                    7 props
+  compute.Subnetwork                                  17 props
+  compute.TargetHttpProxy                             4 props
+  compute.TargetHttpsProxy                            9 props
 
-[container]  (2 resources)
-  container.Cluster                                   5 props
-  container.NodePool                                  3 props
+[container]  (8 resources)
+  container.AttachedCluster                           5 props
+  container.AwsCluster                                3 props
+  container.AwsNodePool                               4 props
+  container.AzureClient                               3 props
+  container.AzureCluster                              5 props
+  container.AzureNodePool                             5 props
+  container.Cluster                                   28 props
+  container.NodePool                                  7 props
 
-[dataflow]  (1 resources)
-  dataflow.Job                                        5 props
+[dataflow]  (3 resources)
+  dataflow.FlexTemplateJob                            18 props
+  dataflow.Job                                        14 props
+  dataflow.Pipeline                                   5 props
 
-[dns]  (2 resources)
-  dns.ManagedZone                                     3 props
-  dns.RecordSet                                       4 props
+[dataproc]  (16 resources)
+  dataproc.AutoscalingPolicy                          2 props
+  dataproc.Batch                                      2 props
+  dataproc.Cluster                                    2 props
+  dataproc.ClusterIAMBinding                          3 props
+  dataproc.ClusterIAMMember                           4 props
+  dataproc.ClusterIAMPolicy                           3 props
+  dataproc.GdcApplicationEnvironment                  5 props
+  dataproc.GdcServiceInstance                         4 props
+  dataproc.GdcSparkApplication                        7 props
+  dataproc.Job                                        3 props
+  dataproc.JobIAMBinding                              3 props
+  dataproc.JobIAMMember                               4 props
+  dataproc.JobIAMPolicy                               3 props
+  dataproc.MetastoreFederation                        3 props
+  dataproc.MetastoreService                           7 props
+  dataproc.WorkflowTemplate                           3 props
 
-[eventarc]  (1 resources)
+[dns]  (5 resources)
+  dns.ManagedZone                                     5 props
+  dns.Policy                                          3 props
+  dns.RecordSet                                       3 props
+  dns.ResponsePolicy                                  2 props
+  dns.ResponsePolicyRule                              4 props
+
+[eventarc]  (7 resources)
+  eventarc.Channel                                    3 props
+  eventarc.Enrollment                                 6 props
+  eventarc.GoogleApiSource                            5 props
+  eventarc.GoogleChannelConfig                        2 props
+  eventarc.MessageBus                                 4 props
+  eventarc.Pipeline                                   4 props
   eventarc.Trigger                                    4 props
 
-[firestore]  (1 resources)
-  firestore.Database                                  5 props
+[filestore]  (3 resources)
+  filestore.Backup                                    4 props
+  filestore.Instance                                  9 props
+  filestore.Snapshot                                  3 props
 
-[iam]  (1 resources)
-  iam.ServiceAccount                                  4 props
+[firestore]  (5 resources)
+  firestore.BackupSchedule                            2 props
+  firestore.Database                                  11 props
+  firestore.Document                                  4 props
+  firestore.Field                                     3 props
+  firestore.Index                                     9 props
 
-[kms]  (2 resources)
-  kms.CryptoKey                                       4 props
-  kms.KeyRing                                         2 props
+[iam]  (17 resources)
+  iam.AccessBoundaryPolicy                            2 props
+  iam.DenyPolicy                                      2 props
+  iam.FoldersPolicyBinding                            6 props
+  iam.OauthClient                                     6 props
+  iam.OauthClientCredential                           5 props
+  iam.OrganizationsPolicyBinding                      6 props
+  iam.PrincipalAccessBoundaryPolicy                   4 props
+  iam.ProjectsPolicyBinding                           5 props
+  iam.WorkforcePool                                   7 props
+  iam.WorkforcePoolProvider                           9 props
+  iam.WorkforcePoolProviderKey                        5 props
+  iam.WorkforcePoolProviderScimTenant                 7 props
+  iam.WorkforcePoolProviderScimToken                  6 props
+  iam.WorkloadIdentityPool                            5 props
+  iam.WorkloadIdentityPoolManagedIdentity             5 props
+  iam.WorkloadIdentityPoolNamespace                   4 props
+  iam.WorkloadIdentityPoolProvider                    6 props
 
-[logging]  (2 resources)
-  logging.LogSink                                     4 props
-  logging.Metric                                      3 props
+[kms]  (12 resources)
+  kms.AutokeyConfig                                   3 props
+  kms.CryptoKey                                       7 props
+  kms.CryptoKeyIAMBinding                             2 props
+  kms.CryptoKeyIAMMember                              3 props
+  kms.CryptoKeyIAMPolicy                              2 props
+  kms.EkmConnection                                   3 props
+  kms.KeyHandle                                       2 props
+  kms.KeyRingIAMBinding                               2 props
+  kms.KeyRingIAMMember                                3 props
+  kms.KeyRingIAMPolicy                                2 props
+  kms.KeyRingImportJob                                4 props
+  kms.SecretCiphertext                                3 props
 
-[monitoring]  (3 resources)
+[logging]  (19 resources)
+  logging.BillingAccountBucketConfig                  5 props
+  logging.BillingAccountExclusion                     4 props
+  logging.BillingAccountSink                          5 props
+  logging.FolderBucketConfig                          5 props
+  logging.FolderExclusion                             4 props
+  logging.FolderSettings                              4 props
+  logging.FolderSink                                  7 props
+  logging.LinkedDataset                               5 props
+  logging.LogScope                                    3 props
+  logging.LogView                                     5 props
+  logging.Metric                                      5 props
+  logging.OrganizationBucketConfig                    5 props
+  logging.OrganizationExclusion                       4 props
+  logging.OrganizationSettings                        4 props
+  logging.OrganizationSink                            7 props
+  logging.ProjectBucketConfig                         6 props
+  logging.ProjectExclusion                            3 props
+  logging.ProjectSink                                 6 props
+  logging.SavedQuery                                  5 props
+
+[memcache]  (1 resources)
+  memcache.Instance                                   5 props
+
+[monitoring]  (8 resources)
   monitoring.AlertPolicy                              4 props
-  monitoring.Dashboard                                3 props
-  monitoring.NotificationChannel                      4 props
+  monitoring.CustomService                            2 props
+  monitoring.GenericService                           2 props
+  monitoring.Group                                    4 props
+  monitoring.MetricDescriptor                         7 props
+  monitoring.NotificationChannel                      5 props
+  monitoring.Slo                                      6 props
+  monitoring.UptimeCheckConfig                        5 props
 
-[pubsub]  (3 resources)
-  pubsub.Schema                                       3 props
-  pubsub.Subscription                                 5 props
-  pubsub.Topic                                        3 props
+[networkconnectivity]  (11 resources)
+  networkconnectivity.Destination                     4 props
+  networkconnectivity.GatewayAdvertisedRoute          6 props
+  networkconnectivity.Group                           2 props
+  networkconnectivity.Hub                             4 props
+  networkconnectivity.InternalRange                   7 props
+  networkconnectivity.MulticloudDataTransferConfig    2 props
+  networkconnectivity.PolicyBasedRoute                5 props
+  networkconnectivity.RegionalEndpoint                7 props
+  networkconnectivity.ServiceConnectionPolicy         4 props
+  networkconnectivity.Spoke                           4 props
+  networkconnectivity.Transport                       13 props
 
-[redis]  (1 resources)
-  redis.Instance                                      7 props
+[pubsub]  (9 resources)
+  pubsub.Schema                                       2 props
+  pubsub.Subscription                                 7 props
+  pubsub.SubscriptionIAMBinding                       2 props
+  pubsub.SubscriptionIAMMember                        3 props
+  pubsub.SubscriptionIAMPolicy                        2 props
+  pubsub.Topic                                        2 props
+  pubsub.TopicIAMBinding                              2 props
+  pubsub.TopicIAMMember                               3 props
+  pubsub.TopicIAMPolicy                               2 props
 
-[secretmanager]  (1 resources)
-  secretmanager.Secret                                3 props
+[redis]  (2 resources)
+  redis.Cluster                                       11 props
+  redis.Instance                                      17 props
 
-[spanner]  (2 resources)
-  spanner.Database                                    3 props
-  spanner.Instance                                    5 props
+[secretmanager]  (2 resources)
+  secretmanager.RegionalSecret                        5 props
+  secretmanager.Secret                                4 props
 
-[sql]  (3 resources)
+[spanner]  (11 resources)
+  spanner.BackupSchedule                              3 props
+  spanner.Database                                    5 props
+  spanner.DatabaseIAMBinding                          3 props
+  spanner.DatabaseIAMMember                           4 props
+  spanner.DatabaseIAMPolicy                           3 props
+  spanner.Instance                                    8 props
+  spanner.InstanceConfig                              2 props
+  spanner.InstanceIAMBinding                          2 props
+  spanner.InstanceIAMMember                           3 props
+  spanner.InstanceIAMPolicy                           2 props
+  spanner.InstancePartition                           5 props
+
+[sql]  (6 resources)
   sql.Database                                        4 props
-  sql.DatabaseInstance                                4 props
-  sql.User                                            4 props
+  sql.DatabaseInstance                                12 props
+  sql.ProvisionScript                                 5 props
+  sql.SourceRepresentationInstance                    10 props
+  sql.SslCert                                         2 props
+  sql.User                                            7 props
 
-[storage]  (1 resources)
-  storage.Bucket                                      3 props
+[storage]  (16 resources)
+  storage.AnywhereCache                               4 props
+  storage.BatchOperationsJob                          2 props
+  storage.Bucket                                      9 props
+  storage.BucketACL                                   3 props
+  storage.BucketIAMBinding                            2 props
+  storage.BucketIAMMember                             3 props
+  storage.BucketIAMPolicy                             2 props
+  storage.BucketObject                                15 props
+  storage.Folder                                      2 props
+  storage.HmacKey                                     2 props
+  storage.InsightsDatasetConfig                       9 props
+  storage.InsightsReportConfig                        3 props
+  storage.ManagedFolder                               2 props
+  storage.Notification                                4 props
+  storage.ObjectACL                                   3 props
+  storage.TransferJob                                 3 props
 
 [workflows]  (1 resources)
-  workflows.Workflow                                  5 props
+  workflows.Workflow                                  8 props

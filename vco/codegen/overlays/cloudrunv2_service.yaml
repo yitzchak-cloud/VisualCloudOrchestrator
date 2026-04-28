@@ -1,8 +1,4 @@
 # codegen/overlays/cloudrunv2_service.yaml
-# ─────────────────────────────────────────
-# Phase-2 overlay for gcp:cloudrunv2/service:Service
-# Keys here add to / override what the auto-codegen produces from the Pulumi schema.
-
 class_name:  CloudRunNode
 description: Serverless container runtime
 category:    Compute
@@ -10,8 +6,6 @@ node_color:  "#6366f1"
 icon:        cloudRun
 url_field:   service_url
 
-# Only params you want to control (order, options, labels).
-# Everything else is pulled automatically from the Pulumi schema.
 params_schema:
   - key: image
     label: Container Image
@@ -96,163 +90,115 @@ outputs:
     multi: true
 
 resolve_edges_body: |
-        if src_id == self.node_id and src_type == "CloudRunNode":
-            if tgt_type == "PubsubTopicNode":
-                ctx[self.node_id].setdefault("publishes_to_topics", []).append(tgt_id)
-                return True
-            if tgt_type == "GcsBucketNode":
-                ctx[tgt_id].setdefault("writer_ids", []).append(self.node_id)
-                return True
-        return False
+  if src_id == self.node_id and src_type == "CloudRunNode":
+      if tgt_type == "PubsubTopicNode":
+          ctx[self.node_id].setdefault("publishes_to_topics", []).append(tgt_id)
+          return True
+      if tgt_type == "GcsBucketNode":
+          ctx[tgt_id].setdefault("writer_ids", []).append(self.node_id)
+          return True
+  return False
 
 dag_deps_body: |
-        my  = ctx.get(self.node_id, {})
-        deps = list(my.get("publishes_to_topics", []))
-        deps += my.get("bucket_ids", [])
-        deps += my.get("task_queue_ids", [])
-        if my.get("subnetwork_id"):
-            deps.append(my["subnetwork_id"])
-        if my.get("service_account_id"):
-            deps.append(my["service_account_id"])
-        return deps
-
-pulumi_program_extra: |
-        my = ctx.get(self.node_id, {})
-
-        # VPC paths
-        subnet_id       = my.get("subnetwork_id", "")
-        subnet_outputs  = deployed_outputs.get(subnet_id, {})
-        network_path    = subnet_outputs.get("network_path")    or props.get("vpc_network",    "")
-        subnetwork_path = subnet_outputs.get("subnetwork_path") or props.get("vpc_subnetwork", "")
-
-        if not network_path or not subnetwork_path:
-            logger.warning(
-                "CloudRunNode %s: no VPC resolved — connect SubnetworkNode or fill fallback props",
-                self.node_id,
-            )
-
-        # Env vars from wired nodes
-        topic_envs = [
-            gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
-                name="PUBSUB_TOPIC_" + re.sub(r"[^A-Z0-9]", "_", _node_name(all_nodes, tid).upper()),
-                value=deployed_outputs.get(tid, {}).get("name", ""),
-            )
-            for tid in my.get("publishes_to_topics", [])
-        ]
-        bucket_envs = [
-            gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
-                name="GCS_BUCKET_" + re.sub(r"[^A-Z0-9]", "_", _node_name(all_nodes, bid).upper()),
-                value=deployed_outputs.get(bid, {}).get("name", ""),
-            )
-            for bid in my.get("bucket_ids", [])
-        ]
-        queue_envs = [
-            gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
-                name="CLOUD_TASKS_QUEUE_" + re.sub(r"[^A-Z0-9]", "_", _node_name(all_nodes, qid).upper()),
-                value=deployed_outputs.get(qid, {}).get("queue_name", ""),
-            )
-            for qid in my.get("task_queue_ids", [])
-        ]
-        sub_envs = [
-            gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
-                name="PUBSUB_SUBSCRIPTION_" + re.sub(r"[^A-Z0-9]", "_", _node_name(all_nodes, sid).upper()),
-                value=_resource_name(next((n for n in all_nodes if n["id"] == sid), {})),
-            )
-            for sid in my.get("receives_from_subs", [])
-        ]
-        all_envs = topic_envs + bucket_envs + queue_envs + sub_envs
+  my = ctx.get(self.node_id, {})
+  deps = list(my.get("publishes_to_topics", []))
+  deps += my.get("bucket_ids", [])
+  deps += my.get("task_queue_ids", [])
+  if my.get("subnetwork_id"):
+      deps.append(my["subnetwork_id"])
+  if my.get("service_account_id"):
+      deps.append(my["service_account_id"])
+  return deps
 
 live_outputs_body: |
-        return {"service_url": pulumi_outputs.get("uri", "")}
+  return {"service_url": pulumi_outputs.get("uri", "")}
 
 log_source_body: |
-        name = pulumi_outputs.get("name", "")
-        if not name:
-            return None
-        return LogSource(
-            filter=(
-                f'resource.type="cloud_run_revision"'
-                f' AND resource.labels.service_name="{name}"'
-                f' AND resource.labels.location="{region}"'
-            ),
-            project=project,
-        )
+  name = pulumi_outputs.get("name", "")
+  if not name:
+      return None
+  return LogSource(
+      filter=(
+          f'resource.type="cloud_run_revision"'
+          f' AND resource.labels.service_name="{name}"'
+          f' AND resource.labels.location="{region}"'
+      ),
+      project=project,
+  )
 
-# The pulumi_program closure itself is kept in extra_methods so it can reference
-# the variables built in pulumi_program_extra above.
-extra_methods: |
-    # override the generated program() to use the full Cloud Run API surface
-    def pulumi_program(self, ctx, project, region, all_nodes, deployed_outputs):
-        node_dict = ctx.get("node", {})
-        props     = node_dict.get("props", {})
-        my        = ctx.get(self.node_id, {})
+# Full pulumi_program replacement — suppresses the generated skeleton
+pulumi_program_method: |
+  def pulumi_program(self, ctx, project, region, all_nodes, deployed_outputs):
+      node_dict = ctx.get("node", {})
+      props     = node_dict.get("props", {})
+      my        = ctx.get(self.node_id, {})
 
-        subnet_id       = my.get("subnetwork_id", "")
-        subnet_outputs  = deployed_outputs.get(subnet_id, {})
-        network_path    = subnet_outputs.get("network_path")    or props.get("vpc_network",    "")
-        subnetwork_path = subnet_outputs.get("subnetwork_path") or props.get("vpc_subnetwork", "")
-        sa_email        = deployed_outputs.get(my.get("service_account_id", ""), {}).get("email", "")
+      subnet_id       = my.get("subnetwork_id", "")
+      subnet_outputs  = deployed_outputs.get(subnet_id, {})
+      network_path    = subnet_outputs.get("network_path")    or props.get("vpc_network",    "")
+      subnetwork_path = subnet_outputs.get("subnetwork_path") or props.get("vpc_subnetwork", "")
+      sa_email        = deployed_outputs.get(my.get("service_account_id", ""), {}).get("email", "")
 
-        topic_envs = [
-            gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
-                name="PUBSUB_TOPIC_" + re.sub(r"[^A-Z0-9]", "_", _node_name(all_nodes, tid).upper()),
-                value=deployed_outputs.get(tid, {}).get("name", ""),
-            )
-            for tid in my.get("publishes_to_topics", [])
-        ]
-        bucket_envs = [
-            gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
-                name="GCS_BUCKET_" + re.sub(r"[^A-Z0-9]", "_", _node_name(all_nodes, bid).upper()),
-                value=deployed_outputs.get(bid, {}).get("name", ""),
-            )
-            for bid in my.get("bucket_ids", [])
-        ]
-        queue_envs = [
-            gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
-                name="CLOUD_TASKS_QUEUE_" + re.sub(r"[^A-Z0-9]", "_", _node_name(all_nodes, qid).upper()),
-                value=deployed_outputs.get(qid, {}).get("queue_name", ""),
-            )
-            for qid in my.get("task_queue_ids", [])
-        ]
-        sub_envs = [
-            gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
-                name="PUBSUB_SUBSCRIPTION_" + re.sub(r"[^A-Z0-9]", "_", _node_name(all_nodes, sid).upper()),
-                value=_resource_name(next((n for n in all_nodes if n["id"] == sid), {})),
-            )
-            for sid in my.get("receives_from_subs", [])
-        ]
-        all_envs = topic_envs + bucket_envs + queue_envs + sub_envs
+      topic_envs = [
+          gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
+              name="PUBSUB_TOPIC_" + re.sub(r"[^A-Z0-9]", "_", _node_name(all_nodes, tid).upper()),
+              value=deployed_outputs.get(tid, {}).get("name", ""),
+          )
+          for tid in my.get("publishes_to_topics", [])
+      ]
+      bucket_envs = [
+          gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
+              name="GCS_BUCKET_" + re.sub(r"[^A-Z0-9]", "_", _node_name(all_nodes, bid).upper()),
+              value=deployed_outputs.get(bid, {}).get("name", ""),
+          )
+          for bid in my.get("bucket_ids", [])
+      ]
+      queue_envs = [
+          gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
+              name="CLOUD_TASKS_QUEUE_" + re.sub(r"[^A-Z0-9]", "_", _node_name(all_nodes, qid).upper()),
+              value=deployed_outputs.get(qid, {}).get("queue_name", ""),
+          )
+          for qid in my.get("task_queue_ids", [])
+      ]
+      sub_envs = [
+          gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
+              name="PUBSUB_SUBSCRIPTION_" + re.sub(r"[^A-Z0-9]", "_", _node_name(all_nodes, sid).upper()),
+              value=_resource_name(next((n for n in all_nodes if n["id"] == sid), {})),
+          )
+          for sid in my.get("receives_from_subs", [])
+      ]
+      all_envs = topic_envs + bucket_envs + queue_envs + sub_envs
 
-        def program() -> None:
-            vpc_access = None
-            if network_path and subnetwork_path:
-                vpc_access = gcp.cloudrunv2.ServiceTemplateVpcAccessArgs(
-                    egress="PRIVATE_RANGES_ONLY",
-                    network_interfaces=[
-                        gcp.cloudrunv2.ServiceTemplateVpcAccessNetworkInterfaceArgs(
-                            network=network_path,
-                            subnetwork=subnetwork_path,
-                        )
-                    ],
-                )
-            svc = gcp.cloudrunv2.Service(
-                self.node_id,
-                name=props.get("name") or _resource_name(node_dict),
-                location=region,
-                project=project,
-                deletion_protection=False,
-                ingress="INGRESS_TRAFFIC_INTERNAL_ONLY",
-                template=gcp.cloudrunv2.ServiceTemplateArgs(
-                    service_account=sa_email or None,
-                    containers=[gcp.cloudrunv2.ServiceTemplateContainerArgs(
-                        image=props.get("image", "gcr.io/cloudrun/hello"),
-                        envs=all_envs or None,
-                    )],
-                    vpc_access=vpc_access,
-                ),
-            )
-            pulumi.export("uri",  svc.uri)
-            pulumi.export("name", svc.name)
-            pulumi.export("id",   svc.id)
+      def program() -> None:
+          vpc_access = None
+          if network_path and subnetwork_path:
+              vpc_access = gcp.cloudrunv2.ServiceTemplateVpcAccessArgs(
+                  egress="PRIVATE_RANGES_ONLY",
+                  network_interfaces=[
+                      gcp.cloudrunv2.ServiceTemplateVpcAccessNetworkInterfaceArgs(
+                          network=network_path,
+                          subnetwork=subnetwork_path,
+                      )
+                  ],
+              )
+          svc = gcp.cloudrunv2.Service(
+              self.node_id,
+              name=props.get("name") or _resource_name(node_dict),
+              location=region,
+              project=project,
+              deletion_protection=False,
+              ingress="INGRESS_TRAFFIC_INTERNAL_ONLY",
+              template=gcp.cloudrunv2.ServiceTemplateArgs(
+                  service_account=sa_email or None,
+                  containers=[gcp.cloudrunv2.ServiceTemplateContainerArgs(
+                      image=props.get("image", "gcr.io/cloudrun/hello"),
+                      envs=all_envs or None,
+                  )],
+                  vpc_access=vpc_access,
+              ),
+          )
+          pulumi.export("uri",  svc.uri)
+          pulumi.export("name", svc.name)
+          pulumi.export("id",   svc.id)
 
-        return program
+      return program

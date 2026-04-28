@@ -20,6 +20,7 @@ class PortType(Enum):
     RUN_JOB             = "run_job"       # Scheduler → CloudRunJob trigger
     # ── New ───────────────────────────────────────────────────────────────────
     DIRECT_EVENT        = "direct_event"  # Firestore / RTDB / Build / GCS → DirectEventTriggerNode
+    FIRESTORE           = "firestore"     # FirestoreNode → CloudRunNode / WorkflowNode
 
 
 PORT_META: dict[str, dict] = {
@@ -41,4 +42,5 @@ PORT_META: dict[str, dict] = {
     PortType.RUN_JOB.value:         {"color": "#a5b4fc", "label": "Job"},
     # ── New ───────────────────────────────────────────────────────────────────
     PortType.DIRECT_EVENT.value:    {"color": "#8b5cf6", "label": "Direct"},
+    PortType.FIRESTORE.value:       {"color": "#ff8c00", "label": "Firestore"},
 }

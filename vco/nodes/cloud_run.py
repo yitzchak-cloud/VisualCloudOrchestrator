@@ -94,6 +94,7 @@ class CloudRunNode(GCPNode):
         Port("task_queue",      PortType.TASK_QUEUE,       required=False, multi=True, multi_in=True),
         Port("secret",          PortType.SECRET,           multi=True,     multi_in=True),
         Port("MESSAGE",         PortType.MESSAGE,          multi=True,     multi_in=True),
+        Port("firestore",       PortType.FIRESTORE,        required=False, multi=True, multi_in=True),
     ]
     outputs: ClassVar = [
         Port("publishes_to",    PortType.TOPIC,   multi=True),
@@ -117,12 +118,24 @@ class CloudRunNode(GCPNode):
             if tgt_type == "GcsBucketNode":
                 ctx[tgt_id].setdefault("writer_ids", []).append(self.node_id)
                 return True
+
+        # FirestoreNode / CloudVisionNode / CloudFunctionsNode / ExternalApiNode → CloudRunNode
+        # These nodes inject env vars into this CR.
+        if tgt_id == self.node_id:
+            if src_type == "FirestoreNode":
+                ctx[self.node_id].setdefault("firestore_ids", []).append(src_id)
+                return True
+            if src_type in ("CloudVisionNode", "CloudFunctionsNode", "ExternalApiNode"):
+                ctx[self.node_id].setdefault("visual_api_ids", []).append(src_id)
+                return True
         return False
 
     def dag_deps(self, ctx) -> list[str]:
         deps = list(ctx.get("publishes_to_topics", []))
-        deps += ctx.get("bucket_ids", [])        # buckets that inject env vars into this CR
-        deps += ctx.get("task_queue_ids", [])    # queues that inject env vars into this CR
+        deps += ctx.get("bucket_ids",      [])   # buckets that inject env vars into this CR
+        deps += ctx.get("task_queue_ids",  [])   # queues that inject env vars into this CR
+        deps += ctx.get("firestore_ids",   [])   # firestore dbs that inject env vars
+        deps += ctx.get("visual_api_ids",  [])   # visual-only API nodes (Vision, Functions…)
         if ctx.get("subnetwork_id"):
             deps.append(ctx["subnetwork_id"])
         if ctx.get("service_account_id"):
@@ -189,11 +202,35 @@ class CloudRunNode(GCPNode):
             for qid in ctx.get("task_queue_ids", [])
         ]
 
+        # ── Firestore env vars ────────────────────────────────────────────
+        firestore_envs = [
+            gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
+                name="FIRESTORE_DATABASE_" + re.sub(r"[^A-Z0-9]", "_", _node_name(all_nodes, fid).upper()),
+                value=deployed_outputs.get(fid, {}).get("database_id", "(default)"),
+            )
+            for fid in ctx.get("firestore_ids", [])
+        ]
+
+        # ── Visual API env vars (Cloud Vision, Cloud Functions, External) ─
+        visual_api_envs = []
+        for vid in ctx.get("visual_api_ids", []):
+            out  = deployed_outputs.get(vid, {})
+            url  = out.get("url",  "")
+            vname = out.get("name", _node_name(all_nodes, vid))
+            key  = re.sub(r"[^A-Z0-9]", "_", vname.upper())
+            if url:
+                visual_api_envs.append(
+                    gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
+                        name=f"API_URL_{key}",
+                        value=url,
+                    )
+                )
+
         # NOTE: SELF_URL is added inside program() after svc is created,
         # because it's a Pulumi Output[str] — it cannot be resolved at
         # plan-time. We add it as a separate env var via apply().
 
-        all_envs = topic_envs + sub_envs + bucket_envs + queue_envs
+        all_envs = topic_envs + sub_envs + bucket_envs + queue_envs + firestore_envs + visual_api_envs
 
         def program() -> None:
             # ── VPC access block ──────────────────────────────────────────────

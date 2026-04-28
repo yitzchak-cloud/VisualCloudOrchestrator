@@ -40,7 +40,6 @@ class {{ class_name }}(GCPNode):
 
     # ── Ports ─────────────────────────────────────────────────────────────────
     inputs: ClassVar = [
-{% if inputs %}
 {% for p in inputs %}
         Port(
             {{ p.name | pyrepr }},
@@ -50,10 +49,8 @@ class {{ class_name }}(GCPNode):
             multi_in={{ p.multi_in | default(False) }},
         ),
 {% endfor %}
-{% endif %}
     ]
     outputs: ClassVar = [
-{% if outputs %}
 {% for p in outputs %}
         Port(
             {{ p.name | pyrepr }},
@@ -61,7 +58,6 @@ class {{ class_name }}(GCPNode):
             multi={{ p.multi | default(False) }},
         ),
 {% endfor %}
-{% endif %}
     ]
 
     # ── Edge wiring ───────────────────────────────────────────────────────────
@@ -74,14 +70,37 @@ class {{ class_name }}(GCPNode):
         tgt_type: str,
         ctx:      dict[str, Any],
     ) -> bool:
-{{ resolve_edges_body }}
+{{ resolve_edges_body | indent(8, first=True) }}
 
     # ── DAG dependencies ──────────────────────────────────────────────────────
 
     def dag_deps(self, ctx: dict[str, Any]) -> list[str]:
-{{ dag_deps_body }}
+{{ dag_deps_body | indent(8, first=True) }}
+
+    # ── Post-deploy UI sync ───────────────────────────────────────────────────
+
+    def live_outputs(
+        self,
+        pulumi_outputs: dict[str, Any],
+        project:        str,
+        region:         str,
+    ) -> dict[str, Any]:
+{{ live_outputs_body | indent(8, first=True) }}
+
+    # ── Log streaming ─────────────────────────────────────────────────────────
+
+    def log_source(
+        self,
+        pulumi_outputs: dict[str, Any],
+        project:        str,
+        region:         str,
+    ) -> LogSource | None:
+{{ log_source_body | indent(8, first=True) }}
 
     # ── Pulumi program ────────────────────────────────────────────────────────
+{% if has_custom_pulumi_program %}
+{{ pulumi_program_method | indent(4, first=True) }}
+{% else %}
 
     def pulumi_program(
         self,
@@ -96,42 +115,20 @@ class {{ class_name }}(GCPNode):
         sa_email  = deployed_outputs.get(
             ctx.get("service_account_id", ""), {}
         ).get("email", "")
-{{ pulumi_program_extra }}
+
         def program() -> None:
             resource_name = props.get("name") or _resource_name(node_dict)
-
             gcp.{{ pulumi_module }}.{{ pulumi_class }}(
                 self.node_id,
                 name=resource_name,
                 project=project,
-                # ── add kwargs from props as needed ───────────────────────────
-                # Extend this section or use pulumi_program_extra in your overlay
             )
-            # pulumi.export("name", resource.name)
+            pulumi.export("name", resource_name)
 
         return program
+{% endif %}
+{% if extra_class_members %}
 
-    # ── Post-deploy UI sync ───────────────────────────────────────────────────
-
-    def live_outputs(
-        self,
-        pulumi_outputs: dict[str, Any],
-        project:        str,
-        region:         str,
-    ) -> dict[str, Any]:
-{{ live_outputs_body }}
-
-    # ── Log streaming ─────────────────────────────────────────────────────────
-
-    def log_source(
-        self,
-        pulumi_outputs: dict[str, Any],
-        project:        str,
-        region:         str,
-    ) -> LogSource | None:
-{{ log_source_body }}
-
-{% if extra_methods %}
-    # ── Extra methods (from overlay) ──────────────────────────────────────────
-{{ extra_methods | indent(4) }}
+    # ── Extra class members (from overlay) ────────────────────────────────────
+{{ extra_class_members | indent(4, first=True) }}
 {% endif %}

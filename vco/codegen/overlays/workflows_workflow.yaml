@@ -1,7 +1,4 @@
 # codegen/overlays/workflows_workflow.yaml
-# ─────────────────────────────────────────
-# Phase-2 overlay for gcp:workflows/workflow:Workflow
-
 class_name:  WorkflowNode
 description: HTTP services orchestration
 category:    Integration_Services
@@ -36,91 +33,92 @@ outputs:
     multi: true
 
 resolve_edges_body: |
-        if src_id != self.node_id:
-            return False
-        if tgt_type == "CloudRunNode":
-            ctx[self.node_id].setdefault("target_run_ids", []).append(tgt_id)
-            return True
-        return False
+  if src_id != self.node_id:
+      return False
+  if tgt_type == "CloudRunNode":
+      ctx[self.node_id].setdefault("target_run_ids", []).append(tgt_id)
+      return True
+  return False
 
 dag_deps_body: |
-        my   = ctx.get(self.node_id, {})
-        deps = list(my.get("target_run_ids", []))
-        sa_id = my.get("service_account_id")
-        if sa_id:
-            deps.append(sa_id)
-        return deps
+  my = ctx.get(self.node_id, {})
+  deps = list(my.get("target_run_ids", []))
+  sa_id = my.get("service_account_id")
+  if sa_id:
+      deps.append(sa_id)
+  return deps
 
 live_outputs_body: |
-        return {"name": pulumi_outputs.get("workflow_name", "")}
+  return {"name": pulumi_outputs.get("workflow_name", "")}
 
 log_source_body: |
-        name = pulumi_outputs.get("workflow_name", "")
-        if not name:
-            return None
-        return LogSource(
-            filter=(
-                f'resource.type="workflows.googleapis.com/Workflow"'
-                f' AND resource.labels.workflow_id="{name}"'
-            ),
-            project=project,
-        )
+  name = pulumi_outputs.get("workflow_name", "")
+  if not name:
+      return None
+  return LogSource(
+      filter=(
+          f'resource.type="workflows.googleapis.com/Workflow"'
+          f' AND resource.labels.workflow_id="{name}"'
+      ),
+      project=project,
+  )
 
-extra_methods: |
-    # YAML builder helpers — kept inline so the file is self-contained
-    _STEP_YAML = (
-        "  - {step_name}:\n"
-        "      call: http.post\n"
-        "      args:\n"
-        "        url: {url}\n"
-        "        auth:\n"
-        "          type: OIDC\n"
-        "      result: {step_name}_result\n"
-    )
-    _WF_YAML = "main:\n  steps:\n{steps}  - returnResult:\n      return: \"done\"\n"
+# class-level helpers (not a method — indented at class level)
+extra_class_members: |
+  _STEP_YAML = (
+      "  - {step_name}:\n"
+      "      call: http.post\n"
+      "      args:\n"
+      "        url: {url}\n"
+      "        auth:\n"
+      "          type: OIDC\n"
+      "      result: {step_name}_result\n"
+  )
+  _WF_YAML = "main:\n  steps:\n{steps}  - returnResult:\n      return: \"done\"\n"
 
-    @staticmethod
-    def _build_yaml(step_urls: list) -> str:
-        steps = "".join(
-            WorkflowNode._STEP_YAML.format(step_name=n, url=u)
-            for n, u in step_urls
-        )
-        return WorkflowNode._WF_YAML.format(steps=steps)
+  @staticmethod
+  def _build_yaml(step_urls: list) -> str:
+      steps = "".join(
+          WorkflowNode._STEP_YAML.format(step_name=n, url=u)
+          for n, u in step_urls
+      )
+      return WorkflowNode._WF_YAML.format(steps=steps)
 
-    def pulumi_program(self, ctx, project, region, all_nodes, deployed_outputs):
-        node_dict = ctx.get("node", {})
-        props     = node_dict.get("props", {})
-        my        = ctx.get(self.node_id, {})
-        sa_email  = deployed_outputs.get(my.get("service_account_id", ""), {}).get("email", "")
-        target_run_ids = my.get("target_run_ids", [])
+pulumi_program_method: |
+  def pulumi_program(self, ctx, project, region, all_nodes, deployed_outputs):
+      node_dict = ctx.get("node", {})
+      props     = node_dict.get("props", {})
+      my        = ctx.get(self.node_id, {})
+      sa_email  = deployed_outputs.get(my.get("service_account_id", ""), {}).get("email", "")
+      target_run_ids = my.get("target_run_ids", [])
 
-        def program() -> None:
-            source_yaml = (props.get("source_yaml") or "").strip()
-            if not source_yaml:
-                http_path  = props.get("http_path", "/")
-                step_urls  = []
-                for run_id in target_run_ids:
-                    uri = deployed_outputs.get(run_id, {}).get("uri", "")
-                    if uri:
-                        step_name = re.sub(
-                            r"[^a-z0-9_]", "_",
-                            _node_name(all_nodes, run_id).lower()
-                        )
-                        step_urls.append((step_name, uri.rstrip("/") + http_path))
-                source_yaml = (
-                    WorkflowNode._build_yaml(step_urls) if step_urls
-                    else 'main:\n  steps:\n  - returnResult:\n      return: "no targets wired"\n'
-                )
+      def program() -> None:
+          source_yaml = (props.get("source_yaml") or "").strip()
+          if not source_yaml:
+              http_path = props.get("http_path", "/")
+              step_urls = []
+              for run_id in target_run_ids:
+                  uri = deployed_outputs.get(run_id, {}).get("uri", "")
+                  if uri:
+                      step_name = re.sub(
+                          r"[^a-z0-9_]", "_",
+                          _node_name(all_nodes, run_id).lower()
+                      )
+                      step_urls.append((step_name, uri.rstrip("/") + http_path))
+              source_yaml = (
+                  WorkflowNode._build_yaml(step_urls) if step_urls
+                  else 'main:\n  steps:\n  - returnResult:\n      return: "no targets wired"\n'
+              )
 
-            wf = gcp.workflows.Workflow(
-                self.node_id,
-                name=props.get("name") or _resource_name(node_dict),
-                region=props.get("region", region),
-                project=project,
-                service_account=sa_email or None,
-                source_contents=source_yaml,
-            )
-            pulumi.export("workflow_name", wf.name)
-            pulumi.export("workflow_id",   wf.id)
+          wf = gcp.workflows.Workflow(
+              self.node_id,
+              name=props.get("name") or _resource_name(node_dict),
+              region=props.get("region", region),
+              project=project,
+              service_account=sa_email or None,
+              source_contents=source_yaml,
+          )
+          pulumi.export("workflow_name", wf.name)
+          pulumi.export("workflow_id",   wf.id)
 
-        return program
+      return program

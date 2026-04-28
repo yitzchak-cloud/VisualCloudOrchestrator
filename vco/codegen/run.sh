@@ -23,8 +23,6 @@ REFRESH_SCHEMA=0
 DRY_RUN=""
 SPECIFIC_RESOURCES=()
 
-echo "🚀  Starting VCO codegen …"
-
 # ── parse args ────────────────────────────────────────────────────────────────
 for arg in "$@"; do
     case "$arg" in
