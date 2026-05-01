@@ -31,8 +31,9 @@
     href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/addon/fold/foldgutter.min.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/addon/lint/lint.min.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
-    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@400;500;600;700;800&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&family=Google+Sans+Mono:wght@400;500&family=JetBrains+Mono:wght@400;500;600&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
     rel="stylesheet" />
   <link rel="stylesheet" href="style.css">
   <style>
@@ -55,29 +56,42 @@
       NodeResizer, NodeToolbar, useEdges,
     } = window.ReactFlow;
 
-    // ── Icons (inline SVG) ────────────────────────────────────────────────────────
+    // ── Material Symbols helper ────────────────────────────────────────────────────
+    // Renders a Google Material Symbol icon
+    const MS = ({ name, size = 18, fill = 0, style = {} }) => (
+      <span className="material-symbols-outlined" style={{
+        fontSize: size,
+        fontVariationSettings: `'FILL' ${fill}, 'wght' 400, 'GRAD' 0, 'opsz' ${size}`,
+        lineHeight: 1,
+        display: 'flex',
+        alignItems: 'center',
+        ...style
+      }}>{name}</span>
+    );
+
+    // ── Icons map — Material Symbols names ────────────────────────────────────────
     const ICONS = {
-      cloud: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" /></svg>,
-      database: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" /><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" /></svg>,
-      radio: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0" /><path d="M1.42 9a16 16 0 0 1 21.16 0" /><path d="M8.53 16.11a6 6 0 0 1 6.95 0" /><circle cx="12" cy="20" r="1" /></svg>,
-      archive: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="21 8 21 21 3 21 3 8" /><rect x="1" y="3" width="22" height="5" /><line x1="10" y1="12" x2="14" y2="12" /></svg>,
-      'user-check': <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><polyline points="16 11 18 13 22 9" /></svg>,
-      network: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="6" height="6" /><rect x="16" y="2" width="6" height="6" /><rect x="9" y="16" width="6" height="6" /><path d="M5 8v4c0 1 1 2 2 2h10c1 0 2-1 2-2V8" /><line x1="12" y1="14" x2="12" y2="16" /></svg>,
-      key: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" /></svg>,
-      search: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>,
-      play: <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3" /></svg>,
-      save: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></svg>,
-      trash: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>,
-      terminal: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" /></svg>,
-      close: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>,
-      chevron: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>,
-      zap: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>,
-      table: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M3 15h18M9 3v18" /></svg>,
-      layers: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" /></svg>,
-      inbox: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12" /><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" /></svg>,
-      globe: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>,
-      'chevron-down': <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>,
-      'chevron-right': <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>,
+      cloud:           <MS name="cloud" size={16} />,
+      database:        <MS name="database" size={16} />,
+      radio:           <MS name="cell_tower" size={16} />,
+      archive:         <MS name="inventory_2" size={16} />,
+      'user-check':    <MS name="verified_user" size={16} />,
+      network:         <MS name="hub" size={16} />,
+      key:             <MS name="key" size={16} />,
+      search:          <MS name="search" size={16} />,
+      play:            <MS name="play_arrow" size={16} fill={1} />,
+      save:            <MS name="save" size={16} />,
+      trash:           <MS name="delete" size={16} />,
+      terminal:        <MS name="terminal" size={16} />,
+      close:           <MS name="close" size={16} />,
+      chevron:         <MS name="chevron_right" size={14} />,
+      zap:             <MS name="bolt" size={16} fill={1} />,
+      table:           <MS name="table_chart" size={16} />,
+      layers:          <MS name="layers" size={16} />,
+      inbox:           <MS name="inbox" size={16} />,
+      globe:           <MS name="language" size={16} />,
+      'chevron-down':  <MS name="expand_more" size={14} />,
+      'chevron-right': <MS name="chevron_right" size={14} />,
     };
 
     // ── Node type definitions (fallback if backend offline) ───────────────────────
@@ -457,6 +471,154 @@
     // ── GCP Custom Node Component ─────────────────────────────────────────────────
     const NODE_ACCENT_COLORS = ['#6366f1', '#3b82f6', '#10b981', '#f97316', '#ec4899', '#eab308', '#8b5cf6', '#ef4444', '#06b6d4', '#f43f5e'];
 
+    // ── NodeStatusIndicator — faithful to ReactFlow UI docs ───────────────────────
+    // border variant: spinning conic-gradient ring (like BorderLoadingIndicator)
+    // overlay variant: frosted glass + centered spinning loader
+// ── NodeStatusIndicator ────────────────────────────────────────────────────────
+// ── NodeStatusIndicator ────────────────────────────────────────────────────────
+    const NodeStatusIndicator = ({ status, variant = 'border', color = '#1a73e8', children }) => {
+      const styles = `
+        @keyframes nsi-border-spin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        @keyframes nsi-loader-spin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        @keyframes nsi-ping {
+          0%   { transform: scale(1); opacity: 0.6; }
+          100% { transform: scale(2.8); opacity: 0; }
+        }
+        .nsi-conic-spinner {
+          position: absolute;
+          top: 50%; left: 50%;
+          width: 200%; height: 200%;
+          margin-top: -100%; margin-left: -100%;
+          animation: nsi-border-spin 1.5s linear infinite;
+          transform-origin: center center;
+        }
+        .nsi-loader-svg { animation: nsi-loader-spin 1s linear infinite; }
+        .nsi-ping { animation: nsi-ping 1.4s ease-out infinite; }
+        .nsi-ping2 { animation: nsi-ping 1.4s ease-out 0.5s infinite; }
+      `;
+
+      if (status === 'loading') {
+        if (variant === 'border') {
+          return (
+            <div style={{ position: 'relative' }}>
+              <style>{styles}</style>
+              <div style={{
+                position: 'absolute', top: -2, left: -2,
+                width: 'calc(100% + 4px)', height: 'calc(100% + 4px)',
+                borderRadius: 19, overflow: 'hidden',
+                pointerEvents: 'none', zIndex: 10,
+              }}>
+                <div className="nsi-conic-spinner" style={{
+                  background: `conic-gradient(from 0deg, ${color} 0deg, ${color} 80deg, transparent 80deg)`,
+                }} />
+                <div style={{
+                  position: 'absolute',
+                  top: 3, left: 3, right: 3, bottom: 3,
+                  borderRadius: 16,
+                  background: 'var(--node-bg, #1e2a3a)',
+                }} />
+              </div>
+              <div style={{ position: 'relative', zIndex: 11 }}>
+                {children}
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <div style={{ position: 'relative' }}>
+            <style>{styles}</style>
+            <div style={{
+              position: 'absolute', inset: 0, borderRadius: 16,
+              background: 'var(--node-bg-alpha, rgba(26,37,53,0.85))',
+              backdropFilter: 'blur(5px)',
+              WebkitBackdropFilter: 'blur(5px)',
+              zIndex: 10, pointerEvents: 'none',
+              border: `1.5px solid ${color}55`,
+            }} />
+            <div style={{
+              position: 'absolute', inset: 0, zIndex: 11,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              pointerEvents: 'none',
+            }}>
+              <div className="nsi-ping" style={{
+                position: 'absolute',
+                width: 80, height: 80, borderRadius: '50%',
+                background: color + '18',
+              }} />
+              <div className="nsi-ping2" style={{
+                position: 'absolute',
+                width: 50, height: 50, borderRadius: '50%',
+                background: color + '28',
+              }} />
+              <svg className="nsi-loader-svg" width="28" height="28" viewBox="0 0 24 24"
+                fill="none" stroke={color} strokeWidth="2.5"
+                strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+            </div>
+            {children}
+          </div>
+        );
+      }
+
+      if (status === 'success') {
+        return (
+          <div style={{ position: 'relative' }}>
+            <div style={{
+              position: 'absolute', top: -2, left: -2,
+              width: 'calc(100% + 4px)', height: 'calc(100% + 4px)',
+              borderRadius: 19, border: '2px solid #1e8e3e',
+              boxShadow: '0 0 8px rgba(30,142,62,0.2)',
+              pointerEvents: 'none', zIndex: 10, opacity: 0.7,
+            }} />
+            {children}
+          </div>
+        );
+      }
+
+      if (status === 'error') {
+        return (
+          <div style={{ position: 'relative' }}>
+            <div style={{
+              position: 'absolute', top: -2, left: -2,
+              width: 'calc(100% + 4px)', height: 'calc(100% + 4px)',
+              borderRadius: 19, border: '2px solid #d93025',
+              boxShadow: '0 0 8px rgba(217,48,37,0.18)',
+              pointerEvents: 'none', zIndex: 10, opacity: 0.65,
+            }} />
+            {children}
+          </div>
+        );
+      }
+
+      return <>{children}</>;
+    };
+
+    // Maps app status → NodeStatusIndicator props
+    const NodeStatusWrapper = ({ status, children, nodeColor }) => {
+      const color = nodeColor || '#1a73e8';
+      switch (status) {
+        case 'deploying': // all nodes deploying → border (spinning ring)
+          return <NodeStatusIndicator status="loading" variant="border" color={color}>{children}</NodeStatusIndicator>;
+        case 'working':   // individual node working → overlay (frosted spinner)
+          return <NodeStatusIndicator status="loading" variant="overlay" color={color}>{children}</NodeStatusIndicator>;
+        case 'deployed':
+          return <NodeStatusIndicator status="success">{children}</NodeStatusIndicator>;
+        case 'error':
+        case 'failed':
+          return <NodeStatusIndicator status="error">{children}</NodeStatusIndicator>;
+        default:
+          return <NodeStatusIndicator status="initial">{children}</NodeStatusIndicator>;
+      }
+    };
+
     // Global context so GCPNodeComponent can call openNodeLogs without prop-drilling
     const VCOContext = React.createContext({ openNodeLogs: null, openEditModal: null, onDisconnectEdge: null });
 
@@ -507,202 +669,190 @@
 
       return (
         <>
-          {/* Node Toolbar */}
-          <NodeToolbar isVisible={selected} position={Position.Top} offset={8}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'var(--bg1)', border: '1px solid var(--border)', borderRadius: 'var(--r8)', padding: '4px 6px', boxShadow: '0 4px 16px var(--shadow)' }}>
-              {/* Collapse toggle */}
-              <button className="node-toolbar-btn" title={collapsed ? 'Expand' : 'Collapse'} onClick={toggleCollapse}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  {collapsed
-                    ? <><polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" /><line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" /></>
-                    : <><polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" /><line x1="10" y1="14" x2="3" y2="21" /><line x1="21" y1="3" x2="14" y2="10" /></>}
-                </svg>
-              </button>
-              {/* Duplicate */}
-              <button className="node-toolbar-btn success" title="Duplicate" onClick={duplicateNode}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
-              </button>
-              {/* Rename */}
-              <button className="node-toolbar-btn" title="Rename" onClick={renameNode}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-              </button>
-              {/* Copy ID */}
-              <button className="node-toolbar-btn" title="Copy node ID" onClick={() => navigator.clipboard?.writeText(id)}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" ry="1" /></svg>
-              </button>
-              {/* Status cycle */}
-              <button className="node-toolbar-btn" title="Cycle status" onClick={() => setStatus(['idle', 'deployed', 'deploying', 'error'][((['idle', 'deployed', 'deploying', 'error'].indexOf(status) + 1) % 4)])}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></svg>
-              </button>
-              {/* Mark Error */}
-              <button className="node-toolbar-btn danger" title="Mark Error" onClick={() => setStatus('error')}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
-              </button>
-              <div className="node-toolbar-divider" />
-              {/* Color swatches */}
-              {NODE_ACCENT_COLORS.slice(0, 6).map(c => (
-                <div key={c} onClick={() => setColor(c)} style={{ width: 14, height: 14, borderRadius: '50%', background: c, cursor: 'pointer', border: nodeColor === c ? '2px solid var(--text0)' : '2px solid transparent', transition: 'transform .1s', flexShrink: 0 }}
-                  onMouseEnter={e => e.target.style.transform = 'scale(1.3)'} onMouseLeave={e => e.target.style.transform = 'scale(1)'}
-                />
-              ))}
-              <div className="node-toolbar-divider" />
-              {/* Edit Params */}
-              <button
-                className="node-toolbar-btn"
-                title="Edit Parameters (double-click)"
-                onClick={e => { e.stopPropagation(); openEditModalCtx && openEditModalCtx(id); }}
-                style={{ color: 'var(--accent2)', fontWeight: 700, fontSize: 10, padding: '2px 7px', letterSpacing: '.03em' }}
-              >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
-              </button>
-              <div className="node-toolbar-divider" />
-              {/* Logs button */}
-              <button
-                className="node-toolbar-btn"
-                title="View Live Logs"
-                onClick={e => { e.stopPropagation(); openNodeLogsCtx && openNodeLogsCtx(id, data.label || schema.label); }}
-                style={{ color: 'var(--accent)' }}
-              >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
-                  <line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" />
-                </svg>
-              </button>
-              {/* URL button — only if node has a url_field with a value */}
-              {schema.url_field && data.props?.[schema.url_field] && (
+            <NodeToolbar isVisible={selected} position={Position.Top} offset={8}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'var(--bg1)', border: '1px solid var(--border)', borderRadius: 'var(--r8)', padding: '4px 6px', boxShadow: '0 2px 8px var(--shadow)' }}>
+                {/* Collapse toggle */}
+                <button className="node-toolbar-btn" title={collapsed ? 'Expand' : 'Collapse'} onClick={toggleCollapse}>
+                  <MS name={collapsed ? 'open_in_full' : 'close_fullscreen'} size={13} />
+                </button>
+                {/* Duplicate */}
+                <button className="node-toolbar-btn success" title="Duplicate" onClick={duplicateNode}>
+                  <MS name="content_copy" size={13} />
+                </button>
+                {/* Rename */}
+                <button className="node-toolbar-btn" title="Rename" onClick={renameNode}>
+                  <MS name="edit" size={13} />
+                </button>
+                {/* Copy ID */}
+                <button className="node-toolbar-btn" title="Copy node ID" onClick={() => navigator.clipboard?.writeText(id)}>
+                  <MS name="content_paste" size={13} />
+                </button>
+                {/* Status cycle */}
+                <button className="node-toolbar-btn" title="Cycle status" onClick={() => setStatus(['idle', 'deployed', 'deploying', 'working', 'error'][((['idle', 'deployed', 'deploying', 'working', 'error'].indexOf(status) + 1) % 5)])}>
+                  <MS name="refresh" size={13} />
+                </button>
+                {/* Mark Error */}
+                <button className="node-toolbar-btn danger" title="Mark Error" onClick={() => setStatus('error')}>
+                  <MS name="error" size={13} />
+                </button>
+                <div className="node-toolbar-divider" />
+                {/* Color swatches */}
+                {NODE_ACCENT_COLORS.slice(0, 6).map(c => (
+                  <div key={c} onClick={() => setColor(c)} style={{ width: 14, height: 14, borderRadius: '50%', background: c, cursor: 'pointer', border: nodeColor === c ? '2px solid var(--text0)' : '2px solid transparent', transition: 'transform .1s', flexShrink: 0 }}
+                    onMouseEnter={e => e.target.style.transform = 'scale(1.3)'} onMouseLeave={e => e.target.style.transform = 'scale(1)'}
+                  />
+                ))}
+                <div className="node-toolbar-divider" />
+                {/* Edit Params */}
                 <button
                   className="node-toolbar-btn"
-                  title={`Open: ${data.props[schema.url_field]}`}
-                  onClick={e => { e.stopPropagation(); window.open(data.props[schema.url_field], '_blank'); }}
-                  style={{ color: 'var(--green)' }}
+                  title="Edit Parameters (double-click)"
+                  onClick={e => { e.stopPropagation(); openEditModalCtx && openEditModalCtx(id); }}
+                  style={{ color: 'var(--gcp-blue)' }}
                 >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                    <polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
-                  </svg>
+                  <MS name="tune" size={13} />
                 </button>
-              )}
-              <div className="node-toolbar-divider" />
-              {/* Delete */}
-              <button className="node-toolbar-btn danger" title="Delete" onClick={deleteNode}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>
-              </button>
-            </div>
-          </NodeToolbar>
+                <div className="node-toolbar-divider" />
+                {/* Logs button */}
+                <button
+                  className="node-toolbar-btn"
+                  title="View Live Logs"
+                  onClick={e => { e.stopPropagation(); openNodeLogsCtx && openNodeLogsCtx(id, data.label || schema.label); }}
+                  style={{ color: 'var(--gcp-teal)' }}
+                >
+                  <MS name="description" size={13} />
+                </button>
+                {/* URL button */}
+                {schema.url_field && data.props?.[schema.url_field] && (
+                  <button
+                    className="node-toolbar-btn"
+                    title={`Open: ${data.props[schema.url_field]}`}
+                    onClick={e => { e.stopPropagation(); window.open(data.props[schema.url_field], '_blank'); }}
+                    style={{ color: 'var(--gcp-green)' }}
+                  >
+                    <MS name="open_in_new" size={13} />
+                  </button>
+                )}
+                <div className="node-toolbar-divider" />
+                {/* Delete */}
+                <button className="node-toolbar-btn danger" title="Delete" onClick={deleteNode}>
+                  <MS name="delete" size={13} />
+                </button>
+              </div>
+            </NodeToolbar>
 
           {/* Resizer */}
           <NodeResizer
             isVisible={selected}
             minWidth={180}
             minHeight={collapsed ? 52 : 90}
-            handleStyle={{ width: 8, height: 8, background: 'var(--accent)', border: '2px solid var(--bg1)', borderRadius: 2 }}
-            lineStyle={{ border: '1px solid var(--accent)', opacity: .5 }}
+            handleStyle={{ width: 8, height: 8, background: 'var(--gcp-blue)', border: '2px solid #fff', borderRadius: 2 }}
+            lineStyle={{ border: '1px solid var(--gcp-blue)', opacity: .35 }}
           />
 
-          <div
-            className={`gcp-node ${selected ? 'selected' : ''} status-${status} ${collapsed ? 'node-collapsed' : ''}`}
-            style={{ '--node-color': nodeColor, width: '100%', height: '100%' }}
-          >
-            {/* Header */}
-            <div className="node-header">
-              <div className="node-header-icon" style={{ background: nodeColor + '22', color: nodeColor }}>
-                <GCPIcon nodeType={schema.type} fallbackIcon={schema.icon} color={nodeColor} size={18} />
+          <NodeStatusWrapper status={status} nodeColor={nodeColor}>
+            <div
+              className={`gcp-node ${selected ? 'selected' : ''} ${collapsed ? 'node-collapsed' : ''}`}
+              style={{ '--node-color': nodeColor, width: '100%', height: '100%' }}
+            >
+              {/* Header */}
+              <div className="node-header">
+                <div className="node-header-icon" style={{ background: nodeColor + '18', color: nodeColor }}>
+                  <GCPIcon nodeType={schema.type} fallbackIcon={schema.icon} color={nodeColor} size={18} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="node-header-name">{data.label || schema.label}</div>
+                  <div className="node-header-type">{schema.type.replace('Node', '')}</div>
+                </div>
+                {edgeCount > 0 && (
+                  <span title={`${edgeCount} connection(s)`} style={{
+                    fontSize: 9, fontWeight: 700, color: '#80868b',
+                    background: '#f1f3f4', borderRadius: 99,
+                    padding: '1px 6px', marginRight: 4, flexShrink: 0,
+                  }}>
+                    {edgeCount}
+                  </span>
+                )}
+                <div className={`status-badge ${status}`} style={{ marginRight: 4 }} />
+                <button className="collapse-btn" onClick={toggleCollapse} title={collapsed ? 'Expand' : 'Collapse'}>
+                  <MS name={collapsed ? 'expand_more' : 'expand_less'} size={16} />
+                </button>
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="node-header-name">{data.label || schema.label}</div>
-                <div className="node-header-type">{schema.type.replace('Node', '')}</div>
-              </div>
-              {/* Connection count badge */}
-              {edgeCount > 0 && (
-                <span title={`${edgeCount} connection(s)`} style={{
-                  fontSize: 9, fontWeight: 700, color: 'var(--text2)',
-                  background: 'var(--bg3)', borderRadius: 99,
-                  padding: '1px 5px', marginRight: 4, flexShrink: 0,
-                }}>
-                  {edgeCount}
-                </span>
-              )}
-              <div className={`status-badge ${status}`} style={{ marginRight: 2 }} />
-              <button className="collapse-btn" onClick={toggleCollapse} title={collapsed ? 'Expand' : 'Collapse'}>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  {collapsed ? <polyline points="6 9 12 15 18 9" /> : <polyline points="18 15 12 9 6 15" />}
-                </svg>
-              </button>
-            </div>
 
-            {/* Ports */}
-            {!collapsed && (
-              <div className="node-ports">
-                {schema.inputs.map((port) => {
-                  const isConnected = connectedTargets.has(port.name);
-                  const isMissingRequired = port.required && !isConnected;
-                  return (
-                    <div key={`in-${port.name}`} className="port-row" style={{ position: 'relative' }}>
+              {/* Ports */}
+              {!collapsed && (
+                <div className="node-ports">
+                  {schema.inputs.map((port) => {
+                    const isConnected = connectedTargets.has(port.name);
+                    const isMissingRequired = port.required && !isConnected;
+                    return (
+                      <div key={`in-${port.name}`} className="port-row" style={{ position: 'relative' }}>
+                        <Handle
+                          type="target"
+                          position={Position.Left}
+                          id={port.name}
+                          data-multiin={port.multi_in ? 'true' : 'false'}
+                          title={port.multi_in ? `${port.name} · multi-in` : `${port.name} · single connection`}
+                          style={{
+                            background: port.color,
+                            border: isMissingRequired ? '2px solid #f29900' : port.multi_in ? '2px solid #34d399' : '2px solid #fff',
+                            position: 'absolute', left: -5, top: '50%', transform: 'translateY(-50%)',
+                            transition: 'transform .15s, box-shadow .15s',
+                            boxShadow: isMissingRequired ? '0 0 0 3px rgba(242,153,0,0.3)' : 'none',
+                          }}
+                        />
+                        <span className="port-label input" style={{ paddingLeft: 20 }}>
+                          <span style={{ color: port.color, fontSize: 9, fontWeight: 700, marginRight: 4 }}>{port.label}</span>
+                          {port.name.replace(/_/g, ' ')}
+                          {port.required && (
+                            <span style={{ color: isConnected ? '#1e8e3e' : '#f29900', marginLeft: 3, fontSize: 9 }}>
+                              {isConnected ? '✓' : '!'}
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {schema.inputs.length > 0 && schema.outputs.length > 0 && (
+                    <div style={{ height: 1, background: '#f1f3f4', margin: '4px 0' }} />
+                  )}
+                  {schema.outputs.map((port) => (
+                    <div key={`out-${port.name}`} className="port-row" style={{ position: 'relative' }}>
+                      <span className="port-label output" style={{ textAlign: 'right', paddingRight: 20 }}>
+                        {port.name.replace(/_/g, ' ')}
+                        <span style={{ color: port.color, fontSize: 9, fontWeight: 700, marginLeft: 4 }}>{port.label}</span>
+                      </span>
                       <Handle
-                        type="target"
-                        position={Position.Left}
+                        type="source"
+                        position={Position.Right}
                         id={port.name}
-                        data-multiin={port.multi_in ? 'true' : 'false'}
-                        title={port.multi_in ? `${port.name} · multi-in` : `${port.name} · single connection`}
                         style={{
                           background: port.color,
-                          border: isMissingRequired ? '2px solid var(--yellow)' : port.multi_in ? '2px solid #34d399' : '2px solid var(--bg2)',
-                          position: 'absolute', left: -5, top: '50%', transform: 'translateY(-50%)',
+                          border: '2px solid #fff',
+                          position: 'absolute', right: -5, top: '50%', transform: 'translateY(-50%)',
                           transition: 'transform .15s, box-shadow .15s',
-                          boxShadow: isMissingRequired ? '0 0 0 3px rgba(245,158,11,0.35)' : 'none',
                         }}
                       />
-                      <span className="port-label input" style={{ paddingLeft: 20 }}>
-                        <span style={{ color: port.color, fontSize: 9, fontWeight: 700, marginRight: 4 }}>{port.label}</span>
-                        {port.name.replace(/_/g, ' ')}
-                        {port.required && (
-                          <span style={{ color: isConnected ? 'var(--green)' : 'var(--yellow)', marginLeft: 3, fontSize: 9 }}>
-                            {isConnected ? '✓' : '!'}
-                          </span>
-                        )}
-                      </span>
                     </div>
-                  );
-                })}
-                {schema.inputs.length > 0 && schema.outputs.length > 0 && (
-                  <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
-                )}
-                {schema.outputs.map((port) => (
-                  <div key={`out-${port.name}`} className="port-row" style={{ position: 'relative' }}>
-                    <span className="port-label output" style={{ textAlign: 'right', paddingRight: 20 }}>
-                      {port.name.replace(/_/g, ' ')}
-                      <span style={{ color: port.color, fontSize: 9, fontWeight: 700, marginLeft: 4 }}>{port.label}</span>
-                    </span>
-                    <Handle
-                      type="source"
-                      position={Position.Right}
-                      id={port.name}
-                      style={{
-                        background: port.color,
-                        border: '2px solid var(--bg2)',
-                        position: 'absolute', right: -5, top: '50%', transform: 'translateY(-50%)',
-                        transition: 'transform .15s, box-shadow .15s',
-                      }}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
 
-            {/* Collapsed: show inline handles */}
-            {collapsed && (
-              <>
-                {schema.inputs.map((port, i) => (
-                  <Handle key={`in-${port.name}`} type="target" position={Position.Left} id={port.name}
-                    style={{ background: port.color, border: '2px solid var(--bg2)', top: `${50 + (i - (schema.inputs.length - 1) / 2) * 20}%` }} />
-                ))}
-                {schema.outputs.map((port, i) => (
-                  <Handle key={`out-${port.name}`} type="source" position={Position.Right} id={port.name}
-                    style={{ background: port.color, border: '2px solid var(--bg2)', top: `${50 + (i - (schema.outputs.length - 1) / 2) * 20}%` }} />
-                ))}
-              </>
-            )}
-          </div>
+              {/* Collapsed: inline handles */}
+              {collapsed && (
+                <>
+                  {schema.inputs.map((port, i) => (
+                    <Handle key={`in-${port.name}`} type="target" position={Position.Left} id={port.name}
+                      style={{ background: port.color, border: '2px solid #fff', top: `${50 + (i - (schema.inputs.length - 1) / 2) * 20}%` }} />
+                  ))}
+                  {schema.outputs.map((port, i) => (
+                    <Handle key={`out-${port.name}`} type="source" position={Position.Right} id={port.name}
+                      style={{ background: port.color, border: '2px solid #fff', top: `${50 + (i - (schema.outputs.length - 1) / 2) * 20}%` }} />
+                  ))}
+                </>
+              )}
+            </div>
+          </NodeStatusWrapper>
         </>
       );
     };
@@ -908,16 +1058,14 @@
             {/* Back button */}
             <div onClick={() => setActiveCategory(null)} style={{
               display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px 10px',
-              cursor: 'pointer', color: 'var(--text2)', fontSize: 11, fontFamily: 'var(--font-mono)',
+              cursor: 'pointer', color: 'var(--text2)', fontSize: 11, fontFamily: 'var(--font-display)',
               borderBottom: '1px solid var(--border)', marginBottom: 6,
               transition: 'color .15s',
             }}
               onMouseEnter={e => e.currentTarget.style.color = 'var(--text0)'}
               onMouseLeave={e => e.currentTarget.style.color = 'var(--text2)'}
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
+              <MS name="arrow_back" size={14} />
               <span>All Categories</span>
               <div style={{ flex: 1 }} />
               <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -2979,6 +3127,8 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
       const [ctxMenu, setCtxMenu] = useState(null);
       const [edgeCtxMenu, setEdgeCtxMenu] = useState(null);
       const [defaultEdgeType, setDefaultEdgeType] = useState('bezier');
+      const [snapToGrid, setSnapToGrid] = useState(false);
+      const [bgVariant, setBgVariant] = useState('dots');
       // ── Namespaces ──────────────────────────────────────────────────────────────
       const [namespace, setNamespace] = useState('default');
       const [namespaces, setNamespaces] = useState(['default']);
@@ -3707,14 +3857,14 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
               <div className="sidebar-header">
                 <div className="logo">
                   <div className="logo-dot" />
-                  <span>VCO</span>
-                </div>
-                <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 4, fontFamily: 'var(--font-mono)' }}>
-                  GCP Cloud Orchestrator
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--text0)', lineHeight: 1.2 }}>Cloud Orchestrator</div>
+                    <div style={{ fontSize: 10, color: 'var(--text2)', fontFamily: 'var(--font-display)', marginTop: 1 }}>GCP Visual Designer</div>
+                  </div>
                 </div>
               </div>
               <div className="sidebar-search">
-                <span className="search-icon">{ICONS.search}</span>
+                <span className="search-icon"><MS name="search" size={18} /></span>
                 <input
                   placeholder="Search nodes..."
                   value={search}
@@ -3728,35 +3878,29 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
                 </div>
                 <div
                   className="node-item"
-                  style={{ borderColor: 'rgba(16,185,129,0.3)', background: 'rgba(16,185,129,0.06)', marginBottom: 8 }}
+                  style={{ borderColor: 'rgba(30,142,62,0.3)', background: 'rgba(30,142,62,0.05)', marginBottom: 8 }}
                   draggable
                   onDragStart={e => e.dataTransfer.setData('application/vco-node', '__VPC_GROUP__')}
                 >
-                  <div className="node-icon" style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981' }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="2" y="2" width="6" height="6" /><rect x="16" y="2" width="6" height="6" />
-                      <rect x="9" y="16" width="6" height="6" />
-                      <path d="M5 8v4c0 1 1 2 2 2h10c1 0 2-1 2-2V8" /><line x1="12" y1="14" x2="12" y2="16" />
-                    </svg>
+                  <div className="node-icon" style={{ background: 'rgba(30,142,62,0.12)', color: '#1e8e3e' }}>
+                    <MS name="hub" size={16} />
                   </div>
                   <div className="node-info">
-                    <div className="node-name" style={{ color: '#a7f3d0' }}>VPC Group</div>
+                    <div className="node-name" style={{ color: '#1e8e3e' }}>VPC Group</div>
                     <div className="node-desc">Drop nodes inside to attach to VPC</div>
                   </div>
                 </div>
                 <div
                   className="node-item"
-                  style={{ borderColor: 'rgba(139,92,246,0.28)', background: 'rgba(139,92,246,0.08)', marginBottom: 8 }}
+                  style={{ borderColor: 'rgba(124,77,255,0.25)', background: 'rgba(124,77,255,0.05)', marginBottom: 8 }}
                   draggable
                   onDragStart={e => e.dataTransfer.setData('application/vco-node', '__GROUP_BOX__')}
                 >
-                  <div className="node-icon" style={{ background: 'rgba(139,92,246,0.15)', color: '#8b5cf6' }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M4 6h16v12H4z" /><path d="M8 10h8" /><path d="M8 14h8" />
-                    </svg>
+                  <div className="node-icon" style={{ background: 'rgba(124,77,255,0.12)', color: '#7c4dff' }}>
+                    <MS name="view_in_ar" size={16} />
                   </div>
                   <div className="node-info">
-                    <div className="node-name" style={{ color: '#c4b5fd' }}>Visual Group</div>
+                    <div className="node-name" style={{ color: '#7c4dff' }}>Visual Group</div>
                     <div className="node-desc">Drop nodes inside to create a visual container</div>
                   </div>
                 </div>
@@ -3798,39 +3942,44 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
                     }}
                     type="button"
                   >
-                    ☰ Menu
+                    <MS name="menu" size={16} /> Menu
                   </button>
                   {menuOpen && (
                     <div id="topbar-menu-panel" className="topbar-menu-panel" onClick={e => e.stopPropagation()}>
-                      <div className="topbar-menu-item" onClick={() => { fitView(); setMenuOpen(false); }}>
-                        <span>Center View</span>
-                        <span style={{ color: 'var(--text2)' }}>focus</span>
+                      <div className="topbar-menu-item" onClick={() => { fitView({ duration: 400 }); setMenuOpen(false); }}>
+                        <MS name="fit_screen" size={14} /><span>Fit to View</span>
+                        <span style={{ color: 'var(--text2)', fontSize: 10 }}>Ctrl+Shift+H</span>
                       </div>
                       <div className="topbar-menu-item" onClick={() => { handleSave(); setMenuOpen(false); }}>
-                        <span>Save Graph</span>
-                        <span style={{ color: 'var(--text2)' }}>yaml/json</span>
+                        <MS name="save" size={14} /><span>Save Graph</span>
+                        <span style={{ color: 'var(--text2)', fontSize: 10 }}>Ctrl+S</span>
                       </div>
                       <div className="topbar-menu-item" onClick={() => { handleDeploy(); setMenuOpen(false); }}>
-                        <span>Deploy</span>
-                        <span style={{ color: 'var(--text2)' }}>run</span>
+                        <MS name="rocket_launch" size={14} /><span>Deploy</span>
                       </div>
                       <div className="topbar-menu-item" onClick={() => { handleClear(); setMenuOpen(false); }}>
-                        <span>Clear Canvas</span>
-                        <span style={{ color: 'var(--text2)' }}>reset</span>
+                        <MS name="delete_sweep" size={14} /><span>Clear Canvas</span>
+                      </div>
+                      <div className="topbar-menu-divider" />
+                      <div className="topbar-menu-item" onClick={() => { setSnapToGrid(s => !s); }}>
+                        <MS name="grid_4x4" size={14} /><span>Snap to Grid</span>
+                        <span style={{ color: snapToGrid ? 'var(--gcp-blue)' : 'var(--text2)', fontSize: 10, fontWeight: 600 }}>{snapToGrid ? 'ON' : 'OFF'}</span>
+                      </div>
+                      <div className="topbar-menu-item" onClick={() => { setBgVariant(v => v === 'dots' ? 'lines' : v === 'lines' ? 'cross' : 'dots'); }}>
+                        <MS name="blur_on" size={14} /><span>Background</span>
+                        <span style={{ color: 'var(--text2)', fontSize: 10, textTransform: 'capitalize' }}>{bgVariant}</span>
                       </div>
                       <div className="topbar-menu-divider" />
                       <div className="topbar-menu-item" onClick={() => { setInfoModal('guide'); setMenuOpen(false); }}>
-                        <span>Guide</span>
-                        <span style={{ color: 'var(--text2)' }}>help</span>
+                        <MS name="menu_book" size={14} /><span>Guide</span>
                       </div>
                       <div className="topbar-menu-item" onClick={() => { setInfoModal('contact'); setMenuOpen(false); }}>
-                        <span>Contact</span>
-                        <span style={{ color: 'var(--text2)' }}>about</span>
+                        <MS name="info" size={14} /><span>About</span>
                       </div>
                       <div className="topbar-menu-divider" />
                       <div className="topbar-menu-item" onClick={() => { setTheme(t => t === 'dark' ? 'light' : 'dark'); setMenuOpen(false); }}>
-                        <span>Toggle Theme</span>
-                        <span style={{ color: 'var(--text2)' }}>{theme === 'dark' ? 'Light' : 'Dark'}</span>
+                        <MS name={theme === 'dark' ? 'light_mode' : 'dark_mode'} size={14} /><span>Toggle Theme</span>
+                        <span style={{ color: 'var(--text2)', fontSize: 10 }}>{theme === 'dark' ? 'Light' : 'Dark'}</span>
                       </div>
                     </div>
                   )}
@@ -3936,67 +4085,84 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
                 </div>
                 <div className="topbar-spacer" />
 
-                {/* Edge type selector */}
-                <div style={{ display: 'flex', gap: 2, background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 'var(--r8)', padding: 3 }}>
-                  {['step', 'bezier', 'straight'].map(t => (
+                {/* ── Edge type selector ── */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 99, padding: '3px 4px' }}>
+                  {[['step','Step'],['bezier','Bezier'],['straight','Straight']].map(([t,label]) => (
                     <button key={t} onClick={() => setDefaultEdgeType(t)}
-                      style={{ padding: '3px 8px', borderRadius: 6, border: 'none', background: defaultEdgeType === t ? 'var(--accent)' : 'transparent', color: defaultEdgeType === t ? '#fff' : 'var(--text1)', fontSize: 10, fontFamily: 'var(--font-mono)', cursor: 'pointer', transition: 'all .12s' }}>
-                      {t[0].toUpperCase() + t.slice(1)}
+                      style={{
+                        padding: '3px 10px', borderRadius: 99, border: 'none',
+                        background: defaultEdgeType === t ? 'var(--gcp-blue)' : 'transparent',
+                        color: defaultEdgeType === t ? '#fff' : 'var(--text1)',
+                        fontSize: 12, fontFamily: 'var(--font-display)', fontWeight: defaultEdgeType === t ? 600 : 400,
+                        cursor: 'pointer', transition: 'all .12s',
+                      }}>
+                      {label}
                     </button>
                   ))}
                 </div>
 
-                {/* WS status */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: wsConnected ? 'var(--green)' : 'var(--text2)', boxShadow: wsConnected ? '0 0 6px var(--green)' : 'none' }} />
-                  <span style={{ fontSize: 10, color: wsConnected ? 'var(--green)' : 'var(--text2)' }}>
+                {/* ── Snap to grid toggle ── */}
+                <button
+                  onClick={() => setSnapToGrid(s => !s)}
+                  className="btn btn-ghost"
+                  style={{ gap: 5, borderColor: snapToGrid ? 'var(--gcp-blue)' : 'var(--border)', color: snapToGrid ? 'var(--gcp-blue)' : 'var(--text1)', background: snapToGrid ? 'var(--gcp-blue-light)' : 'transparent' }}
+                  title="Snap to grid (16×16)"
+                >
+                  <MS name="grid_4x4" size={15} />
+                  Snap
+                </button>
+
+                {/* ── Background variant ── */}
+                <button
+                  onClick={() => setBgVariant(v => v === 'dots' ? 'lines' : v === 'lines' ? 'cross' : 'dots')}
+                  className="btn btn-ghost"
+                  title={`Background: ${bgVariant}`}
+                  style={{ gap: 5, minWidth: 'auto', padding: '0 10px' }}
+                >
+                  <MS name={bgVariant === 'dots' ? 'blur_on' : bgVariant === 'lines' ? 'border_all' : 'add'} size={15} />
+                </button>
+
+                {/* ── WS status ── */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '0 4px' }}>
+                  <div style={{ width: 7, height: 7, borderRadius: '50%', background: wsConnected ? '#1e8e3e' : '#80868b', boxShadow: wsConnected ? '0 0 5px rgba(30,142,62,0.6)' : 'none', flexShrink: 0 }} />
+                  <span style={{ fontSize: 12, color: wsConnected ? '#1e8e3e' : '#80868b', fontFamily: 'var(--font-display)', fontWeight: 500 }}>
                     {wsConnected ? 'live' : 'offline'}
                   </span>
                 </div>
-                <button className="btn btn-ghost" onClick={() => setInfoModal('contact')} title="מידע ויצירת קשר">
-                  {/* info icon */}
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
-                  Info
-                </button>
-                <button className="btn btn-ghost" onClick={() => setInfoModal('guide')} title="System Guide">
-                  {/* book icon */}
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" /><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></svg>
-                  Guide
-                </button>
-                <button className="btn btn-ghost" onClick={handleClear}>{ICONS.trash} Clear</button>
-                <button className="btn btn-ghost" onClick={handleSave}>{ICONS.save} Save</button>
+
+                {/* ── divider ── */}
+                <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 2px' }} />
+
+                <button className="btn btn-ghost" onClick={() => setInfoModal('contact')} title="Info"><MS name="info" size={15} /> Info</button>
+                <button className="btn btn-ghost" onClick={() => setInfoModal('guide')} title="Guide"><MS name="menu_book" size={15} /> Guide</button>
+
+                {/* ── divider ── */}
+                <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 2px' }} />
+
+                <button className="btn btn-ghost" onClick={handleClear}><MS name="delete_sweep" size={15} /> Clear</button>
+                <button className="btn btn-ghost" onClick={handleSave}><MS name="save" size={15} /> Save</button>
+
                 <button className="btn btn-deploy" onClick={handleDeploy} disabled={isDeploying}>
-                  {ICONS.play} {isDeploying ? 'Deploying...' : 'Deploy'}
+                  <MS name="rocket_launch" size={15} fill={isDeploying ? 0 : 1} />
+                  {isDeploying ? 'Deploying…' : 'Deploy'}
                 </button>
-                <button className="btn btn-ghost" onClick={() => setLogVisible(v => !v)} style={{ marginLeft: 4 }}>
-                  {ICONS.terminal} Log
-                </button>
+
+                <button className="btn btn-ghost" onClick={() => setLogVisible(v => !v)}><MS name="terminal" size={15} /> Log</button>
+
                 <button
                   className="btn btn-ghost"
                   onClick={() => setTfModalOpen(true)}
-                  title="Export Terraform workspace"
-                  style={{ borderColor: '#7c3aed', color: '#a78bfa' }}
+                  style={{ borderColor: '#7c4dff', color: '#7c4dff' }}
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" strokeWidth="2"
-                    strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="7 10 12 15 17 10" />
-                    <line x1="12" y1="15" x2="12" y2="3" />
-                  </svg>
-                  Export TF
+                  <MS name="download" size={15} /> Export TF
                 </button>
 
+                {/* ── divider ── */}
+                <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 2px' }} />
+
                 {/* Theme toggle */}
-                <button
-                  onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 99, border: '1px solid var(--border2)', background: 'var(--bg2)', color: 'var(--text1)', cursor: 'pointer', fontSize: 11, fontFamily: 'var(--font-mono)', transition: 'all .15s' }}
-                  title="Toggle light/dark mode"
-                >
-                  {theme === 'dark'
-                    ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></svg>
-                    : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
-                  }
+                <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} className="btn btn-ghost" title="Toggle theme">
+                  <MS name={theme === 'dark' ? 'light_mode' : 'dark_mode'} size={15} />
                   {theme === 'dark' ? 'Light' : 'Dark'}
                 </button>
               </div>
@@ -4030,13 +4196,34 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
                   fitView
                   deleteKeyCode={['Backspace', 'Delete']}
                   defaultEdgeOptions={{ type: 'gcpEdge', data: { edgeType: defaultEdgeType, animated: true, label: '' } }}
+                  snapToGrid={snapToGrid}
+                  snapGrid={[16, 16]}
+                  panOnScroll={true}
+                  panOnScrollMode="free"
+                  zoomOnScroll={false}
+                  zoomOnPinch={true}
+                  selectionOnDrag={true}
+                  selectionMode="partial"
+                  elevateEdgesOnSelect={true}
+                  elevateNodesOnSelect={true}
+                  connectionRadius={40}
+                  minZoom={0.1}
+                  maxZoom={4}
+                  proOptions={{ hideAttribution: true }}
                 >
-                  <Background variant="dots" gap={28} size={1} color="var(--border)" />
-                  <Controls style={{ bottom: 16, left: 16 }} />
+                  <Background
+                    variant={bgVariant}
+                    gap={bgVariant === 'dots' ? 28 : 20}
+                    size={bgVariant === 'dots' ? 1 : 1}
+                    color="var(--border)"
+                  />
+                  <Controls style={{ bottom: 16, left: 16 }} showInteractive={true} />
                   <MiniMap
                     nodeColor={n => n.data.accentColor || n.data.schema?.color || '#1e293b'}
                     maskColor={theme === 'light' ? 'rgba(226,232,240,0.7)' : 'rgba(8,11,18,0.7)'}
                     style={{ bottom: 16, right: selectedNode ? 296 : 16 }}
+                    zoomable
+                    pannable
                   />
                 </ReactFlow>
 
@@ -4065,28 +4252,28 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
                     setNodes(nds => nds.map(n => n.id === ctxMenu.nodeId ? { ...n, data: { ...n.data, collapsed: !n.data.collapsed } } : n));
                     closeCtxMenu();
                   }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" /><line x1="10" y1="14" x2="3" y2="21" /><line x1="21" y1="3" x2="14" y2="10" /></svg>
+                    <MS name="open_in_full" size={14} />
                     Toggle Collapse
                   </div>
                   <div className="ctx-item" onClick={() => {
                     setNodes(nds => { const orig = nds.find(n => n.id === ctxMenu.nodeId); if (!orig) return nds; const newId = `${orig.data.schema?.type || 'node'}-${Date.now()}`; return [...nds, { ...orig, id: newId, position: { x: orig.position.x + 40, y: orig.position.y + 40 }, selected: false }]; });
                     closeCtxMenu();
                   }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                    <MS name="content_copy" size={14} />
                     Duplicate
                   </div>
                   <div className="ctx-item" onClick={() => {
                     setNodes(nds => nds.map(n => n.id === ctxMenu.nodeId ? { ...n, data: { ...n.data, status: 'deployed' } } : n));
                     closeCtxMenu();
                   }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                    <MS name="check_circle" size={14} style={{ color: 'var(--gcp-green)' }} />
                     Mark Deployed
                   </div>
                   <div className="ctx-item" onClick={() => {
                     setNodes(nds => nds.map(n => n.id === ctxMenu.nodeId ? { ...n, data: { ...n.data, status: 'idle' } } : n));
                     closeCtxMenu();
                   }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /></svg>
+                    <MS name="radio_button_unchecked" size={14} />
                     Reset Status
                   </div>
                   <div className="ctx-item sep" />
@@ -4104,7 +4291,6 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
                   </div>
                   <div className="ctx-item sep" />
                   <div className="ctx-item danger" onClick={() => {
-                    const deletedId = ctxMenu.nodeId;
                     deleteElements({ nodes: [{ id: deletedId }] });
                     closeCtxMenu();
                     // Auto-save so deletion persists on reload
@@ -4123,7 +4309,7 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
                       } catch { /* silent */ }
                     }, 100);
                   }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>
+                    <MS name="delete" size={14} />
                     Delete Node
                   </div>
                 </div>
@@ -4180,9 +4366,7 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
                     deleteElements({ edges: [{ id: edge.id }] });
                     setEdgeCtxMenu(null);
                   }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M18 6L6 18M6 6l12 12" />
-                    </svg>
+                    <MS name="link_off" size={14} />
                     Disconnect Edge
                   </div>
                 </div>

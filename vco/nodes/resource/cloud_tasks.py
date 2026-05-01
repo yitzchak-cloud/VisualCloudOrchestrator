@@ -1,18 +1,20 @@
 """
 nodes/cloud_tasks.py — Cloud Tasks Queue resource node (fully self-describing).
 
+Changes from previous version
+------------------------------
+  • Added iam_binding input port (so IamBindingNode can target this queue).
+
 Topology
 --------
   CloudTasksQueueNode ──(TASK_QUEUE)──► CloudRunNode
 
+  IamBindingNode ──(IAM_BINDING)──► CloudTasksQueueNode  ← NEW
+    e.g. grant roles/cloudtasks.enqueuer to a SA
+
 Creates a Cloud Tasks queue. The wired CloudRunNode URL is stored as the
 queue's default HTTP target so that the application only needs to know the
 queue name — not the destination URL.
-
-The queue name and handler URL are exported so application code can enqueue
-tasks without hardcoded values:
-    CLOUD_TASKS_QUEUE   = <queue id>
-    CLOUD_TASKS_HANDLER = <cloud run url + path>
 """
 from __future__ import annotations
 
@@ -35,6 +37,7 @@ class CloudTasksQueueNode(GCPNode):
     Cloud Tasks Queue — asynchronous task execution.
 
     Connect to CloudRunNode → tasks are dispatched via HTTPS POST to that service.
+    Connect IamBindingNode → this queue to grant roles (e.g. cloudtasks.enqueuer).
     """
 
     params_schema: ClassVar = [
@@ -68,8 +71,10 @@ class CloudTasksQueueNode(GCPNode):
         },
     ]
 
-    inputs:  ClassVar = [
-        Port("service_account", PortType.SERVICE_ACCOUNT, required=False),
+    inputs: ClassVar = [
+        Port("none",            PortType.TASK_QUEUE,       multi=True),
+        Port("service_account", PortType.SERVICE_ACCOUNT,  required=False),
+        Port("iam_binding",     PortType.IAM_BINDING,      required=False, multi=True, multi_in=True),  # NEW
     ]
     outputs: ClassVar = [
         Port("dispatches_to", PortType.TASK_QUEUE, multi=True),
@@ -115,13 +120,13 @@ class CloudTasksQueueNode(GCPNode):
         target_run_ids = ctx.get("target_run_ids", [])
 
         def program() -> None:
-            queue_name            = props.get("name") or _resource_name(node_dict)
-            http_path             = props.get("http_path", "/tasks/handle")
-            max_concurrent        = int(props.get("max_concurrent", 100))
-            max_attempts          = int(props.get("max_attempts", 5))
-            min_backoff           = int(props.get("min_backoff", 10))
-            max_backoff           = int(props.get("max_backoff", 300))
-            max_dispatches_per_s  = int(props.get("max_dispatches_per_second", 500))
+            queue_name           = props.get("name") or _resource_name(node_dict)
+            http_path            = props.get("http_path", "/tasks/handle")
+            max_concurrent       = int(props.get("max_concurrent", 100))
+            max_attempts         = int(props.get("max_attempts", 5))
+            min_backoff          = int(props.get("min_backoff", 10))
+            max_backoff          = int(props.get("max_backoff", 300))
+            max_dispatches_per_s = int(props.get("max_dispatches_per_second", 500))
 
             # Build the HTTP target URI from the first wired CR (most common case)
             http_target_uri: str | None = None
@@ -169,9 +174,9 @@ class CloudTasksQueueNode(GCPNode):
                 http_target=http_target_cfg,
             )
 
-            pulumi.export("queue_name",   q.name)
-            pulumi.export("queue_id",     q.id)
-            pulumi.export("handler_url",  http_target_uri or "")
+            pulumi.export("queue_name",  q.name)
+            pulumi.export("queue_id",    q.id)
+            pulumi.export("handler_url", http_target_uri or "")
 
         return program
 

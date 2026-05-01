@@ -97,8 +97,8 @@ class PubsubPullSubscriptionNode(GCPNode):
     params_schema: ClassVar = [
         {"key": "ack_deadline_seconds",        "label": "Ack Deadline (s)",      "type": "number",  "default": 20},
         {"key": "filter",                       "label": "Filter Expression",     "type": "text",    "default": ""},
-        {"key": "enable_message_ordering",      "label": "Message Ordering",      "type": "boolean", "default": False},
-        {"key": "enable_exactly_once_delivery", "label": "Exactly Once Delivery", "type": "boolean", "default": False},
+        {"key": "enable_message_ordering",      "label": "Message Ordering",      "type": "checkbox", "default": False},
+        {"key": "enable_exactly_once_delivery", "label": "Exactly Once Delivery", "type": "checkbox", "default": False},
         {"key": "service_account",              "label": "Service Account Email", "type": "text",    "default": ""},
         {"key": "dead_letter_topic",            "label": "Dead Letter Topic",     "type": "text",    "default": ""},
     ]
@@ -262,8 +262,8 @@ class PubsubBigQuerySubscriptionNode(GCPNode):
 
     params_schema: ClassVar = [
         {"key": "table",            "label": "Target Table (project.dataset.table)", "type": "text",    "default": ""},
-        {"key": "use_topic_schema", "label": "Use Topic Schema",                     "type": "boolean", "default": True},
-        {"key": "write_metadata",   "label": "Write Metadata",                       "type": "boolean", "default": False},
+        {"key": "use_topic_schema", "label": "Use Topic Schema",                     "type": "checkbox", "default": True},
+        {"key": "write_metadata",   "label": "Write Metadata",                       "type": "checkbox", "default": False},
     ]
     inputs:  ClassVar = [Port("topic_link", PortType.SUBSCRIPTION, required=True)]
     outputs: ClassVar = [Port("bq_table",   PortType.DATABASE)]

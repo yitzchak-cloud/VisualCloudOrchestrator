@@ -1,31 +1,25 @@
 """
 nodes/workflows.py — Cloud Workflows resource node (fully self-describing).
 
+Changes from previous version
+------------------------------
+  • Added iam_binding input port (so IamBindingNode can target this workflow).
+
 Topology
 --------
   WorkflowNode ──(SERVICE_ACCOUNT)──► ServiceAccountNode   (execution SA)
   WorkflowNode ──(HTTP_TARGET)──────► CloudRunNode          (step targets)
   WorkflowNode ──(STORAGE)──────────► GcsBucketNode         (env: GCS_BUCKET_<NAME>)
   WorkflowNode ──(TASK_QUEUE)───────► CloudTasksQueueNode   (env: CLOUD_TASKS_QUEUE_<NAME>)
-  WorkflowNode ──(FIRESTORE)────────► FirestoreNode          (env: FIRESTORE_DATABASE_<NAME>)
+  WorkflowNode ──(STORAGE)──────────► FirestoreNode          (env: FIRESTORE_DATABASE_<NAME>)
 
-  FirestoreNode    ──(FIRESTORE)────► WorkflowNode  (visual step reference)
+  FirestoreNode    ──(STORAGE)──────► WorkflowNode  (visual step reference)
   CloudVisionNode  ──(HTTP_TARGET)──► WorkflowNode  (visual step reference)
   CloudFunctionsNode──(HTTP_TARGET)─► WorkflowNode  (visual step reference)
 
-Cloud Workflows is an HTTP orchestrator.  Each wired CloudRunNode becomes an
-available step-target: the workflow YAML is auto-generated with an http.post
-step for every wired service, so you get a working skeleton immediately.
-
-You can also paste your own YAML into the `source_yaml` parameter — if that
-field is non-empty it takes precedence over the auto-generated YAML.
-
-Visual-only wiring (Firestore, CloudVision, CloudFunctions)
-------------------------------------------------------------
-These connections are represented on the canvas to document that the workflow
-*interacts* with these services, but they do NOT affect the generated YAML
-unless you supply a custom YAML. The env vars for these resources ARE injected
-into the workflow's environment so the YAML can reference them at runtime.
+  IamBindingNode   ──(IAM_BINDING)──► WorkflowNode  ← NEW
+    (pulumi_gcp has no WorkflowIamMember — falls back to project-level IAMMember
+     for roles like roles/workflows.invoker)
 
 Exports
 -------
@@ -88,6 +82,7 @@ class WorkflowNode(GCPNode):
     Connect to FirestoreNode           → injects FIRESTORE_DATABASE_* env var (visual).
     Connect to CloudVisionNode         → injects CLOUD_VISION_URL env var (visual).
     Connect to CloudFunctionsNode      → injects CLOUD_FUNCTIONS_URL_* env var (visual).
+    Connect IamBindingNode → this      → grants roles on this workflow (project-level fallback).
     """
 
     params_schema: ClassVar = [
@@ -112,14 +107,17 @@ class WorkflowNode(GCPNode):
         },
     ]
 
-    inputs:  ClassVar = [
-        Port("service_account", PortType.SERVICE_ACCOUNT, required=False),
-        Port("firestore",       PortType.FIRESTORE,        required=False, multi=True, multi_in=True),
+    inputs: ClassVar = [
+        Port("service_account", PortType.SERVICE_ACCOUNT,   required=False),
+        Port("firestore",       PortType.STORAGE,            required=False, multi=True, multi_in=True),
+        Port("visual",          PortType.VISUAL_CONNECTION,  multi_in=True),
+        Port("iam_binding",     PortType.IAM_BINDING,        required=False, multi=True, multi_in=True),  # NEW
     ]
     outputs: ClassVar = [
-        Port("calls",        PortType.HTTP_TARGET, multi=True),   # → CloudRunNode / visual nodes
-        Port("writes_to",    PortType.STORAGE,     multi=True),   # → GcsBucketNode
-        Port("task_queue",   PortType.TASK_QUEUE,  multi=True),   # → CloudTasksQueueNode
+        Port("calls",      PortType.HTTP_TARGET,       multi=True),   # → CloudRunNode / visual nodes
+        Port("writes_to",  PortType.STORAGE,           multi=True),   # → GcsBucketNode / FirestoreNode
+        Port("task_queue", PortType.TASK_QUEUE,        multi=True),   # → CloudTasksQueueNode
+        Port("visual",     PortType.VISUAL_CONNECTION, multi=True),   # → visual nodes
     ]
 
     node_color:  ClassVar = "#c084fc"
@@ -145,7 +143,12 @@ class WorkflowNode(GCPNode):
             ctx[self.node_id].setdefault("bucket_ids", []).append(tgt_id)
             return True
 
-        # TASK_QUEUE output → CloudTasksQueueNode (visual only — env var)
+        # STORAGE output → FirestoreNode (visual — env var injection)
+        if tgt_type == "FirestoreNode":
+            ctx[self.node_id].setdefault("firestore_ids", []).append(tgt_id)
+            return True
+
+        # TASK_QUEUE output → CloudTasksQueueNode (visual — env var)
         if tgt_type == "CloudTasksQueueNode":
             ctx[self.node_id].setdefault("task_queue_ids", []).append(tgt_id)
             return True
@@ -252,17 +255,14 @@ class WorkflowNode(GCPNode):
                 project=project,
                 service_account=sa_email or None,
                 source_contents=source_yaml,
-                # Workflows supports user-defined labels (not env vars natively),
-                # but we export the env var map for caller reference.
                 labels={
                     k.lower().replace("_", "-")[:63]: v[:63]
-                    for k, v in list(all_env_vars.items())[:64]   # GCP label limits
+                    for k, v in list(all_env_vars.items())[:64]
                 } if all_env_vars else None,
             )
 
-            pulumi.export("workflow_name",    wf.name)
-            pulumi.export("workflow_id",      wf.id)
-            # Export the env var map so orchestrators/callers can read it
+            pulumi.export("workflow_name", wf.name)
+            pulumi.export("workflow_id",   wf.id)
             for k, v in all_env_vars.items():
                 pulumi.export(f"env_{k}", v)
 

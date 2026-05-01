@@ -180,3 +180,22 @@ gcloud run services add-iam-policy-binding ${DELETE_SERVICE} \
   --region=${DELETE_SERVICE_REGION} \
   --member="serviceAccount:${DELETE_TRIGGER_SA}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
   --role="roles/run.invoker"
+
+
+gcloud eventarc triggers create image-delete-trigger \
+    --location=YOUR_LOCATION \
+    --destination-run-service=YOUR_SERVICE_NAME \
+    --destination-run-path="/" \
+    --event-filters="type=google.cloud.storage.object.v1.deleted" \
+    --event-filters="bucket=uploaded-images" \
+    --service-account="delete-image-trigger-sa@YOUR_PROJECT_ID.iam.gserviceaccount.com"
+
+  
+  gcloud scheduler jobs create http collage-schedule \
+    --location=YOUR_REGION \
+    --schedule="* * * * *" \
+    --time-zone="UTC" \
+    --uri="YOUR_CREATE_COLLAGE_SERVICE_URL" \
+    --http-method=POST \
+    --oidc-service-account-email="collage-schedule-sa@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
+    --oidc-token-audience="YOUR_CREATE_COLLAGE_SERVICE_URL"
