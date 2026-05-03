@@ -1,0 +1,279 @@
+# ── Basic ─────────────────────────────────────────────
+- key: name
+  label: Bucket Name
+  type: text
+  default: ""
+  placeholder: my-project-bucket
+  category: Basic
+  description: >
+    The globally unique name of the GCS bucket. Must be lowercase,
+    between 3–63 characters, and follow DNS naming conventions.
+    This name is publicly visible and cannot be changed after creation.
+- key: location
+  label: Location
+  type: select
+  options:
+    - EU
+    - US
+    - ASIA
+    - me-west1
+    - us-central1
+    - us-east1
+    - us-west1
+    - europe-west1
+    - europe-west2
+    - europe-west3
+    - asia-east1
+    - asia-northeast1
+    - asia-southeast1
+    - northamerica-northeast1
+    - southamerica-east1
+    - australia-southeast1
+  default: EU
+  category: Basic
+  description: >
+    Defines the geographical location where the bucket's data is stored.
+    Multi-region (EU/US/ASIA) provides high availability and redundancy,
+    while single-region locations reduce cost and latency.
+    This setting is immutable after bucket creation.
+- key: storage_class
+  label: Storage Class
+  type: select
+  options: [STANDARD, NEARLINE, COLDLINE, ARCHIVE]
+  default: STANDARD
+  category: Testing & Cost Control
+  description: >
+    Determines pricing, availability, and access latency.
+    STANDARD is optimized for frequent access.
+    NEARLINE is suitable for data accessed less than once per month.
+    COLDLINE is intended for quarterly access.
+    ARCHIVE is designed for long-term storage with rare access.
+# ── Access & Security ─────────────────────────────
+- key: uniform_access
+  label: Uniform Bucket-Level Access
+  type: checkbox
+  default: true
+  category: Access & Security
+  description: >
+    Enforces IAM-based access control only, disabling legacy ACLs.
+    This simplifies permission management and is strongly recommended
+    for all modern applications.
+- key: public_access
+  label: Allow Public Read (allUsers objectViewer)
+  type: checkbox
+  default: false
+  category: Access & Security
+  description: >
+    Grants public read access to all objects in the bucket using
+    the allUsers IAM member. Useful for static websites or public assets,
+    but should be used with caution due to security implications.
+- key: public_access_prevention
+  label: Public Access Prevention
+  type: select
+  options: [inherited, enforced]
+  default: inherited
+  category: Access & Security
+  description: >
+    Controls whether public access is allowed at the bucket level.
+    'inherited' follows organization policy.
+    'enforced' blocks all public access regardless of IAM settings.
+# ── Versioning & Lifecycle ─────────────────────────
+- key: versioning
+  label: Object Versioning
+  type: checkbox
+  default: false
+  category: Versioning & Lifecycle
+  description: >
+    Enables storage of previous object versions when objects are overwritten
+    or deleted. Protects against accidental data loss but increases storage usage.
+- key: lifecycle_age
+  label: Auto-Delete After N Days (0=off)
+  type: number
+  default: 0
+  category: Versioning & Lifecycle
+  description: >
+    Automatically deletes objects older than the specified number of days.
+    Set to 0 to disable. Useful for temporary data, logs, or backups.
+- key: lifecycle_noncurrent_age
+  label: Auto-Delete Noncurrent Versions After N Days (0=off)
+  type: number
+  default: 0
+  category: Versioning & Lifecycle
+  description: >
+    When versioning is enabled, removes older (noncurrent) object versions
+    after a defined number of days to control storage costs.
+- key: lifecycle_abort_mpu_age
+  label: Abort Incomplete Multipart Uploads After N Days (0=off)
+  type: number
+  default: 0
+  category: Versioning & Lifecycle
+  description: >
+    Automatically cancels incomplete multipart uploads after the specified
+    number of days, preventing unnecessary storage charges.
+# ── Data Protection ─────────────────────────────
+- key: soft_delete_days
+  label: Soft Delete Retention (Days, 0=default)
+  type: number
+  default: 0
+  category: Data Protection
+  description: >
+    Defines how long deleted objects can be recovered.
+    Default is 7 days. Set to 0 to use system default or disable if supported.
+- key: retention_days
+  label: Retention Policy (Days, 0=off)
+  type: number
+  default: 0
+  category: Data Protection
+  description: >
+    Prevents deletion or modification of objects for a minimum duration.
+    Used for compliance and regulatory requirements (WORM).
+- key: retention_locked
+  label: Lock Retention Policy (irreversible!)
+  type: checkbox
+  default: false
+  category: Data Protection
+  description: >
+    Permanently locks the retention policy, making it impossible
+    to reduce or remove. This action is irreversible.
+# ── Autoclass ─────────────────────────────
+- key: autoclass
+  label: Autoclass
+  type: checkbox
+  default: false
+  category: Cost Optimization
+  description: >
+    Automatically adjusts storage class based on object access patterns,
+    reducing costs without manual intervention.
+- key: autoclass_terminal_class
+  label: Autoclass Terminal Storage Class
+  type: select
+  options: ["", NEARLINE, ARCHIVE]
+  default: ""
+  category: Cost Optimization
+  description: >
+    Defines the lowest storage class an object can transition to
+    when Autoclass is enabled.
+# ── Networking ─────────────────────────────
+- key: rpo
+  label: RPO
+  type: select
+  options: ["", DEFAULT, ASYNC_TURBO]
+  default: ""
+  category: Networking
+  description: >
+    Recovery Point Objective configuration.
+    ASYNC_TURBO provides faster replication (up to 15 minutes)
+    but incurs additional cost.
+- key: ip_filter_mode
+  label: IP Filter Mode
+  type: select
+  options: ["", Enabled, Disabled]
+  default: ""
+  category: Networking
+  description: >
+    Restricts access to the bucket based on source IP ranges.
+- key: ip_filter_cidrs
+  label: IP Filter Allowed CIDRs
+  type: text
+  default: ""
+  category: Networking
+  description: >
+    Comma-separated list of allowed CIDR ranges when IP filtering is enabled.
+# ── CORS ─────────────────────────────
+- key: cors_origins
+  label: CORS Origins
+  type: text
+  default: ""
+  category: CORS
+  description: >
+    Specifies which origins are allowed to access resources via browser.
+- key: cors_methods
+  label: CORS Methods
+  type: text
+  default: GET,HEAD
+  category: CORS
+  description: >
+    Allowed HTTP methods for cross-origin requests.
+- key: cors_max_age_seconds
+  label: CORS Max Age
+  type: number
+  default: 3600
+  category: CORS
+  description: >
+    Duration the browser can cache preflight responses.
+# ── Logging ─────────────────────────────
+- key: log_bucket
+  label: Access Log Target Bucket
+  type: text
+  default: ""
+  category: Logging
+  description: >
+    Destination bucket where access logs will be stored.
+- key: log_prefix
+  label: Access Log Object Prefix
+  type: text
+  default: ""
+  category: Logging
+  description: >
+    Prefix applied to log object names for organization.
+# ── Advanced Features ─────────────────────────────
+- key: hierarchical_namespace
+  label: Hierarchical Namespace
+  type: checkbox
+  default: false
+  category: Advanced
+  description: >
+    Enables directory-like structure for big data workloads.
+- key: enable_object_retention
+  label: Enable Per-Object Retention Locks
+  type: checkbox
+  default: false
+  category: Advanced
+  description: >
+    Allows setting retention policies per object.
+- key: default_event_based_hold
+  label: Default Event-Based Hold
+  type: checkbox
+  default: false
+  category: Advanced
+  description: >
+    Automatically applies a hold on new objects until explicitly released.
+- key: requester_pays
+  label: Requester Pays
+  type: checkbox
+  default: false
+  category: Billing
+  description: >
+    Charges the requester for access and bandwidth usage instead of the bucket owner.
+# ── Encryption ─────────────────────────────
+- key: encryption_key
+  label: CMEK Key
+  type: text
+  default: ""
+  category: Encryption
+  description: >
+    Customer-managed encryption key from Cloud KMS.
+    Provides full control over encryption keys.
+# ── Labels ─────────────────────────────
+- key: labels
+  label: Labels
+  type: text
+  default: ""
+  category: Organization
+  description: >
+    Key-value pairs used for organizing, filtering, and billing analysis.
+# ── Website ─────────────────────────────
+- key: website_main_page
+  label: Static Website Main Page
+  type: text
+  default: ""
+  category: Website Hosting
+  description: >
+    Defines the index page when hosting a static website.
+- key: website_not_found_page
+  label: Static Website 404 Page
+  type: text
+  default: ""
+  category: Website Hosting
+  description: >
+    Defines the page shown when a requested object is not found.

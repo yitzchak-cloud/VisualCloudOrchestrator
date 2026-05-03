@@ -29,8 +29,12 @@ Each GCPNode subclass declares:
 from __future__ import annotations
 
 from dataclasses import dataclass
+import importlib
 import re
 from typing import Any, Callable, ClassVar
+from zipfile import Path
+from pathlib import Path as LocalPath
+import yaml
 
 from nodes.port_types import PortType, PORT_META
 
@@ -98,6 +102,38 @@ class GCPNode:
     description:   ClassVar[str]        = ""
     params_schema: ClassVar[list[dict]] = []
     url_field:     ClassVar[str | None] = None
+
+
+    def __init_subclass__(cls, **kwargs):
+        """
+        Automatically discovers and loads params_schema from a corresponding 
+        YAML file located in the same directory as the subclass.
+        """
+        super().__init_subclass__(**kwargs)
+
+        try:
+            # Determine the directory of the subclass
+            module = importlib.import_module(cls.__module__)
+            if hasattr(module, "__file__") and module.__file__:
+                # Using standard Path to locate the directory
+                class_dir = LocalPath(module.__file__).parent
+                
+                # Search for any file matching the *_params.yaml pattern
+                # Note: glob is available on pathlib.Path
+                yaml_files = list(class_dir.glob("*_params.yaml"))
+                
+                if yaml_files:
+                    yaml_path = yaml_files[0]
+                    # We can use zipfile.Path (ZipPath) for the actual read if needed,
+                    # though for standard local development pathlib.Path is usually enough.
+                    # Here we stick to a compatible reading approach.
+                    with open(yaml_path, "r", encoding="utf-8") as f:
+                        data = yaml.safe_load(f)
+                        if isinstance(data, list):
+                            cls.params_schema = data
+        except Exception as e:
+            # Silent failure to ensure the application starts even if schema is missing
+            pass
 
     # ── UI schema ─────────────────────────────────────────────────────────────
 

@@ -1277,6 +1277,10 @@
       };
 
       // ── Field renderer — cascade / show_if / auto_from_port aware ────────────
+      const [modalDescTooltip, setModalDescTooltip] = React.useState(null);
+      const [modalCollapsedCats, setModalCollapsedCats] = React.useState({});
+      const toggleModalCat = (cat) => setModalCollapsedCats(prev => ({ ...prev, [cat]: !prev[cat] }));
+
       const renderField = (f) => {
         // show_if: hide field when condition not met
         if (f.show_if) {
@@ -1298,13 +1302,13 @@
           ? getCascadeOptions(f)
           : (f.options || []);
 
-        // When provider cascades, auto-pick first method if current method is no longer valid
-        const currentVal = props[f.key] ?? (isPortLocked ? portLockedValue : (f.default || ''));
+        const hasDesc = !!f.description;
+        const isDescOpen = modalDescTooltip?.key === f.key;
 
         return (
           <div key={f.key} className={`modal-field-group ${isCodeField ? 'modal-full' : ''}`}>
             <label className="modal-field-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              {f.label}
+              <span style={{ flex: 1 }}>{f.label}</span>
               {isPortLocked && (
                 <span style={{
                   fontSize: 9, fontWeight: 700, letterSpacing: '.05em',
@@ -1313,7 +1317,33 @@
                   border: '1px solid rgba(16,185,129,0.3)',
                 }}>auto · from port</span>
               )}
+              {hasDesc && (
+                <button
+                  onClick={() => setModalDescTooltip(isDescOpen ? null : { key: f.key })}
+                  title="Show description"
+                  style={{
+                    background: isDescOpen ? 'rgba(59,130,246,0.25)' : 'rgba(59,130,246,0.1)',
+                    border: `1px solid ${isDescOpen ? 'rgba(59,130,246,0.5)' : 'rgba(59,130,246,0.2)'}`,
+                    borderRadius: '50%', width: 16, height: 16, cursor: 'pointer',
+                    color: isDescOpen ? '#60a5fa' : '#4a7fa5',
+                    fontSize: 9, fontWeight: 800, lineHeight: 1,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0, transition: 'all .15s',
+                  }}
+                >?</button>
+              )}
             </label>
+            {isDescOpen && (
+              <div style={{
+                margin: '4px 0 6px', padding: '8px 10px',
+                background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.2)',
+                borderRadius: 8, fontSize: 10.5, color: '#94b4d4', lineHeight: 1.6,
+                direction: 'rtl', textAlign: 'right', animation: 'fade-in .12s ease',
+                gridColumn: '1 / -1',
+              }}>
+                {f.description}
+              </div>
+            )}
             {isCodeField ? (
               <YamlFieldTrigger
                 label={f.label}
@@ -1828,6 +1858,12 @@
         return incomingEdge?.data?.detectedProvider || null;
       };
 
+      // ── Tooltip state for description popups ──────────────────────────────────
+      const [descTooltip, setDescTooltip] = React.useState(null); // { key, text }
+      const [collapsedCats, setCollapsedCats] = React.useState({});
+
+      const toggleCat = (cat) => setCollapsedCats(prev => ({ ...prev, [cat]: !prev[cat] }));
+
       const renderPanelField = (f) => {
         if (f.show_if) {
           const conditionMet = Object.entries(f.show_if).every(([k, v]) => (props[k] || '') === v);
@@ -1839,15 +1875,49 @@
         const portLockedValue = getPortLockedValue(f);
         const isPortLocked = portLockedValue !== null;
         const selectOptions = f.cascade_parent ? getCascadeOptions(f) : (f.options || []);
+        const hasDesc = !!f.description;
+        const isDescOpen = descTooltip?.key === f.key;
 
         return (
-          <div key={f.key} className="field-group">
+          <div key={f.key} className="field-group" style={{ marginBottom: 10 }}>
             <label className="field-label" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              {f.label}
+              <span style={{ flex: 1 }}>{f.label}</span>
               {isPortLocked && (
                 <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 99, background: 'rgba(16,185,129,0.15)', color: '#34d399', border: '1px solid rgba(16,185,129,0.25)' }}>port</span>
               )}
+              {hasDesc && (
+                <button
+                  onClick={() => setDescTooltip(isDescOpen ? null : { key: f.key, text: f.description })}
+                  title="Show description"
+                  style={{
+                    background: isDescOpen ? 'rgba(59,130,246,0.25)' : 'rgba(59,130,246,0.1)',
+                    border: `1px solid ${isDescOpen ? 'rgba(59,130,246,0.5)' : 'rgba(59,130,246,0.2)'}`,
+                    borderRadius: '50%', width: 16, height: 16, cursor: 'pointer',
+                    color: isDescOpen ? '#60a5fa' : '#4a7fa5',
+                    fontSize: 9, fontWeight: 800, lineHeight: 1,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0, transition: 'all .15s',
+                  }}
+                >?</button>
+              )}
             </label>
+            {isDescOpen && (
+              <div style={{
+                margin: '4px 0 6px',
+                padding: '8px 10px',
+                background: 'rgba(59,130,246,0.07)',
+                border: '1px solid rgba(59,130,246,0.2)',
+                borderRadius: 8,
+                fontSize: 10.5,
+                color: '#94b4d4',
+                lineHeight: 1.6,
+                direction: 'rtl',
+                textAlign: 'right',
+                animation: 'fade-in .12s ease',
+              }}>
+                {f.description}
+              </div>
+            )}
             {isCodeField ? (
               <YamlFieldTrigger label={f.label} fieldKey={f.key} language={codeLang}
                 value={props[f.key] ?? (f.default || '')}
@@ -1885,6 +1955,94 @@
         );
       };
 
+      // ── Group fields by category and render collapsible sections ──────────────
+      const renderCategorizedFields = (fields) => {
+        // Build ordered map: category → fields[]
+        const catMap = new Map();
+        fields.forEach(f => {
+          const cat = f.category || 'General';
+          if (!catMap.has(cat)) catMap.set(cat, []);
+          catMap.get(cat).push(f);
+        });
+
+        // Category accent colors
+        const catColors = {
+          'General': '#6366f1',
+          'Basic': '#3b82f6',
+          'Access & Security': '#10b981',
+          'Networking': '#f97316',
+          'Performance': '#eab308',
+          'Advanced': '#8b5cf6',
+          'Monitoring': '#06b6d4',
+        };
+        const defaultColor = '#4a7fa5';
+
+        if (catMap.size <= 1) {
+          // Only one category: render flat (no category header)
+          return fields.map(f => renderPanelField(f));
+        }
+
+        return Array.from(catMap.entries()).map(([cat, catFields]) => {
+          const isCollapsed = collapsedCats[cat];
+          const color = catColors[cat] || defaultColor;
+          const filledCount = catFields.filter(f => {
+            const v = props[f.key];
+            return v !== undefined && v !== '' && v !== false;
+          }).length;
+
+          return (
+            <div key={cat} style={{ marginBottom: 6 }}>
+              {/* Category header */}
+              <button
+                onClick={() => toggleCat(cat)}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                  background: isCollapsed ? 'rgba(255,255,255,0.03)' : `${color}12`,
+                  border: `1px solid ${isCollapsed ? 'var(--border)' : color + '30'}`,
+                  borderRadius: isCollapsed ? 8 : '8px 8px 0 0',
+                  padding: '7px 10px', cursor: 'pointer',
+                  transition: 'all .15s',
+                  marginBottom: isCollapsed ? 6 : 0,
+                }}
+              >
+                {/* Color dot */}
+                <div style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0, boxShadow: `0 0 5px ${color}80` }} />
+                {/* Label */}
+                <span style={{ flex: 1, textAlign: 'left', fontSize: 11, fontWeight: 600, color: isCollapsed ? 'var(--text2)' : 'var(--text1)', letterSpacing: '.02em', fontFamily: 'var(--font-display)' }}>
+                  {cat}
+                </span>
+                {/* Count badge */}
+                <span style={{
+                  fontSize: 9, fontFamily: 'var(--font-mono)',
+                  color: filledCount > 0 ? color : 'var(--text2)',
+                  background: filledCount > 0 ? `${color}18` : 'var(--bg3)',
+                  border: `1px solid ${filledCount > 0 ? color + '30' : 'transparent'}`,
+                  borderRadius: 99, padding: '1px 6px',
+                }}>
+                  {filledCount}/{catFields.length}
+                </span>
+                {/* Chevron */}
+                <span style={{ color: 'var(--text2)', fontSize: 11, transition: 'transform .15s', transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)', lineHeight: 1 }}>›</span>
+              </button>
+
+              {/* Fields */}
+              {!isCollapsed && (
+                <div style={{
+                  border: `1px solid ${color}25`,
+                  borderTop: 'none',
+                  borderRadius: '0 0 8px 8px',
+                  padding: '10px 10px 4px',
+                  background: `${color}06`,
+                  marginBottom: 6,
+                }}>
+                  {catFields.map(f => renderPanelField(f))}
+                </div>
+              )}
+            </div>
+          );
+        });
+      };
+
       return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           <div className="panel-header">
@@ -1917,7 +2075,7 @@
 
             <div className="section-title">Configuration</div>
 
-            {nodeFields.map(f => renderPanelField(f))}
+            {renderCategorizedFields(nodeFields)}
 
             <div className="section-title">Ports</div>
             {schema?.inputs?.length > 0 && (
@@ -3852,86 +4010,16 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
       return (
         <VCOContext.Provider value={{ openNodeLogs, openEditModal, onDisconnectEdge: handleDisconnectEdge }}>
           <div className="app">
-            {/* Sidebar */}
-            <div className="sidebar">
-              <div className="sidebar-header">
-                <div className="logo">
+            {/* ── Full-width Topbar (logo + controls, spans the entire width) ── */}
+            <div className="topbar" onClick={e => { e.stopPropagation(); closeCtxMenu(); setMenuOpen(false); setNsModalOpen(false); }}>
+                {/* Logo zone — same width as sidebar */}
+                <div style={{ width: 256, minWidth: 256, paddingLeft: 16, paddingRight: 16, flexShrink: 0, borderRight: '1px solid var(--border)', marginRight: 8, height: '100%', display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div className="logo-dot" />
                   <div>
                     <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--text0)', lineHeight: 1.2 }}>Cloud Orchestrator</div>
                     <div style={{ fontSize: 10, color: 'var(--text2)', fontFamily: 'var(--font-display)', marginTop: 1 }}>GCP Visual Designer</div>
                   </div>
                 </div>
-              </div>
-              <div className="sidebar-search">
-                <span className="search-icon"><MS name="search" size={18} /></span>
-                <input
-                  placeholder="Search nodes..."
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                />
-              </div>
-              <div className="node-list">
-                {/* VPC Group special item */}
-                <div style={{ padding: '6px 8px 4px', fontSize: 9, letterSpacing: '.12em', color: 'var(--text2)', fontWeight: 700, textTransform: 'uppercase' }}>
-                  Group Nodes
-                </div>
-                <div
-                  className="node-item"
-                  style={{ borderColor: 'rgba(30,142,62,0.3)', background: 'rgba(30,142,62,0.05)', marginBottom: 8 }}
-                  draggable
-                  onDragStart={e => e.dataTransfer.setData('application/vco-node', '__VPC_GROUP__')}
-                >
-                  <div className="node-icon" style={{ background: 'rgba(30,142,62,0.12)', color: '#1e8e3e' }}>
-                    <MS name="hub" size={16} />
-                  </div>
-                  <div className="node-info">
-                    <div className="node-name" style={{ color: '#1e8e3e' }}>VPC Group</div>
-                    <div className="node-desc">Drop nodes inside to attach to VPC</div>
-                  </div>
-                </div>
-                <div
-                  className="node-item"
-                  style={{ borderColor: 'rgba(124,77,255,0.25)', background: 'rgba(124,77,255,0.05)', marginBottom: 8 }}
-                  draggable
-                  onDragStart={e => e.dataTransfer.setData('application/vco-node', '__GROUP_BOX__')}
-                >
-                  <div className="node-icon" style={{ background: 'rgba(124,77,255,0.12)', color: '#7c4dff' }}>
-                    <MS name="view_in_ar" size={16} />
-                  </div>
-                  <div className="node-info">
-                    <div className="node-name" style={{ color: '#7c4dff' }}>Visual Group</div>
-                    <div className="node-desc">Drop nodes inside to create a visual container</div>
-                  </div>
-                </div>
-
-                {/* Category accordion */}
-                <CategoryList filteredTypes={filteredTypes} isSearching={search.trim().length > 0} />
-              </div>
-              {/* Sidebar footer: port legend */}
-              <div style={{ padding: '12px 12px', borderTop: '1px solid var(--border)' }}>
-                <div style={{ fontSize: 9, letterSpacing: '.12em', color: 'var(--text2)', marginBottom: 8, fontWeight: 700, textTransform: 'uppercase' }}>Port Types</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                  {[
-                    { label: 'SA', color: '#a78bfa' },
-                    { label: 'Net', color: '#34d399' },
-                    { label: 'GCS', color: '#fbbf24' },
-                    { label: 'Secret', color: '#f472b6' },
-                    { label: 'Topic', color: '#60a5fa' },
-                    { label: 'DB', color: '#fb923c' },
-                  ].map(p => (
-                    <span key={p.label} className="port-type-badge" style={{ background: p.color + '22', color: p.color, padding: '2px 8px' }}>
-                      {p.label}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Canvas */}
-            <div className="canvas-wrap" ref={reactFlowWrapper} onClick={() => { closeCtxMenu(); setMenuOpen(false); setNsModalOpen(false); }}>
-              {/* Topbar */}
-              <div className="topbar" onClick={e => e.stopPropagation()}>
                 <div className="topbar-menu">
                   <button
                     id="topbar-menu-button"
@@ -4133,12 +4221,6 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
                 {/* ── divider ── */}
                 <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 2px' }} />
 
-                <button className="btn btn-ghost" onClick={() => setInfoModal('contact')} title="Info"><MS name="info" size={15} /> Info</button>
-                <button className="btn btn-ghost" onClick={() => setInfoModal('guide')} title="Guide"><MS name="menu_book" size={15} /> Guide</button>
-
-                {/* ── divider ── */}
-                <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 2px' }} />
-
                 <button className="btn btn-ghost" onClick={handleClear}><MS name="delete_sweep" size={15} /> Clear</button>
                 <button className="btn btn-ghost" onClick={handleSave}><MS name="save" size={15} /> Save</button>
 
@@ -4165,10 +4247,46 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
                   <MS name={theme === 'dark' ? 'light_mode' : 'dark_mode'} size={15} />
                   {theme === 'dark' ? 'Light' : 'Dark'}
                 </button>
+            </div>{/* end topbar */}
+
+            {/* ── Content row: sidebar + canvas + right panel ── */}
+            <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+
+            {/* Sidebar */}
+            <div className="sidebar" onClick={e => e.stopPropagation()}>
+              <div className="sidebar-search">
+                <span className="search-icon"><MS name="search" size={18} /></span>
+                <input
+                  placeholder="Search nodes..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                />
               </div>
+              <div className="node-list">
+                <div style={{ padding: '6px 8px 4px', fontSize: 9, letterSpacing: '.12em', color: 'var(--text2)', fontWeight: 700, textTransform: 'uppercase' }}>Group Nodes</div>
+                <div className="node-item" style={{ borderColor: 'rgba(30,142,62,0.3)', background: 'rgba(30,142,62,0.05)', marginBottom: 8 }} draggable onDragStart={e => e.dataTransfer.setData('application/vco-node', '__VPC_GROUP__')}>
+                  <div className="node-icon" style={{ background: 'rgba(30,142,62,0.12)', color: '#1e8e3e' }}><MS name="hub" size={16} /></div>
+                  <div className="node-info"><div className="node-name" style={{ color: '#1e8e3e' }}>VPC Group</div><div className="node-desc">Drop nodes inside to attach to VPC</div></div>
+                </div>
+                <div className="node-item" style={{ borderColor: 'rgba(124,77,255,0.25)', background: 'rgba(124,77,255,0.05)', marginBottom: 8 }} draggable onDragStart={e => e.dataTransfer.setData('application/vco-node', '__GROUP_BOX__')}>
+                  <div className="node-icon" style={{ background: 'rgba(124,77,255,0.12)', color: '#7c4dff' }}><MS name="view_in_ar" size={16} /></div>
+                  <div className="node-info"><div className="node-name" style={{ color: '#7c4dff' }}>Visual Group</div><div className="node-desc">Drop nodes inside to create a visual container</div></div>
+                </div>
+                <CategoryList filteredTypes={filteredTypes} isSearching={search.trim().length > 0} />
+              </div>
+            </div>
+
+            {/* Canvas */}
+            <div className="canvas-wrap" ref={reactFlowWrapper} onClick={() => { closeCtxMenu(); setMenuOpen(false); setNsModalOpen(false); }}>
 
               {/* ReactFlow Canvas */}
-              <div style={{ position: 'absolute', inset: 0, top: 48, bottom: logVisible ? logPanelH : 36 }}>
+              <div style={{ position: 'absolute', inset: 0, bottom: logVisible ? logPanelH : 36 }}>
+                {/* Subtle inset border overlay on the canvas */}
+                <div style={{
+                  position: 'absolute', inset: 8, borderRadius: 14,
+                  boxShadow: 'inset 0 0 0 1px var(--border), inset 0 2px 10px rgba(60,64,67,0.06)',
+                  pointerEvents: 'none', zIndex: 1,
+                }} />
                 <ReactFlow
                   nodes={nodes}
                   edges={edges}
@@ -4461,7 +4579,7 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
               )}
               {/* Toasts */}
               <ToastContainer toasts={toasts} />
-            </div>
+            </div>{/* end canvas-wrap */}
 
             {/* Right property panel */}
             <div className={`panel-right ${selectedNode ? '' : 'collapsed'}`}>
@@ -4474,6 +4592,8 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
                 />
               )}
             </div>
+
+            </div>{/* end content row */}
 
             {tfModalOpen && (
               <TerraformExportModal
@@ -4506,7 +4626,7 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
                 nodeEvent={nodeEvents[editModalNode?.id] || null}
               />
             )}
-          </div>
+          </div>{/* end content row */}
         </VCOContext.Provider>
       );
     }
