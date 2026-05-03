@@ -56,6 +56,9 @@
       NodeResizer, NodeToolbar, useEdges,
     } = window.ReactFlow;
 
+    // ── Server base URL — שנה כאן בלבד את כתובת השרת ────────────────────────────
+    const SERVER_BASE_URL = 'http://35.226.73.246:8000';
+
     // ── Material Symbols helper ────────────────────────────────────────────────────
     // Renders a Google Material Symbol icon
     const MS = ({ name, size = 18, fill = 0, style = {} }) => (
@@ -2979,7 +2982,7 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
 
       React.useEffect(() => { fetchPreview(); }, []);
 
-      const API = 'http://35.226.73.246:8000/api/terraform';
+      const API = `${SERVER_BASE_URL}/api/terraform`;
 
       const fetchPreview = async () => {
         setLoading(true); setError(null);
@@ -3313,7 +3316,7 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
         // Append to existing logs (history already loaded from server)
         setLogs(l => [...l.slice(-1499), entry]);
         // Persist to backend (fire-and-forget — don't await, don't block UI)
-        fetch('http://localhost:8000/api/deploy-logs/append', {
+        fetch(`${SERVER_BASE_URL}/api/deploy-logs/append`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...entry, namespace: namespaceRef.current }),
@@ -3333,7 +3336,7 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
 
       // ── Load namespace list on mount ──────────────────────────────────────────
       useEffect(() => {
-        fetch('http://localhost:8000/api/namespaces')
+        fetch(`${SERVER_BASE_URL}/api/namespaces`)
           .then(r => r.ok ? r.json() : null)
           .then(d => { if (d?.namespaces) setNamespaces(d.namespaces); })
           .catch(() => { });
@@ -3351,7 +3354,7 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
         setNodeEvents({});
         graphLoadedRef.current = false;
         try {
-          const stateRes = await fetch(`http://localhost:8000/api/state?namespace=${encodeURIComponent(ns)}`);
+          const stateRes = await fetch(`${SERVER_BASE_URL}/api/state?namespace=${encodeURIComponent(ns)}`);
           const state = await stateRes.json();
           if (state?.nodes?.length) {
             const schemaSource = nodeTypesData;
@@ -3375,11 +3378,11 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
           }
         } catch (e) { /* silent */ }
         try {
-          const logRes = await fetch(`http://localhost:8000/api/deploy-logs/history?limit=500&namespace=${encodeURIComponent(ns)}`);
+          const logRes = await fetch(`${SERVER_BASE_URL}/api/deploy-logs/history?limit=500&namespace=${encodeURIComponent(ns)}`);
           if (logRes.ok) { const d = await logRes.json(); if (d.entries?.length) setLogs(d.entries); }
         } catch { }
         try {
-          const evRes = await fetch(`http://localhost:8000/api/deploy-logs/node-events?namespace=${encodeURIComponent(ns)}`);
+          const evRes = await fetch(`${SERVER_BASE_URL}/api/deploy-logs/node-events?namespace=${encodeURIComponent(ns)}`);
           if (evRes.ok) { const d = await evRes.json(); setNodeEvents(d || {}); }
         } catch { }
         graphLoadedRef.current = true;
@@ -3390,7 +3393,7 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
       const createNamespace = useCallback(async (name) => {
         setNsLoading(true);
         try {
-          const res = await fetch('http://localhost:8000/api/namespaces', {
+          const res = await fetch(`${SERVER_BASE_URL}/api/namespaces`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name }),
           });
@@ -3409,7 +3412,7 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
         if (name === 'default') { showToast('Cannot delete the default namespace', 'error'); return; }
         if (!confirm(`Delete namespace "${name}" and ALL its data?`)) return;
         try {
-          const res = await fetch(`http://localhost:8000/api/namespaces/${encodeURIComponent(name)}`, { method: 'DELETE' });
+          const res = await fetch(`${SERVER_BASE_URL}/api/namespaces/${encodeURIComponent(name)}`, { method: 'DELETE' });
           if (!res.ok) { const err = await res.json(); showToast(err.detail || 'Failed', 'error'); return; }
           setNamespaces(namespaces.filter(n => n !== name));
           showToast(`Namespace "${name}" deleted`, 'success');
@@ -3448,22 +3451,22 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
         (async () => {
           try {
             // 1. First get the node schemas
-            const typesRes = await fetch('http://localhost:8000/api/node-types');
+            const typesRes = await fetch(`${SERVER_BASE_URL}/api/node-types`);
             const typesData = await typesRes.json();
             if (typesData?.length) setNodeTypesData(typesData);
 
             // 2. Then get the saved graph (schemas are now available in typesData)
-            const stateRes = await fetch(`http://localhost:8000/api/state?namespace=${encodeURIComponent(namespaceRef.current)}`);
+            const stateRes = await fetch(`${SERVER_BASE_URL}/api/state?namespace=${encodeURIComponent(namespaceRef.current)}`);
             const state = await stateRes.json();
             if (!state?.nodes?.length) {
               graphLoadedRef.current = true;
               // Still load logs + events even if no nodes
               try {
-                const logRes = await fetch(`http://localhost:8000/api/deploy-logs/history?limit=500&namespace=${encodeURIComponent(namespaceRef.current)}`);
+                const logRes = await fetch(`${SERVER_BASE_URL}/api/deploy-logs/history?limit=500&namespace=${encodeURIComponent(namespaceRef.current)}`);
                 if (logRes.ok) { const d = await logRes.json(); if (d.entries?.length) setLogs(d.entries); }
               } catch { }
               try {
-                const evRes = await fetch(`http://localhost:8000/api/deploy-logs/node-events?namespace=${encodeURIComponent(namespaceRef.current)}`);
+                const evRes = await fetch(`${SERVER_BASE_URL}/api/deploy-logs/node-events?namespace=${encodeURIComponent(namespaceRef.current)}`);
                 if (evRes.ok) { const d = await evRes.json(); setNodeEvents(d || {}); }
               } catch { }
               return;
@@ -3500,7 +3503,7 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
 
             // 3. Load persisted log history FIRST (before addLog so we don't overwrite)
             try {
-              const logRes = await fetch(`http://localhost:8000/api/deploy-logs/history?limit=500&namespace=${encodeURIComponent(namespaceRef.current)}`);
+              const logRes = await fetch(`${SERVER_BASE_URL}/api/deploy-logs/history?limit=500&namespace=${encodeURIComponent(namespaceRef.current)}`);
               if (logRes.ok) {
                 const logData = await logRes.json();
                 if (logData.entries?.length) {
@@ -3512,7 +3515,7 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
 
             // 4. Load per-node last-deploy events
             try {
-              const evRes = await fetch(`http://localhost:8000/api/deploy-logs/node-events?namespace=${encodeURIComponent(namespaceRef.current)}`);
+              const evRes = await fetch(`${SERVER_BASE_URL}/api/deploy-logs/node-events?namespace=${encodeURIComponent(namespaceRef.current)}`);
               if (evRes.ok) {
                 const evData = await evRes.json();
                 setNodeEvents(evData || {});
@@ -3534,7 +3537,7 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
       useEffect(() => {
         const connect = () => {
           try {
-            const ws = new WebSocket('ws://localhost:8000/ws');
+            const ws = new WebSocket(`${SERVER_BASE_URL.replace(/^http/, 'ws')}/ws`);
             ws.onopen = () => { setWsConnected(true); addLog('WebSocket connected', 'ok'); };
             ws.onclose = () => { setWsConnected(false); setTimeout(connect, 3000); };
             ws.onmessage = e => handleWsMessage(JSON.parse(e.data));
@@ -3574,7 +3577,7 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
           })),
         };
         try {
-          await fetch('http://localhost:8000/api/graph', {
+          await fetch(`${SERVER_BASE_URL}/api/graph`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
           });
           addLog('State auto-saved after deploy', 'ok');
@@ -3608,7 +3611,7 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
           // Refresh node events after status change
           if (newStatus === 'deployed' || newStatus === 'failed') {
             setTimeout(() => {
-              fetch(`http://localhost:8000/api/deploy-logs/node-events?namespace=${encodeURIComponent(namespaceRef.current)}`)
+              fetch(`${SERVER_BASE_URL}/api/deploy-logs/node-events?namespace=${encodeURIComponent(namespaceRef.current)}`)
                 .then(r => r.ok ? r.json() : null)
                 .then(data => { if (data) setNodeEvents(data); })
                 .catch(() => { });
@@ -3655,7 +3658,7 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
           }
           // Refresh node events after deploy
           setTimeout(() => {
-            fetch(`http://localhost:8000/api/deploy-logs/node-events?namespace=${encodeURIComponent(namespaceRef.current)}`)
+            fetch(`${SERVER_BASE_URL}/api/deploy-logs/node-events?namespace=${encodeURIComponent(namespaceRef.current)}`)
               .then(r => r.ok ? r.json() : null)
               .then(data => { if (data) setNodeEvents(data); })
               .catch(() => { });
@@ -3675,7 +3678,7 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
         }
         setNodeLogsModal({ nodeId, label, lines: [], connecting: true });
         try {
-          const es = new EventSource(`http://localhost:8000/api/logs/${nodeId}`);
+          const es = new EventSource(`${SERVER_BASE_URL}/api/logs/${nodeId}`);
           es.onopen = () => {
             setNodeLogsModal(m => m ? { ...m, connecting: false } : m);
           };
@@ -3920,7 +3923,7 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
         addLog('Initiating deployment...', 'warn');
 
         try {
-          const res = await fetch('http://localhost:8000/api/deploy', {
+          const res = await fetch(`${SERVER_BASE_URL}/api/deploy`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
           });
           if (!res.ok) {
@@ -3968,7 +3971,7 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
           })),
         };
         try {
-          await fetch('http://localhost:8000/api/graph', {
+          await fetch(`${SERVER_BASE_URL}/api/graph`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, namespace: namespaceRef.current }),
           });
           showToast('Saved to desired.yaml', 'success');
@@ -3986,7 +3989,7 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
         addLog('Canvas cleared', 'warn');
         // Persist the empty state so reload doesn't bring back deleted nodes
         try {
-          await fetch('http://localhost:8000/api/graph', {
+          await fetch(`${SERVER_BASE_URL}/api/graph`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ nodes: [], edges: [], namespace: namespaceRef.current }),
           });
@@ -4416,7 +4419,7 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
                       const currentNodes = nodesRef.current.filter(n => n.id !== deletedId);
                       const currentEdges = edgesRef.current.filter(e => e.source !== deletedId && e.target !== deletedId);
                       try {
-                        await fetch('http://localhost:8000/api/graph', {
+                        await fetch(`${SERVER_BASE_URL}/api/graph`, {
                           method: 'POST', headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({
                             namespace: namespaceRef.current,
@@ -4493,7 +4496,7 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
               {/* Log */}
               <LogPanel logs={logs} visible={logVisible} onToggle={() => setLogVisible(v => !v)} onClear={() => {
                 setLogs([]);
-                fetch(`http://localhost:8000/api/deploy-logs/history?namespace=${encodeURIComponent(namespaceRef.current)}`, { method: 'DELETE' }).catch(() => { });
+                fetch(`${SERVER_BASE_URL}/api/deploy-logs/history?namespace=${encodeURIComponent(namespaceRef.current)}`, { method: 'DELETE' }).catch(() => { });
               }} panelH={logPanelH} onResize={setLogPanelH} nodeEvents={nodeEvents} />
               {nodeLogsModal && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}
