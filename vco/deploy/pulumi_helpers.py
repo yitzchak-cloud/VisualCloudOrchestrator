@@ -17,18 +17,16 @@ logger = logging.getLogger(__name__)
 
 _pulumi_command: "auto.PulumiCommand | None" = None
 
-
 def get_pulumi_command(work_dir: Path) -> "auto.PulumiCommand":
     global _pulumi_command
     if _pulumi_command is not None:
         return _pulumi_command
-    cli_root = work_dir / ".pulumi-cli"
+    cli_root = work_dir.resolve() / ".pulumi-cli" 
     cli_root.mkdir(parents=True, exist_ok=True)
     logger.info("Installing Pulumi CLI into %s …", cli_root)
     _pulumi_command = auto.PulumiCommand.install(root=str(cli_root))
     logger.info("Pulumi CLI ready")
     return _pulumi_command
-
 
 def make_workspace_opts(
     work_dir:       Path,

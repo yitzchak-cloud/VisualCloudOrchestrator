@@ -188,7 +188,7 @@ class SubnetworkNode(GCPNode):
 
         subnet_name   = props.get("subnetwork_name", _DEFAULT_SUBNETWORK) or _DEFAULT_SUBNETWORK
         subnet_region = props.get("region", region) or region
-        subnet_path   = f"projects/{host_project}/regions/{subnet_region}/subnetworks/{subnet_name}"
+        subnet_path   = f"proj                                                                                                                                                                                                                                                                                                                                                                                                                                ects/{host_project}/regions/{subnet_region}/subnetworks/{subnet_name}"
 
         def program() -> None:
             pulumi.export("subnetwork_path", subnet_path)

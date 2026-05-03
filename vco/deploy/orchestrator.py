@@ -85,7 +85,7 @@ def _classify_line(line: str) -> str:
 
 def _install_gcp_plugin(stack_dir: Path) -> tuple[Any, str, str]:
     cmd       = get_pulumi_command(stack_dir)
-    state_dir = (stack_dir / ".pulumi-state").resolve()
+    state_dir = Path(stack_dir).resolve() if stack_dir else Path(tempfile.mkdtemp(prefix="vco_pulumi_"))
     b_url     = os.environ.get("PULUMI_BACKEND_URL", "file://" + state_dir.as_posix())
     p_home    = str((stack_dir / ".pulumi-home").resolve())
 

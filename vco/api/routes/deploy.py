@@ -86,7 +86,7 @@ async def deploy(payload: DeployPayload):
         log=log_fn,
         work_dir=str(sd),
         namespace=ns,
-    )
+    )                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
 
     run_status = result.get("status")
 

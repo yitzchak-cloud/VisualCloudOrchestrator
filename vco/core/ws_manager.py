@@ -156,13 +156,6 @@ class ConnectionManager:
         logger.info("[deploy_complete] changed=%d  failed=%d", changed, failed)
         await self.broadcast({"event": "deploy_complete", "changed": changed, "failed": failed})
 
-    async def broadcast_graph_saved(self, node_count: int) -> None:
-        """
-        Payload:
-            event      : "graph_saved"
-            node_count : total nodes in the saved graph
-        """
-        await self.broadcast({"event": "graph_saved", "node_count": node_count})
     
     async def broadcast_graph_saved(self, node_count: int) -> None:
         """
