@@ -20,6 +20,7 @@ import re
 from pathlib import Path
 from typing import Any, Callable
 
+from matplotlib.pylab import stack
 from pulumi import automation as auto
 from pulumi.automation.events import OpType
 
@@ -66,19 +67,19 @@ def run_node_stack(
     stack.set_config("gcp:project", auto.ConfigValue(value=project))
     stack.set_config("gcp:region",  auto.ConfigValue(value=region))
 
-    # ── Preview first — skip up() when nothing changed ─────────────────────
-    logger.debug("stack_runner: previewing %s", full_name)
-    preview     = stack.preview(color="never")
-    change_ops  = {op for op, count in preview.change_summary.items() if count > 0}
-    has_changes = bool(change_ops - {OpType.SAME})
-
-    if not has_changes:
-        logger.info("stack_runner: no changes for %s — skipping up()", full_name)
-        on_output("  (no changes)")
-        return {"__no_changes__": True, **{k: v.value for k, v in stack.outputs().items()}}
-
-    logger.info("stack_runner: running up() for %s  changes=%s", full_name, change_ops)
+    # ── דלג על preview — קורא ל-compute.googleapis.com שחסום ─────────────
+    logger.info("stack_runner: running up() for %s", full_name)
     result = stack.up(on_output=on_output, color="never", continue_on_error=True)
+    
     outputs = {k: v.value for k, v in result.outputs.items()}
+    
+    # בדוק אם היו שינויים
+    resource_changes = result.summary.resource_changes or {}
+    change_ops = {op for op, count in resource_changes.items() if count > 0}
+    has_changes = bool(change_ops - {OpType.SAME})
+    
+    if not has_changes:
+        return {"__no_changes__": True, **outputs}
+    
     logger.info("stack_runner: up() complete for %s  outputs=%s", full_name, list(outputs.keys()))
     return outputs

@@ -43,6 +43,7 @@ def make_workspace_opts(
             "PULUMI_CONFIG_PASSPHRASE": os.environ.get("PULUMI_CONFIG_PASSPHRASE", ""),
             "PULUMI_SKIP_UPDATE_CHECK": "1",
             "PULUMI_ACCESS_TOKEN":      "",
+            "GOOGLE_SKIP_REGION_VALIDATION": "true",  
         },
     )
 

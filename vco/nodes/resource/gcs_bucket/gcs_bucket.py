@@ -150,242 +150,246 @@ class GcsBucketNode(GCPNode):
         writer_ids = ctx.get("writer_ids", [])
 
         def program() -> None:
-            bucket_name   = props.get("name") or _resource_name(node_dict)
-            location      = props.get("location", "EU")
-            storage_class = props.get("storage_class", "STANDARD")
-            uniform       = props.get("uniform_access", True)
-            public_access = props.get("public_access", False)
-            pub_prev      = props.get("public_access_prevention", "inherited")
+            try:
+                bucket_name   = props.get("name") or _resource_name(node_dict)
+                location      = props.get("location", "EU")
+                storage_class = props.get("storage_class", "STANDARD")
+                uniform       = props.get("uniform_access", True)
+                public_access = props.get("public_access", False)
+                pub_prev      = props.get("public_access_prevention", "inherited")
 
-            # ── Versioning ────────────────────────────────────────────────
-            versioning    = props.get("versioning", False)
+                # ── Versioning ────────────────────────────────────────────────
+                versioning    = props.get("versioning", False)
 
-            # ── Lifecycle rules ───────────────────────────────────────────
-            lifecycle_rules = []
-            lifecycle_age = int(props.get("lifecycle_age", 0))
-            if lifecycle_age > 0:
-                lifecycle_rules.append(
-                    gcp.storage.BucketLifecycleRuleArgs(
-                        action=gcp.storage.BucketLifecycleRuleActionArgs(type="Delete"),
-                        condition=gcp.storage.BucketLifecycleRuleConditionArgs(age=lifecycle_age),
-                    )
-                )
-
-            noncurrent_age = int(props.get("lifecycle_noncurrent_age", 0))
-            if noncurrent_age > 0:
-                # Delete old (noncurrent) versions after N days
-                lifecycle_rules.append(
-                    gcp.storage.BucketLifecycleRuleArgs(
-                        action=gcp.storage.BucketLifecycleRuleActionArgs(type="Delete"),
-                        condition=gcp.storage.BucketLifecycleRuleConditionArgs(
-                            num_newer_versions=1,
-                            days_since_noncurrent_time=noncurrent_age,
-                            send_age_if_zero=False,
-                        ),
-                    )
-                )
-
-            abort_mpu_age = int(props.get("lifecycle_abort_mpu_age", 0))
-            if abort_mpu_age > 0:
-                # Abort stale incomplete multipart uploads
-                lifecycle_rules.append(
-                    gcp.storage.BucketLifecycleRuleArgs(
-                        action=gcp.storage.BucketLifecycleRuleActionArgs(
-                            type="AbortIncompleteMultipartUpload"
-                        ),
-                        condition=gcp.storage.BucketLifecycleRuleConditionArgs(
-                            age=abort_mpu_age
-                        ),
-                    )
-                )
-
-            # ── Soft Delete Policy ────────────────────────────────────────
-            soft_delete_days = int(props.get("soft_delete_days", 0))
-            soft_delete_policy = None
-            if soft_delete_days > 0:
-                soft_delete_policy = gcp.storage.BucketSoftDeletePolicyArgs(
-                    retention_duration_seconds=soft_delete_days * 86400,
-                )
-
-            # ── Retention Policy ──────────────────────────────────────────
-            retention_days   = int(props.get("retention_days", 0))
-            retention_locked = props.get("retention_locked", False)
-            retention_policy = None
-            if retention_days > 0:
-                retention_policy = gcp.storage.BucketRetentionPolicyArgs(
-                    retention_period=str(retention_days * 86400),
-                    is_locked=retention_locked,
-                )
-
-            # ── Autoclass ─────────────────────────────────────────────────
-            autoclass = props.get("autoclass", False)
-            autoclass_terminal = props.get("autoclass_terminal_class", "")
-            autoclass_cfg = None
-            if autoclass:
-                autoclass_cfg = gcp.storage.BucketAutoclassArgs(
-                    enabled=True,
-                    **({"terminal_storage_class": autoclass_terminal} if autoclass_terminal else {}),
-                )
-
-            # ── RPO ───────────────────────────────────────────────────────
-            rpo = props.get("rpo", "") or None
-
-            # ── CORS ──────────────────────────────────────────────────────
-            cors_origins = self._parse_list(props.get("cors_origins", ""))
-            cors_cfg = None
-            if cors_origins:
-                cors_methods  = self._parse_list(props.get("cors_methods", "GET,HEAD"))
-                cors_max_age  = int(props.get("cors_max_age_seconds", 3600))
-                cors_cfg = [
-                    gcp.storage.BucketCorArgs(
-                        origins=cors_origins,
-                        methods=cors_methods,
-                        response_headers=["*"],
-                        max_age_seconds=cors_max_age,
-                    )
-                ]
-
-            # ── Logging ───────────────────────────────────────────────────
-            log_bucket = props.get("log_bucket", "").strip()
-            log_prefix = props.get("log_prefix", "").strip()
-            logging_cfg = None
-            if log_bucket:
-                logging_cfg = gcp.storage.BucketLoggingArgs(
-                    log_bucket=log_bucket,
-                    **({"log_object_prefix": log_prefix} if log_prefix else {}),
-                )
-
-            # ── Custom Placement (dual-region) ────────────────────────────
-            placement_raw = props.get("custom_placement_regions", "").strip()
-            custom_placement = None
-            if placement_raw:
-                regions = self._parse_list(placement_raw)
-                if len(regions) == 2:
-                    custom_placement = gcp.storage.BucketCustomPlacementConfigArgs(
-                        data_locations=regions,
-                    )
-                else:
-                    logger.warning(
-                        "custom_placement_regions must have exactly 2 regions; ignoring. Got: %s",
-                        regions,
-                    )
-
-            # ── Hierarchical Namespace ────────────────────────────────────
-            hns = props.get("hierarchical_namespace", False)
-            hns_cfg = gcp.storage.BucketHierarchicalNamespaceArgs(enabled=True) if hns else None
-
-            # ── IP Filter ─────────────────────────────────────────────────
-            ip_mode  = props.get("ip_filter_mode", "").strip()
-            ip_cidrs = self._parse_list(props.get("ip_filter_cidrs", ""))
-            ip_filter_cfg = None
-            if ip_mode in ("Enabled", "Disabled"):
-                ip_filter_cfg = gcp.storage.BucketIpFilterArgs(
-                    mode=ip_mode,
-
-                    # חובה כש־Enabled, אחרת לא לשים בכלל
-                    allow_all_service_agent_access=(
-                        True if ip_mode == "Enabled" else None
-                    ),
-
-                    # רק אם יש CIDRs
-                    public_network_source=(
-                        gcp.storage.BucketIpFilterPublicNetworkSourceArgs(
-                            allowed_ip_cidr_ranges=ip_cidrs or ["0.0.0.0/0", "::/0"],
+                # ── Lifecycle rules ───────────────────────────────────────────
+                lifecycle_rules = []
+                lifecycle_age = int(props.get("lifecycle_age", 0))
+                if lifecycle_age > 0:
+                    lifecycle_rules.append(
+                        gcp.storage.BucketLifecycleRuleArgs(
+                            action=gcp.storage.BucketLifecycleRuleActionArgs(type="Delete"),
+                            condition=gcp.storage.BucketLifecycleRuleConditionArgs(age=lifecycle_age),
                         )
-                        if ip_cidrs else None
+                    )
+
+                noncurrent_age = int(props.get("lifecycle_noncurrent_age", 0))
+                if noncurrent_age > 0:
+                    # Delete old (noncurrent) versions after N days
+                    lifecycle_rules.append(
+                        gcp.storage.BucketLifecycleRuleArgs(
+                            action=gcp.storage.BucketLifecycleRuleActionArgs(type="Delete"),
+                            condition=gcp.storage.BucketLifecycleRuleConditionArgs(
+                                num_newer_versions=1,
+                                days_since_noncurrent_time=noncurrent_age,
+                                send_age_if_zero=False,
+                            ),
+                        )
+                    )
+
+                abort_mpu_age = int(props.get("lifecycle_abort_mpu_age", 0))
+                if abort_mpu_age > 0:
+                    # Abort stale incomplete multipart uploads
+                    lifecycle_rules.append(
+                        gcp.storage.BucketLifecycleRuleArgs(
+                            action=gcp.storage.BucketLifecycleRuleActionArgs(
+                                type="AbortIncompleteMultipartUpload"
+                            ),
+                            condition=gcp.storage.BucketLifecycleRuleConditionArgs(
+                                age=abort_mpu_age
+                            ),
+                        )
+                    )
+
+                # ── Soft Delete Policy ────────────────────────────────────────
+                soft_delete_days = int(props.get("soft_delete_days", 0))
+                soft_delete_policy = None
+                if soft_delete_days > 0:
+                    soft_delete_policy = gcp.storage.BucketSoftDeletePolicyArgs(
+                        retention_duration_seconds=soft_delete_days * 86400,
+                    )
+
+                # ── Retention Policy ──────────────────────────────────────────
+                retention_days   = int(props.get("retention_days", 0))
+                retention_locked = props.get("retention_locked", False)
+                retention_policy = None
+                if retention_days > 0:
+                    retention_policy = gcp.storage.BucketRetentionPolicyArgs(
+                        retention_period=str(retention_days * 86400),
+                        is_locked=retention_locked,
+                    )
+
+                # ── Autoclass ─────────────────────────────────────────────────
+                autoclass = props.get("autoclass", False)
+                autoclass_terminal = props.get("autoclass_terminal_class", "")
+                autoclass_cfg = None
+                if autoclass:
+                    autoclass_cfg = gcp.storage.BucketAutoclassArgs(
+                        enabled=True,
+                        **({"terminal_storage_class": autoclass_terminal} if autoclass_terminal else {}),
+                    )
+
+                # ── RPO ───────────────────────────────────────────────────────
+                rpo = props.get("rpo", "") or None
+
+                # ── CORS ──────────────────────────────────────────────────────
+                cors_origins = self._parse_list(props.get("cors_origins", ""))
+                cors_cfg = None
+                if cors_origins:
+                    cors_methods  = self._parse_list(props.get("cors_methods", "GET,HEAD"))
+                    cors_max_age  = int(props.get("cors_max_age_seconds", 3600))
+                    cors_cfg = [
+                        gcp.storage.BucketCorArgs(
+                            origins=cors_origins,
+                            methods=cors_methods,
+                            response_headers=["*"],
+                            max_age_seconds=cors_max_age,
+                        )
+                    ]
+
+                # ── Logging ───────────────────────────────────────────────────
+                log_bucket = props.get("log_bucket", "").strip()
+                log_prefix = props.get("log_prefix", "").strip()
+                logging_cfg = None
+                if log_bucket:
+                    logging_cfg = gcp.storage.BucketLoggingArgs(
+                        log_bucket=log_bucket,
+                        **({"log_object_prefix": log_prefix} if log_prefix else {}),
+                    )
+
+                # ── Custom Placement (dual-region) ────────────────────────────
+                placement_raw = props.get("custom_placement_regions", "").strip()
+                custom_placement = None
+                if placement_raw:
+                    regions = self._parse_list(placement_raw)
+                    if len(regions) == 2:
+                        custom_placement = gcp.storage.BucketCustomPlacementConfigArgs(
+                            data_locations=regions,
+                        )
+                    else:
+                        logger.warning(
+                            "custom_placement_regions must have exactly 2 regions; ignoring. Got: %s",
+                            regions,
+                        )
+
+                # ── Hierarchical Namespace ────────────────────────────────────
+                hns = props.get("hierarchical_namespace", False)
+                hns_cfg = gcp.storage.BucketHierarchicalNamespaceArgs(enabled=True) if hns else None
+
+                # ── IP Filter ─────────────────────────────────────────────────
+                ip_mode  = props.get("ip_filter_mode", "").strip()
+                ip_cidrs = self._parse_list(props.get("ip_filter_cidrs", ""))
+                ip_filter_cfg = None
+                if ip_mode in ("Enabled", "Disabled"):
+                    ip_filter_cfg = gcp.storage.BucketIpFilterArgs(
+                        mode=ip_mode,
+
+                        # חובה כש־Enabled, אחרת לא לשים בכלל
+                        allow_all_service_agent_access=(
+                            True if ip_mode == "Enabled" else None
+                        ),
+
+                        # רק אם יש CIDRs
+                        public_network_source=(
+                            gcp.storage.BucketIpFilterPublicNetworkSourceArgs(
+                                allowed_ip_cidr_ranges=ip_cidrs or ["0.0.0.0/0", "::/0"],
+                            )
+                            if ip_cidrs else None
+                        ),
+                    )
+
+                # ── Encryption (CMEK) ─────────────────────────────────────────
+                cmek = props.get("encryption_key", "").strip()
+                encryption_cfg = None
+                if cmek:
+                    encryption_cfg = gcp.storage.BucketEncryptionArgs(
+                        default_kms_key_name=cmek,
+                    )
+
+                # ── Labels ────────────────────────────────────────────────────
+                labels_raw = props.get("labels", "").strip()
+                labels = self._parse_labels(labels_raw) if labels_raw else None
+
+                # ── Website ───────────────────────────────────────────────────
+                website_main = props.get("website_main_page", "").strip()
+                website_404  = props.get("website_not_found_page", "").strip()
+                website_cfg  = None
+                if website_main:
+                    website_cfg = gcp.storage.BucketWebsiteArgs(
+                        main_page_suffix=website_main,
+                        **({"not_found_page": website_404} if website_404 else {}),
+                    )
+
+                # ── Object-level options ──────────────────────────────────────
+                enable_obj_retention = props.get("enable_object_retention", False)
+                default_hold         = props.get("default_event_based_hold", False)
+                requester_pays       = props.get("requester_pays", False)
+
+                # ── Create bucket ─────────────────────────────────────────────
+                b = gcp.storage.Bucket(
+                    self.node_id,
+                    name=bucket_name,
+                    location=location,
+                    storage_class=storage_class,
+                    project=project,
+                    uniform_bucket_level_access=uniform,
+                    public_access_prevention=pub_prev,
+                    versioning=(
+                        gcp.storage.BucketVersioningArgs(enabled=True) if versioning else None
                     ),
+                    lifecycle_rules=lifecycle_rules or None,
+                    soft_delete_policy=soft_delete_policy,
+                    retention_policy=retention_policy,
+                    autoclass=autoclass_cfg,
+                    rpo=rpo,
+                    cors=cors_cfg,
+                    logging=logging_cfg,
+                    custom_placement_config=custom_placement,
+                    hierarchical_namespace=hns_cfg,
+                    ip_filter=ip_filter_cfg,
+                    encryption=encryption_cfg,
+                    labels=labels,
+                    website=website_cfg,
+                    enable_object_retention=enable_obj_retention or None,
+                    default_event_based_hold=default_hold or None,
+                    requester_pays=requester_pays or None,
+                    force_destroy=True,
                 )
 
-            # ── Encryption (CMEK) ─────────────────────────────────────────
-            cmek = props.get("encryption_key", "").strip()
-            encryption_cfg = None
-            if cmek:
-                encryption_cfg = gcp.storage.BucketEncryptionArgs(
-                    default_kms_key_name=cmek,
-                )
+                # ── Public read IAM ───────────────────────────────────────────
+                # Equivalent:
+                #   gcloud storage buckets add-iam-policy-binding gs://${BUCKET} \
+                #     --member=allUsers --role=roles/storage.objectViewer
+                if public_access:
+                    gcp.storage.BucketIAMBinding(
+                        f"{self.node_id}-public-read",
+                        bucket=b.name,
+                        role="roles/storage.objectViewer",
+                        members=["allUsers"],
+                    )
 
-            # ── Labels ────────────────────────────────────────────────────
-            labels_raw = props.get("labels", "").strip()
-            labels = self._parse_labels(labels_raw) if labels_raw else None
+                # ── Grant objectCreator to every wired writer SA ──────────────
+                sa_emails: list[str] = []
+                for wid in writer_ids:
+                    email = deployed_outputs.get(wid, {}).get("sa_email", "")
+                    if not email:
+                        email = deployed_outputs.get(wid, {}).get("email", "")
+                    if email and email not in sa_emails:
+                        sa_emails.append(email)
 
-            # ── Website ───────────────────────────────────────────────────
-            website_main = props.get("website_main_page", "").strip()
-            website_404  = props.get("website_not_found_page", "").strip()
-            website_cfg  = None
-            if website_main:
-                website_cfg = gcp.storage.BucketWebsiteArgs(
-                    main_page_suffix=website_main,
-                    **({"not_found_page": website_404} if website_404 else {}),
-                )
+                if sa_emails:
+                    gcp.storage.BucketIAMBinding(
+                        f"{self.node_id}-writer-binding",
+                        bucket=b.name,
+                        role="roles/storage.objectCreator",
+                        members=[f"serviceAccount:{e}" for e in sa_emails],
+                    )
 
-            # ── Object-level options ──────────────────────────────────────
-            enable_obj_retention = props.get("enable_object_retention", False)
-            default_hold         = props.get("default_event_based_hold", False)
-            requester_pays       = props.get("requester_pays", False)
-
-            # ── Create bucket ─────────────────────────────────────────────
-            b = gcp.storage.Bucket(
-                self.node_id,
-                name=bucket_name,
-                location=location,
-                storage_class=storage_class,
-                project=project,
-                uniform_bucket_level_access=uniform,
-                public_access_prevention=pub_prev,
-                versioning=(
-                    gcp.storage.BucketVersioningArgs(enabled=True) if versioning else None
-                ),
-                lifecycle_rules=lifecycle_rules or None,
-                soft_delete_policy=soft_delete_policy,
-                retention_policy=retention_policy,
-                autoclass=autoclass_cfg,
-                rpo=rpo,
-                cors=cors_cfg,
-                logging=logging_cfg,
-                custom_placement_config=custom_placement,
-                hierarchical_namespace=hns_cfg,
-                ip_filter=ip_filter_cfg,
-                encryption=encryption_cfg,
-                labels=labels,
-                website=website_cfg,
-                enable_object_retention=enable_obj_retention or None,
-                default_event_based_hold=default_hold or None,
-                requester_pays=requester_pays or None,
-                force_destroy=True,
-            )
-
-            # ── Public read IAM ───────────────────────────────────────────
-            # Equivalent:
-            #   gcloud storage buckets add-iam-policy-binding gs://${BUCKET} \
-            #     --member=allUsers --role=roles/storage.objectViewer
-            if public_access:
-                gcp.storage.BucketIAMBinding(
-                    f"{self.node_id}-public-read",
-                    bucket=b.name,
-                    role="roles/storage.objectViewer",
-                    members=["allUsers"],
-                )
-
-            # ── Grant objectCreator to every wired writer SA ──────────────
-            sa_emails: list[str] = []
-            for wid in writer_ids:
-                email = deployed_outputs.get(wid, {}).get("sa_email", "")
-                if not email:
-                    email = deployed_outputs.get(wid, {}).get("email", "")
-                if email and email not in sa_emails:
-                    sa_emails.append(email)
-
-            if sa_emails:
-                gcp.storage.BucketIAMBinding(
-                    f"{self.node_id}-writer-binding",
-                    bucket=b.name,
-                    role="roles/storage.objectCreator",
-                    members=[f"serviceAccount:{e}" for e in sa_emails],
-                )
-
-            pulumi.export("name", b.name)
-            pulumi.export("url",  b.url)
-            pulumi.export("id",   b.id)
+                pulumi.export("name", b.name)
+                pulumi.export("url",  b.url)
+                pulumi.export("id",   b.id)
+            except Exception as e:
+                logger.error("program() crashed: %s", e, exc_info=True)
+                raise
 
         return program
 
