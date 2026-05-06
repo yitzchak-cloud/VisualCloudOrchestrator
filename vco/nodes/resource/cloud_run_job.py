@@ -33,7 +33,10 @@ from typing import Any, Callable, ClassVar
 import pulumi
 import pulumi_gcp as gcp
 
-from nodes.base_node import GCPNode, LogSource, Port, _resource_name, _node_name
+from nodes.base_node import (
+    GCPNode, LogSource, Port, _resource_name, _node_name,
+    TFBlock, TFResult, _tf_name, _resource_name, _node_by_id
+)
 from nodes.port_types import PortType
 
 logger = logging.getLogger(__name__)
@@ -131,7 +134,8 @@ class CloudRunJobNode(GCPNode):
                 ctx[self.node_id].setdefault("publishes_to_topics", []).append(tgt_id)
                 return True
             if tgt_type == "GcsBucketNode":
-                ctx[tgt_id].setdefault("writer_ids", []).append(self.node_id)
+                # Only record our own bucket reference; GcsBucketNode.resolve_edges
+                # will set writer_ids on the bucket from its side.
                 ctx[self.node_id].setdefault("bucket_ids", []).append(tgt_id)
                 return True
         return False
@@ -234,6 +238,83 @@ class CloudRunJobNode(GCPNode):
             pulumi.export("job_id",   j.id)
 
         return program
+
+    # ------------------------------------------------------------------
+    # Terraform blocks
+    # ------------------------------------------------------------------
+
+    def terraform_blocks(self, ctx, project, region, all_nodes) -> "TFResult":
+        result    = TFResult()
+        node_dict = ctx.get("node", {})
+        props     = node_dict.get("props", {})
+        name      = props.get("name") or _resource_name(node_dict)
+        tf_id     = _tf_name(node_dict)
+        r         = props.get("region", region)
+
+        sa_email = ""
+        sa_id    = ctx.get("service_account_id", "")
+        if sa_id:
+            sa_node  = _node_by_id(all_nodes, sa_id)
+            sa_email = (
+                f"${{google_service_account.{_tf_name(sa_node)}.email}}"
+                if sa_node.get("props", {}).get("create_sa", True)
+                else sa_node.get("props", {}).get("email", "")
+            )
+
+        env_list = []
+        for tid in ctx.get("publishes_to_topics", []):
+            t = _node_by_id(all_nodes, tid)
+            env_list.append({
+                "name":  "PUBSUB_TOPIC_" + _resource_name(t).upper().replace("-", "_"),
+                "value": f"${{google_pubsub_topic.{_tf_name(t)}.name}}",
+            })
+        for bid in ctx.get("bucket_ids", []):
+            b = _node_by_id(all_nodes, bid)
+            env_list.append({
+                "name":  "GCS_BUCKET_" + _resource_name(b).upper().replace("-", "_"),
+                "value": f"${{google_storage_bucket.{_tf_name(b)}.name}}",
+            })
+
+        container: dict = {
+            "image":     props.get("image", "gcr.io/cloudrun/hello"),
+            "resources": {"limits": {"memory": props.get("memory", "512Mi"), "cpu": props.get("cpu", "1")}},
+        }
+        if env_list:
+            container["env"] = env_list
+
+        template: dict = {
+            "containers": container,
+            "max_retries": int(props.get("max_retries", 3)),
+            "timeout":     f"{int(props.get('timeout', 600))}s",
+        }
+        if sa_email:
+            template["service_account"] = sa_email
+
+        result.resources.append(TFBlock(
+            block_type="resource",
+            labels=["google_cloud_run_v2_job", tf_id],
+            body={
+                "name":               name,
+                "location":           r,
+                "project":            "var.project_id",
+                "deletion_protection": False,
+                "template": {
+                    "parallelism": int(props.get("parallelism", 1)),
+                    "task_count":  int(props.get("task_count", 1)),
+                    "template":    template,
+                },
+            },
+            comment=f"Cloud Run Job: {node_dict.get('label', name)}",
+        ))
+        result.outputs.append(TFBlock(
+            block_type="output",
+            labels=[f"{tf_id}_name"],
+            body={
+                "description": f"Cloud Run Job name {name}",
+                "value":       f"${{google_cloud_run_v2_job.{tf_id}.name}}",
+            },
+        ))
+        return result
 
     def live_outputs(self, pulumi_outputs, project, region) -> dict:
         return {"name": pulumi_outputs.get("job_name", "")}

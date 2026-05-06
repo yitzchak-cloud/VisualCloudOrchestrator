@@ -84,16 +84,17 @@ sudo apt update
 sudo apt install git
 git clone https://github.com/yitzchak-cloud/VisualCloudOrchestrator.git
 sudo apt install python3-venv
+sudo apt install uvicorn
 
 cd VisualCloudOrchestrator
 python3 -m venv .venv
 
 source .venv/bin/activate
-pip install "fastapi>=0.111" "uvicorn[standard]>=0.29" "pydantic>=2.7" "pydantic-settings>=2.3" "pulumi>=3.117" "pulumi-gcp>=7.0" "google-cloud-logging>=3.10" "google-auth>=2.29" "PyYAML>=6.0"
+pip install "fastapi>=0.111" "uvicorn[standard]>=0.29" "pydantic>=2.7" "pydantic-settings>=2.3" "pulumi>=3.117" "pulumi-gcp>=7.0" "google-cloud-logging>=3.10" "google-auth>=2.29" "PyYAML>=6.0"  "matplotlib>=3.7"
 
 cd frontend
-python -m http.server 3000
+python -m http.server 3000 & 
 
-sudo apt install uvicorn
-cd VisualCloudOrchestrator/vco 
-uvicorn backend.main:app --reload --port 8000
+cd .. 
+cd vco 
+uvicorn main:app --reload --port 8000 --host 0.0.0.0 & git pull

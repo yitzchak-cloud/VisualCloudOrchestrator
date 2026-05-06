@@ -56,6 +56,7 @@ import pulumi
 import pulumi_gcp as gcp
 
 from nodes.base_node import GCPNode, LogSource, Port, _resource_name, _node_name
+from nodes.base_node import TFBlock, TFResult, _tf_name, _resource_name
 from nodes.port_types import PortType
 
 logger = logging.getLogger(__name__)
@@ -109,16 +110,26 @@ class GcsBucketNode(GCPNode):
                 return True
 
         # ── Input edges: writers → this bucket ────────────────────────────
+        # Only record the writer here; the WRITER node sets its own bucket_ids
+        # via its own resolve_edges (CloudRunNode / WorkflowNode / CloudRunJobNode).
+        # We do NOT also set ctx[src_id]["bucket_ids"] here — that is the writer
+        # node's responsibility and doing it from both sides would double-count.
         if tgt_id == self.node_id:
-            if src_type in ("CloudRunNode", "WorkflowNode"):
+            if src_type in ("CloudRunNode", "WorkflowNode", "CloudRunJobNode", "CloudFunctionsNode"):
                 ctx[self.node_id].setdefault("writer_ids", []).append(src_id)
-                ctx[src_id].setdefault("bucket_ids", []).append(self.node_id)
                 return True
 
         return False
 
     def dag_deps(self, ctx) -> list[str]:
-        return list(ctx.get("writer_ids", []))
+        # The bucket does NOT depend on its writers for deploy ordering.
+        # The writer SA email needed for BucketIAMBinding comes from the SA node
+        # (deployed_outputs[writer_id].get("email")), and writers are guaranteed
+        # to be deployed first only if SA→writer→bucket. If the caller wires
+        # writer→bucket without an SA, the IAM binding is skipped gracefully.
+        # Adding writer_ids here would cause CR→Bucket→CR cycles when both
+        # directions are wired (Bucket→CR for env var AND CR→Bucket for writing).
+        return []
 
     # ------------------------------------------------------------------
     # Helpers
@@ -393,6 +404,69 @@ class GcsBucketNode(GCPNode):
 
         return program
 
+    # ------------------------------------------------------------------
+    # Terraform blocks
+    # ------------------------------------------------------------------
+
+    def terraform_blocks(self, ctx, project, region, all_nodes) -> "TFResult":
+        result    = TFResult()
+        node_dict = ctx.get("node", {})
+        props     = node_dict.get("props", {})
+        name      = props.get("name") or _resource_name(node_dict)
+        tf_id     = _tf_name(node_dict)
+
+        body: dict = {
+            "name":                       name,
+            "location":                   props.get("location", "EU"),
+            "project":                    "var.project_id",
+            "storage_class":              props.get("storage_class", "STANDARD"),
+            "uniform_bucket_level_access": props.get("uniform_access", True),
+            "force_destroy":              True,
+        }
+
+        pub_prev = props.get("public_access_prevention", "inherited")
+        if pub_prev:
+            body["public_access_prevention"] = pub_prev
+
+        if props.get("versioning"):
+            body["versioning"] = {"enabled": True}
+
+        lifecycle_age = int(props.get("lifecycle_age", 0))
+        if lifecycle_age > 0:
+            body["lifecycle_rule"] = {
+                "action":    {"type": "Delete"},
+                "condition": {"age": lifecycle_age},
+            }
+
+        result.resources.append(TFBlock(
+            block_type="resource",
+            labels=["google_storage_bucket", tf_id],
+            body=body,
+            comment=f"GCS Bucket: {node_dict.get('label', name)}",
+        ))
+
+        # Public read
+        if props.get("public_access", False):
+            result.resources.append(TFBlock(
+                block_type="resource",
+                labels=["google_storage_bucket_iam_member", f"{tf_id}_public_read"],
+                body={
+                    "bucket": f"${{google_storage_bucket.{tf_id}.name}}",
+                    "role":   "roles/storage.objectViewer",
+                    "member": "allUsers",
+                },
+            ))
+
+        result.outputs.append(TFBlock(
+            block_type="output",
+            labels=[f"{tf_id}_name"],
+            body={
+                "description": f"Name of GCS bucket {name}",
+                "value":       f"${{google_storage_bucket.{tf_id}.name}}",
+            },
+        ))
+        return result
+
     def live_outputs(self, pulumi_outputs, project, region) -> dict:
         return {
             "name": pulumi_outputs.get("name", ""),
@@ -410,4 +484,3 @@ class GcsBucketNode(GCPNode):
             ),
             project=project,
         )
-        

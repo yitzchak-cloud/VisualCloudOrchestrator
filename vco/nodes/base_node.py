@@ -3,36 +3,43 @@ nodes/base_node.py
 ==================
 Base class for all GCP resource nodes.
 
-Every node is self-describing — adding a new resource requires ONE file only.
+Terraform dataclasses
+---------------------
+  TFBlock   — a single HCL block (resource / data / output / variable)
+  TFResult  — legacy flat-file result (kept for compatibility, not used by engine)
+  TFModule  — describes one Terraform module directory for a single node
 
-Each GCPNode subclass declares:
+  Each GCPNode subclass implements:
+    terraform_module(ctx, project, region, all_nodes) → TFModule | None
 
-  ClassVar (UI / registry):
-    inputs, outputs, node_color, icon, category, description,
-    params_schema, url_field
+  TFModule fields
+  ---------------
+    module_name  str                 — Terraform identifier, e.g. "my_sa"
+                                       used as: module.<module_name>
+    resources    list[TFBlock]       — goes into modules/<name>/main.tf
+    data         list[TFBlock]       — data sources, also main.tf
+    variables    list[TFBlock]       — modules/<name>/variables.tf
+    outputs      list[TFBlock]       — modules/<name>/outputs.tf
+    call_vars    dict[str, str]      — key = HCL expression pairs injected
+                                       into the root module{} call block.
+                                       Values are raw HCL (not quoted):
+                                         "sa_email" → "module.other_sa.email"
+                                         "image"    → '"gcr.io/project/img"'
+                                       Use _hcl_str(val) for quoted strings.
 
-  Deploy methods:
-    resolve_edges(src_id, tgt_id, src_type, tgt_type, ctx) → bool
-    dag_deps(ctx)                                           → list[node_id]
-    pulumi_program(ctx, project, region, all_nodes, deployed_outputs)
-                                                            → Callable | None
-
-  Post-deploy sync methods:
-    live_outputs(pulumi_outputs, project, region)  → dict
-        Maps Pulumi exports → UI props to write back onto the canvas node.
-        Called after every successful deploy; result is broadcast via WS.
-
-    log_source(pulumi_outputs, project, region)    → LogSource | None
-        Returns a Cloud Logging query descriptor for the SSE log stream,
-        or None if this resource type has no meaningful log stream.
+Cross-module references
+-----------------------
+Pass a reference to another module's output via call_vars:
+    "sa_email": f"module.{sa_tf_id}.email"
+Terraform resolves the implicit dependency automatically — no explicit
+depends_on needed.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import importlib
 import re
 from typing import Any, Callable, ClassVar
-from zipfile import Path
 from pathlib import Path as LocalPath
 import yaml
 
@@ -54,26 +61,110 @@ class Port:
 
 @dataclass
 class LogSource:
-    """
-    Describes how to query Cloud Logging for a GCP resource.
-
-    filter    — Cloud Logging filter string, e.g.:
-                  'resource.type="cloud_run_revision"
-                   AND resource.labels.service_name="my-svc"'
-    project   — GCP project id (filled by engine from deploy config)
-    page_size — max entries per poll
-    order     — "desc" (newest first) or "asc"
-    """
     filter:    str
     project:   str = ""
     page_size: int = 50
     order:     str = "desc"
 
 
+# ── Terraform dataclasses ─────────────────────────────────────────────────────
+
+@dataclass
+class TFBlock:
+    """A single Terraform block (resource / data / output / variable / locals)."""
+    block_type: str
+    labels:     list[str]
+    body:       dict[str, Any]
+    comment:    str = ""
+
+
+@dataclass
+class TFResult:
+    """Legacy flat-file result — kept for any code that still uses it."""
+    resources: list[TFBlock] = field(default_factory=list)
+    data:      list[TFBlock] = field(default_factory=list)
+    outputs:   list[TFBlock] = field(default_factory=list)
+    variables: list[TFBlock] = field(default_factory=list)
+
+
+@dataclass
+class TFModule:
+    """
+    Describes one Terraform module directory for a single GCP node.
+
+    module_name  — used as the Terraform identifier: module.<module_name>
+                   and as the directory name: modules/<module_name>/
+                   Must be a valid Terraform identifier (letters, digits, _).
+
+    resources    — resource + IAM blocks → modules/<name>/main.tf
+    data         — data source blocks   → modules/<name>/main.tf (above resources)
+    variables    — input variable blocks → modules/<name>/variables.tf
+                   Always include at minimum:
+                     variable "project_id" { type = string }
+                     variable "region"     { type = string }
+    outputs      — output blocks         → modules/<name>/outputs.tf
+                   Each output becomes accessible as module.<name>.<output_name>
+
+    call_vars    — dict of variable_name → HCL expression injected into the
+                   root module{} call block.
+                   Raw HCL — use _hcl_str() for string literals:
+                     "sa_email": "module.other_sa.email"         ← reference
+                     "image":    _hcl_str("gcr.io/project/img")  ← literal
+    """
+    module_name: str
+    resources:   list[TFBlock]      = field(default_factory=list)
+    data:        list[TFBlock]      = field(default_factory=list)
+    variables:   list[TFBlock]      = field(default_factory=list)
+    outputs:     list[TFBlock]      = field(default_factory=list)
+    call_vars:   dict[str, str]     = field(default_factory=dict)
+
+
+# ── HCL helpers ───────────────────────────────────────────────────────────────
+
+def _hcl_str(value: str) -> str:
+    """Wrap a Python string as a quoted HCL string literal."""
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
+def _hcl_var(name: str) -> str:
+    """Reference a root-level Terraform variable: var.<name>"""
+    return f"var.{name}"
+
+
+def _module_ref(module_name: str, output_name: str) -> str:
+    """Reference a module output: module.<name>.<output>"""
+    return f"module.{module_name}.{output_name}"
+
+
+# ── Standard module variables (every module needs these) ──────────────────────
+
+def _std_module_variables() -> list[TFBlock]:
+    """Return the standard project_id + region variables every module needs."""
+    return [
+        TFBlock(
+            block_type="variable", labels=["project_id"],
+            body={"description": "GCP project ID", "type": "string"},
+        ),
+        TFBlock(
+            block_type="variable", labels=["region"],
+            body={"description": "GCP region", "type": "string"},
+        ),
+    ]
+
+
+# ── Shared name helpers ────────────────────────────────────────────────────────
+
 def _resource_name(node_dict: dict) -> str:
     props = node_dict.get("props", {})
     label = node_dict.get("label", node_dict.get("id", "resource"))
     return props.get("name") or re.sub(r"[^a-z0-9-]", "-", label.lower()).strip("-")
+
+def _tf_name(node_dict: dict) -> str:
+    """Valid Terraform identifier (underscores, no hyphens, max 60 chars)."""
+    name = _resource_name(node_dict)
+    ident = re.sub(r"[^a-z0-9_]", "_", name).strip("_") or "resource"
+    return ident[:60]
 
 def _node_label(all_nodes: list[dict], node_id: str) -> str:
     for n in all_nodes:
@@ -87,6 +178,13 @@ def _node_name(all_nodes: list[dict], node_id: str) -> str:
             return _resource_name(n)
     return node_id
 
+def _node_by_id(all_nodes: list[dict], node_id: str) -> dict:
+    for n in all_nodes:
+        if n["id"] == node_id:
+            return n
+    return {}
+
+
 # ── Base node ─────────────────────────────────────────────────────────────────
 
 @dataclass
@@ -99,43 +197,24 @@ class GCPNode:
     node_color:    ClassVar[str]         = "#1e293b"
     icon:          ClassVar[str]         = "box"
     category:      ClassVar[str]         = "General"
-    description:   ClassVar[str]        = ""
-    params_schema: ClassVar[list[dict]] = []
-    url_field:     ClassVar[str | None] = None
-
+    description:   ClassVar[str]         = ""
+    params_schema: ClassVar[list[dict]]  = []
+    url_field:     ClassVar[str | None]  = None
 
     def __init_subclass__(cls, **kwargs):
-        """
-        Automatically discovers and loads params_schema from a corresponding 
-        YAML file located in the same directory as the subclass.
-        """
         super().__init_subclass__(**kwargs)
-
         try:
-            # Determine the directory of the subclass
             module = importlib.import_module(cls.__module__)
             if hasattr(module, "__file__") and module.__file__:
-                # Using standard Path to locate the directory
                 class_dir = LocalPath(module.__file__).parent
-                
-                # Search for any file matching the *_params.yaml pattern
-                # Note: glob is available on pathlib.Path
                 yaml_files = list(class_dir.glob("*_params.yaml"))
-                
                 if yaml_files:
-                    yaml_path = yaml_files[0]
-                    # We can use zipfile.Path (ZipPath) for the actual read if needed,
-                    # though for standard local development pathlib.Path is usually enough.
-                    # Here we stick to a compatible reading approach.
-                    with open(yaml_path, "r", encoding="utf-8") as f:
+                    with open(yaml_files[0], "r", encoding="utf-8") as f:
                         data = yaml.safe_load(f)
                         if isinstance(data, list):
                             cls.params_schema = data
-        except Exception as e:
-            # Silent failure to ensure the application starts even if schema is missing
+        except Exception:
             pass
-
-    # ── UI schema ─────────────────────────────────────────────────────────────
 
     @classmethod
     def ui_schema(cls) -> dict:
@@ -181,72 +260,50 @@ class GCPNode:
             "params_schema": self.__class__.params_schema,
         }
 
-    # ── Deploy logic (subclasses override) ────────────────────────────────────
+    # ── Deploy (Pulumi) ────────────────────────────────────────────────────────
 
-    def resolve_edges(
-        self,
-        src_id:   str,
-        tgt_id:   str,
-        src_type: str,
-        tgt_type: str,
-        ctx:      dict[str, Any],
-    ) -> bool:
-        """Claim and process one edge. Return True if handled."""
+    def resolve_edges(self, src_id, tgt_id, src_type, tgt_type, ctx) -> bool:
         return False
 
     def dag_deps(self, ctx: dict[str, Any]) -> list[str]:
-        """Return node IDs that must be deployed before this node."""
         return []
 
     def pulumi_program(
-        self,
-        ctx:              dict[str, Any],
-        project:          str,
-        region:           str,
-        all_nodes:        list[dict],
-        deployed_outputs: dict[str, dict],
+        self, ctx, project, region, all_nodes, deployed_outputs
     ) -> Callable[[], None] | None:
-        """Return Pulumi program closure, or None to skip."""
         return None
 
-    # ── Post-deploy sync (subclasses override) ────────────────────────────────
+    # ── Terraform ─────────────────────────────────────────────────────────────
 
-    def live_outputs(
+    def terraform_module(
         self,
-        pulumi_outputs: dict[str, Any],
-        project:        str,
-        region:         str,
-    ) -> dict[str, Any]:
+        ctx:       dict[str, Any],
+        project:   str,
+        region:    str,
+        all_nodes: list[dict],
+    ) -> TFModule | None:
         """
-        Map Pulumi exports → UI props to write back onto the canvas node.
+        Return a TFModule describing this node's Terraform module directory.
 
-        Called after every successful deploy. The returned dict is sent via
-        WebSocket as a  node_props_update  event so the UI can update fields
-        like service_url, resource name, etc. without a manual refresh.
+        The engine places the result under  modules/<module_name>/  and adds
+        a module{} call block to the root main.tf.
 
-        Default: pass-through (returns pulumi_outputs as-is).
+        Cross-resource references go through call_vars:
+            sa_id = ctx.get("service_account_id", "")
+            if sa_id:
+                sa_tf = _tf_name(_node_by_id(all_nodes, sa_id))
+                module.call_vars["sa_email"] = f"module.{sa_tf}.email"
 
-        Override example (Cloud Run):
-            return {"service_url": pulumi_outputs.get("uri", "")}
-        """
-        return dict(pulumi_outputs)
-
-    def log_source(
-        self,
-        pulumi_outputs: dict[str, Any],
-        project:        str,
-        region:         str,
-    ) -> "LogSource | None":
-        """
-        Return a LogSource for the SSE /api/logs/{node_id} stream.
-
-        The SSE endpoint calls this to discover what Cloud Logging filter
-        to use when tailing logs for this specific resource.
-
-        *pulumi_outputs* — whatever pulumi_program() exported (uri, name, id…)
-
-        Return None for resources with no meaningful log stream (VPC, SA, …).
+        Return None to skip Terraform generation (visual/UI-only nodes).
 
         Default: None.
         """
+        return None
+
+    # ── Post-deploy ────────────────────────────────────────────────────────────
+
+    def live_outputs(self, pulumi_outputs, project, region) -> dict[str, Any]:
+        return dict(pulumi_outputs)
+
+    def log_source(self, pulumi_outputs, project, region) -> "LogSource | None":
         return None

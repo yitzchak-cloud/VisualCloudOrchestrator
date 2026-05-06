@@ -36,7 +36,10 @@ from typing import Any, Callable, ClassVar
 import pulumi
 import pulumi_gcp as gcp
 
-from nodes.base_node import GCPNode, LogSource, Port, _resource_name, _node_name
+from nodes.base_node import (
+    GCPNode, LogSource, Port, _resource_name, _node_name,
+    TFBlock, TFResult, _tf_name, _resource_name, _node_by_id
+)
 from nodes.port_types import PortType
 
 logger = logging.getLogger(__name__)
@@ -138,8 +141,10 @@ class WorkflowNode(GCPNode):
             return True
 
         # STORAGE output → GcsBucketNode
+        # Only set our own bucket_ids; GcsBucketNode.resolve_edges sets writer_ids
+        # on the bucket from its side (when it sees us as src). Doing both here
+        # would double-count writer_ids when both nodes process the same edge.
         if tgt_type == "GcsBucketNode":
-            ctx[tgt_id].setdefault("writer_ids", []).append(self.node_id)
             ctx[self.node_id].setdefault("bucket_ids", []).append(tgt_id)
             return True
 
@@ -267,6 +272,54 @@ class WorkflowNode(GCPNode):
                 pulumi.export(f"env_{k}", v)
 
         return program
+
+    # ------------------------------------------------------------------
+    # Terraform blocks
+    # ------------------------------------------------------------------
+
+    def terraform_blocks(self, ctx, project, region, all_nodes) -> "TFResult":
+        result    = TFResult()
+        node_dict = ctx.get("node", {})
+        props     = node_dict.get("props", {})
+        name      = props.get("name") or _resource_name(node_dict)
+        tf_id     = _tf_name(node_dict)
+        r         = props.get("region", region)
+
+        sa_email = ""
+        sa_id    = ctx.get("service_account_id", "")
+        if sa_id:
+            sa_node  = _node_by_id(all_nodes, sa_id)
+            sa_email = (
+                f"${{google_service_account.{_tf_name(sa_node)}.email}}"
+                if sa_node.get("props", {}).get("create_sa", True)
+                else sa_node.get("props", {}).get("email", "")
+            )
+
+        body: dict = {
+            "name":    name,
+            "region":  r,
+            "project": "var.project_id",
+        }
+        if sa_email:
+            body["service_account"] = sa_email
+        if props.get("source_yaml"):
+            body["source_contents"] = props["source_yaml"]
+
+        result.resources.append(TFBlock(
+            block_type="resource",
+            labels=["google_workflows_workflow", tf_id],
+            body=body,
+            comment=f"Cloud Workflow: {node_dict.get('label', name)}",
+        ))
+        result.outputs.append(TFBlock(
+            block_type="output",
+            labels=[f"{tf_id}_name"],
+            body={
+                "description": f"Workflow name {name}",
+                "value":       f"${{google_workflows_workflow.{tf_id}.name}}",
+            },
+        ))
+        return result
 
     def live_outputs(self, pulumi_outputs, project, region) -> dict:
         return {"name": pulumi_outputs.get("workflow_name", "")}

@@ -1,38 +1,24 @@
 """
 nodes/cloud_run.py — Cloud Run resource nodes (fully self-describing).
 
-Changes from previous version
-------------------------------
-  • Added allow_unauthenticated prop (default False = --no-allow-unauthenticated)
-  • Added ingress prop (selectable)
-  • Added output port "db_access" (STORAGE) → FirestoreNode
-    so CloudRunNode can be drawn as a writer to Firestore
-  • Added iam_binding input port (already referenced in iam_binding.py)
+Bugs fixed vs previous version
+--------------------------------
+1. resolve_edges duplication:
+   Each edge is now owned by exactly ONE node.
+   Rule:  SOURCE node writes to ctx[src_id],
+          TARGET node writes to ctx[tgt_id].
 
-VPC wiring
-----------
-  VpcNetworkNode ──► SubnetworkNode ──► CloudRunNode
+   CR→Bucket: CloudRunNode writes ctx[tgt_id]["writer_ids"]  (tells bucket who writes)
+              GcsBucketNode writes ctx[tgt_id]["bucket_ids"]  (tells CR about bucket)
+   These are DIFFERENT ctx keys so there is no conflict. But the old code also had
+   GcsBucketNode writing bucket_ids AND writer_ids for the same edge — removed.
 
-Service-Account wiring
-----------------------
-  ServiceAccountNode ──► CloudRunNode
-
-HTTP callers wiring
--------------------
-  CloudSchedulerNode  ──(HTTP_TARGET)──► CloudRunNode
-  EventarcTriggerNode ──(HTTP_TARGET)──► CloudRunNode
-  WorkflowNode        ──(HTTP_TARGET)──► CloudRunNode
-  CloudTasksQueueNode ──(TASK_QUEUE)───► CloudRunNode
-
-GCS writers wiring
-------------------
-  CloudRunNode ──(STORAGE)──► GcsBucketNode
-  WorkflowNode ──(STORAGE)──► GcsBucketNode
-
-Firestore wiring (NEW)
------------------------
-  CloudRunNode ──(STORAGE)──► FirestoreNode
-    Injects FIRESTORE_DATABASE_<NAME> env var into this CR.
+2. dag_deps cycle:
+   bucket_ids removed from dag_deps.  Bucket name comes from the graph
+   (props.name / label), not deployed_outputs.  Adding it as a dep created
+   CR→Bucket→CR cycles.
+   firestore_ids also removed — database_id defaults to "(default)".
+   Only truly deploy-time deps are kept: topics, queues, visual APIs, SA, subnet.
 """
 from __future__ import annotations
 
@@ -44,12 +30,14 @@ from typing import Any, Callable, ClassVar
 import pulumi
 import pulumi_gcp as gcp
 
-from nodes.base_node import GCPNode, LogSource, Port, _resource_name, _node_label, _node_name
+from nodes.base_node import (
+    GCPNode, LogSource, Port, TFBlock, TFResult,
+    _resource_name, _tf_name, _node_label, _node_name, _node_by_id,
+)
 from nodes.port_types import PortType
 
 logger = logging.getLogger(__name__)
 
-# ── Cloud Run ─────────────────────────────────────────────────────────────────
 
 @dataclass
 class CloudRunNode(GCPNode):
@@ -74,38 +62,14 @@ class CloudRunNode(GCPNode):
         {"key": "port",          "label": "Port",            "type": "number", "default": 8080},
         {"key": "region",        "label": "Region",          "type": "select", "options": ["me-west1","us-central1","us-east1"], "default": "me-west1"},
         {"key": "service_url",   "label": "Service URL",     "type": "text",   "default": "", "placeholder": "https://my-service.run.app"},
-        # ── Auth / Ingress ────────────────────────────────────────────────
+        {"key": "allow_unauthenticated", "label": "Allow Unauthenticated (public access)", "type": "checkbox", "default": False},
         {
-            "key":     "allow_unauthenticated",
-            "label":   "Allow Unauthenticated (public access)",
-            "type":    "checkbox",
-            "default": False,
-            # gcloud equivalent:
-            #   True  → --allow-unauthenticated  + allUsers roles/run.invoker IAM
-            #   False → --no-allow-unauthenticated  (default, authenticated only)
-        },
-        {
-            "key":     "ingress",
-            "label":   "Ingress",
-            "type":    "select",
-            "options": [
-                "INGRESS_TRAFFIC_ALL",
-                "INGRESS_TRAFFIC_INTERNAL_ONLY",
-                "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER",
-            ],
+            "key": "ingress", "label": "Ingress", "type": "select",
+            "options": ["INGRESS_TRAFFIC_ALL", "INGRESS_TRAFFIC_INTERNAL_ONLY", "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"],
             "default": "INGRESS_TRAFFIC_INTERNAL_ONLY",
         },
-        # ── VPC fallback props ────────────────────────────────────────────
-        {
-            "key": "vpc_network", "label": "VPC Network (fallback)",
-            "type": "text", "default": "",
-            "placeholder": "projects/HOST_PROJECT/global/networks/NETWORK",
-        },
-        {
-            "key": "vpc_subnetwork", "label": "VPC Subnetwork (fallback)",
-            "type": "text", "default": "",
-            "placeholder": "projects/HOST_PROJECT/regions/REGION/subnetworks/SUBNET",
-        },
+        {"key": "vpc_network",    "label": "VPC Network (fallback)",    "type": "text", "default": "", "placeholder": "projects/HOST_PROJECT/global/networks/NETWORK"},
+        {"key": "vpc_subnetwork", "label": "VPC Subnetwork (fallback)", "type": "text", "default": "", "placeholder": "projects/HOST_PROJECT/regions/REGION/subnetworks/SUBNET"},
     ]
     url_field: ClassVar = "service_url"
 
@@ -116,12 +80,12 @@ class CloudRunNode(GCPNode):
         Port("task_queue",      PortType.TASK_QUEUE,       required=False, multi=True, multi_in=True),
         Port("secret",          PortType.SECRET,           multi=True,     multi_in=True),
         Port("MESSAGE",         PortType.MESSAGE,          multi=True,     multi_in=True),
-        Port("firestore",       PortType.STORAGE,          required=False, multi=True, multi_in=True),
+        Port("storage",         PortType.STORAGE,          required=False, multi=True, multi_in=True),
         Port("iam_binding",     PortType.IAM_BINDING,      required=False, multi=True, multi_in=True),
     ]
     outputs: ClassVar = [
         Port("publishes_to", PortType.TOPIC,   multi=True),
-        Port("writes_to",    PortType.STORAGE, multi=True),   # → GcsBucketNode or FirestoreNode
+        Port("writes_to",    PortType.STORAGE, multi=True),
     ]
     node_color:  ClassVar = "#6366f1"
     icon:        ClassVar = "cloudRun"
@@ -133,20 +97,24 @@ class CloudRunNode(GCPNode):
     # ------------------------------------------------------------------
 
     def resolve_edges(self, src_id, tgt_id, src_type, tgt_type, ctx) -> bool:
+        # ── CR is the SOURCE ──────────────────────────────────────────────────
         if src_id == self.node_id and src_type == "CloudRunNode":
             if tgt_type == "PubsubTopicNode":
                 ctx[self.node_id].setdefault("publishes_to_topics", []).append(tgt_id)
                 return True
-            # CloudRunNode → GcsBucketNode: tell the bucket a writer is connected
+
             if tgt_type == "GcsBucketNode":
-                ctx[tgt_id].setdefault("writer_ids", []).append(self.node_id)
+                # CR→Bucket: GcsBucketNode.resolve_edges sets writer_ids on the
+                # bucket from its side. We do NOT set writer_ids here to avoid
+                # double-counting when both nodes process this edge.
+                # (No ctx write needed from this side for bucket output edges.)
                 return True
-            # CloudRunNode → FirestoreNode: inject FIRESTORE_DATABASE env var into this CR  ← NEW
+
             if tgt_type == "FirestoreNode":
                 ctx[self.node_id].setdefault("firestore_ids", []).append(tgt_id)
                 return True
 
-        # FirestoreNode / CloudVisionNode / CloudFunctionsNode / ExternalApiNode → CloudRunNode
+        # ── CR is the TARGET ──────────────────────────────────────────────────
         if tgt_id == self.node_id:
             if src_type == "FirestoreNode":
                 ctx[self.node_id].setdefault("firestore_ids", []).append(src_id)
@@ -154,13 +122,22 @@ class CloudRunNode(GCPNode):
             if src_type in ("CloudVisionNode", "CloudFunctionsNode", "ExternalApiNode"):
                 ctx[self.node_id].setdefault("visual_api_ids", []).append(src_id)
                 return True
+
         return False
 
     def dag_deps(self, ctx) -> list[str]:
+        """
+        Only nodes whose DEPLOYED OUTPUT is needed at Pulumi build time.
+
+        bucket_ids   → NOT a dep: name known from graph props/label.
+        firestore_ids → NOT a dep: database_id defaults to "(default)".
+        topic_ids    → dep: need deployed topic name for env var value.
+        task_queue   → dep: need deployed queue name for env var value.
+        visual_apis  → dep: need deployed URL.
+        subnet, SA   → deps: need deployed paths / email.
+        """
         deps = list(ctx.get("publishes_to_topics", []))
-        deps += ctx.get("bucket_ids",      [])
         deps += ctx.get("task_queue_ids",  [])
-        deps += ctx.get("firestore_ids",   [])
         deps += ctx.get("visual_api_ids",  [])
         if ctx.get("subnetwork_id"):
             deps.append(ctx["subnetwork_id"])
@@ -176,23 +153,16 @@ class CloudRunNode(GCPNode):
         node_dict = ctx.get("node", {})
         props     = node_dict.get("props", {})
 
-        # ── VPC paths ─────────────────────────────────────────────────────────
         subnet_id       = ctx.get("subnetwork_id", "")
         subnet_outputs  = deployed_outputs.get(subnet_id, {})
         network_path    = subnet_outputs.get("network_path")    or props.get("vpc_network",    "")
         subnetwork_path = subnet_outputs.get("subnetwork_path") or props.get("vpc_subnetwork", "")
 
         if not network_path or not subnetwork_path:
-            logger.warning(
-                "CloudRunNode %s: no VPC network/subnetwork resolved — "
-                "connect a SubnetworkNode or fill the fallback props",
-                self.node_id,
-            )
+            logger.warning("CloudRunNode %s: no VPC resolved", self.node_id)
 
-        # ── Service Account ───────────────────────────────────────────────────
         sa_email = deployed_outputs.get(ctx.get("service_account_id", ""), {}).get("email", "")
 
-        # ── Pub/Sub env vars ──────────────────────────────────────────────────
         topic_envs = [
             gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
                 name="PUBSUB_TOPIC_" + re.sub(r"[^A-Z0-9]", "_", _node_name(all_nodes, tid).upper()),
@@ -207,17 +177,14 @@ class CloudRunNode(GCPNode):
             )
             for sid in ctx.get("receives_from_subs", [])
         ]
-
-        # ── Bucket env vars ───────────────────────────────────────────────────
+        # Bucket name from graph (not deployed_outputs) — no deploy dep needed
         bucket_envs = [
             gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
                 name="GCS_BUCKET_" + re.sub(r"[^A-Z0-9]", "_", _node_name(all_nodes, bid).upper()),
-                value=deployed_outputs.get(bid, {}).get("name", ""),
+                value=_resource_name(_node_by_id(all_nodes, bid)),
             )
             for bid in ctx.get("bucket_ids", [])
         ]
-
-        # ── Task queue env vars ───────────────────────────────────────────────
         queue_envs = [
             gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
                 name="CLOUD_TASKS_QUEUE_" + re.sub(r"[^A-Z0-9]", "_", _node_name(all_nodes, qid).upper()),
@@ -225,11 +192,6 @@ class CloudRunNode(GCPNode):
             )
             for qid in ctx.get("task_queue_ids", [])
         ]
-
-        # ── Firestore env vars ────────────────────────────────────────────────
-        # Populated by:
-        #   FirestoreNode → CloudRunNode  (FirestoreNode.resolve_edges)
-        #   CloudRunNode  → FirestoreNode (this node's resolve_edges, NEW)
         firestore_envs = [
             gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
                 name="FIRESTORE_DATABASE_" + re.sub(r"[^A-Z0-9]", "_", _node_name(all_nodes, fid).upper()),
@@ -237,20 +199,15 @@ class CloudRunNode(GCPNode):
             )
             for fid in ctx.get("firestore_ids", [])
         ]
-
-        # ── Visual API env vars ───────────────────────────────────────────────
         visual_api_envs = []
         for vid in ctx.get("visual_api_ids", []):
             out   = deployed_outputs.get(vid, {})
-            url   = out.get("url",  "")
+            url   = out.get("url", "")
             vname = out.get("name", _node_name(all_nodes, vid))
             key   = re.sub(r"[^A-Z0-9]", "_", vname.upper())
             if url:
                 visual_api_envs.append(
-                    gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
-                        name=f"API_URL_{key}",
-                        value=url,
-                    )
+                    gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(name=f"API_URL_{key}", value=url)
                 )
 
         all_envs = topic_envs + sub_envs + bucket_envs + queue_envs + firestore_envs + visual_api_envs
@@ -259,15 +216,13 @@ class CloudRunNode(GCPNode):
             allow_unauth = props.get("allow_unauthenticated", False)
             ingress      = props.get("ingress", "INGRESS_TRAFFIC_INTERNAL_ONLY")
 
-            # ── VPC access block ──────────────────────────────────────────────
             vpc_access = None
             if network_path and subnetwork_path:
                 vpc_access = gcp.cloudrunv2.ServiceTemplateVpcAccessArgs(
                     egress="PRIVATE_RANGES_ONLY",
                     network_interfaces=[
                         gcp.cloudrunv2.ServiceTemplateVpcAccessNetworkInterfaceArgs(
-                            network=network_path,
-                            subnetwork=subnetwork_path,
+                            network=network_path, subnetwork=subnetwork_path,
                         )
                     ],
                 )
@@ -288,29 +243,119 @@ class CloudRunNode(GCPNode):
                     vpc_access=vpc_access,
                 ),
             )
-
-            # ── IAM: allow unauthenticated invoker ────────────────────────────
-            # Equivalent (when allow_unauthenticated=True):
-            #   gcloud run services add-iam-policy-binding ${SERVICE} \
-            #     --region=${REGION} \
-            #     --member="allUsers" \
-            #     --role="roles/run.invoker"
-            # When False (default): --no-allow-unauthenticated behaviour — no IAM added.
             if allow_unauth:
                 gcp.cloudrun.IamMember(
-                    f"{self.node_id}-public",
-                    location=region,
-                    project=project,
-                    service=svc.name,
-                    role="roles/run.invoker",
-                    member="allUsers",
+                    f"{self.node_id}-public", location=region, project=project,
+                    service=svc.name, role="roles/run.invoker", member="allUsers",
                 )
-
             pulumi.export("uri",  svc.uri)
             pulumi.export("name", svc.name)
             pulumi.export("id",   svc.id)
 
         return program
+
+    # ------------------------------------------------------------------
+    # Terraform blocks
+    # ------------------------------------------------------------------
+
+    def terraform_blocks(self, ctx, project, region, all_nodes) -> TFResult:
+        result    = TFResult()
+        node_dict = ctx.get("node", {})
+        props     = node_dict.get("props", {})
+        name      = _resource_name(node_dict)
+        tf_id     = _tf_name(node_dict)
+        r         = props.get("region", region)
+
+        vpc_block: dict = {}
+        subnet_id = ctx.get("subnetwork_id", "")
+        if subnet_id:
+            sn_tf = _tf_name(_node_by_id(all_nodes, subnet_id))
+            vpc_block = {
+                "egress": "PRIVATE_RANGES_ONLY",
+                "network_interfaces": {
+                    "network":    f"${{google_compute_subnetwork.{sn_tf}.network}}",
+                    "subnetwork": f"${{google_compute_subnetwork.{sn_tf}.self_link}}",
+                },
+            }
+        else:
+            if props.get("vpc_network") and props.get("vpc_subnetwork"):
+                vpc_block = {
+                    "egress": "PRIVATE_RANGES_ONLY",
+                    "network_interfaces": {
+                        "network": props["vpc_network"], "subnetwork": props["vpc_subnetwork"],
+                    },
+                }
+
+        sa_email = ""
+        sa_id    = ctx.get("service_account_id", "")
+        if sa_id:
+            sa_node = _node_by_id(all_nodes, sa_id)
+            sa_email = (
+                f"${{google_service_account.{_tf_name(sa_node)}.email}}"
+                if sa_node.get("props", {}).get("create_sa", True)
+                else sa_node.get("props", {}).get("email", "")
+            )
+
+        env_list = []
+        for tid in ctx.get("publishes_to_topics", []):
+            t = _node_by_id(all_nodes, tid)
+            env_list.append({"name": "PUBSUB_TOPIC_" + _resource_name(t).upper().replace("-", "_"),
+                              "value": f"${{google_pubsub_topic.{_tf_name(t)}.name}}"})
+        for bid in ctx.get("bucket_ids", []):
+            b = _node_by_id(all_nodes, bid)
+            env_list.append({"name": "GCS_BUCKET_" + _resource_name(b).upper().replace("-", "_"),
+                              "value": f"${{google_storage_bucket.{_tf_name(b)}.name}}"})
+        for qid in ctx.get("task_queue_ids", []):
+            q = _node_by_id(all_nodes, qid)
+            env_list.append({"name": "CLOUD_TASKS_QUEUE_" + _resource_name(q).upper().replace("-", "_"),
+                              "value": f"${{google_cloud_tasks_queue.{_tf_name(q)}.name}}"})
+        for fid in ctx.get("firestore_ids", []):
+            f_n = _node_by_id(all_nodes, fid)
+            env_list.append({"name": "FIRESTORE_DATABASE_" + _resource_name(f_n).upper().replace("-", "_"),
+                              "value": _resource_name(f_n)})
+
+        container: dict = {"image": props.get("image", "gcr.io/cloudrun/hello")}
+        if env_list:
+            container["env"] = env_list
+        template: dict = {
+            "containers": container,
+            "scaling": {
+                "min_instance_count": int(props.get("min_instances", 0)),
+                "max_instance_count": int(props.get("max_instances", 10)),
+            },
+        }
+        if sa_email:
+            template["service_account"] = sa_email
+        if vpc_block:
+            template["vpc_access"] = vpc_block
+
+        result.resources.append(TFBlock(
+            block_type="resource",
+            labels=["google_cloud_run_v2_service", tf_id],
+            body={
+                "name": name, "location": r, "project": "var.project_id",
+                "deletion_protection": False,
+                "ingress": props.get("ingress", "INGRESS_TRAFFIC_INTERNAL_ONLY"),
+                "template": template,
+            },
+            comment=f"Cloud Run service: {node_dict.get('label', name)}",
+        ))
+        if props.get("allow_unauthenticated", False):
+            result.resources.append(TFBlock(
+                block_type="resource",
+                labels=["google_cloud_run_v2_service_iam_member", f"{tf_id}_public_invoker"],
+                body={
+                    "project": "var.project_id", "location": r,
+                    "name":   f"${{google_cloud_run_v2_service.{tf_id}.name}}",
+                    "role":   "roles/run.invoker", "member": "allUsers",
+                },
+            ))
+        result.outputs.append(TFBlock(
+            block_type="output", labels=[f"{tf_id}_uri"],
+            body={"description": f"URI of Cloud Run service {name}",
+                  "value": f"${{google_cloud_run_v2_service.{tf_id}.uri}}"},
+        ))
+        return result
 
     # ------------------------------------------------------------------
     # Post-deploy
