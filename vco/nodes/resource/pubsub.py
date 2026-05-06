@@ -10,7 +10,11 @@ from typing import Any, Callable, ClassVar
 import pulumi
 import pulumi_gcp as gcp
 
-from nodes.base_node import GCPNode, LogSource, Port, _resource_name, _node_label
+from nodes.base_node import (
+    GCPNode, LogSource, Port, TFBlock, 
+    _resource_name, _node_label, _tf_name,
+    TFModule, _std_module_variables, TFBlock
+    )
 from nodes.port_types import PortType
 
 logger = logging.getLogger(__name__)
@@ -69,6 +73,50 @@ class PubsubTopicNode(GCPNode):
     def live_outputs(self, pulumi_outputs, project, region) -> dict:
         # Topics have no interesting URL to show, just expose the name
         return {"topic_name": pulumi_outputs.get("name", "")}
+
+    def terraform_module(self, ctx, project, region, all_nodes) -> "TFModule":
+        """
+        Emits:
+          modules/<tf_id>/
+            main.tf      — google_pubsub_topic
+            variables.tf — project_id, region
+            outputs.tf   — name, id
+
+        Consumers (CloudRunNode, WorkflowNode) reference the topic as:
+          module.<tf_id>.name
+        """
+
+        node_dict = ctx.get("node", {})
+        props     = node_dict.get("props", {})
+        name      = props.get("name") or _resource_name(node_dict)
+        tf_id     = _tf_name(node_dict)
+
+        module = TFModule(
+            module_name=tf_id,
+            variables=_std_module_variables(),
+        )
+
+        module.resources.append(TFBlock(
+            block_type="resource",
+            labels=["google_pubsub_topic", "this"],
+            body={
+                "name":                       name,
+                "project":                    "var.project_id",
+                "message_retention_duration": props.get("message_retention_duration", "604800s"),
+            },
+            comment=f"Pub/Sub Topic: {node_dict.get('label', name)}",
+        ))
+
+        module.outputs += [
+            TFBlock("output", ["name"],
+                    {"description": f"Name of Pub/Sub topic {name}",
+                     "value":       "${google_pubsub_topic.this.name}"}),
+            TFBlock("output", ["id"],
+                    {"description": f"ID of Pub/Sub topic {name}",
+                     "value":       "${google_pubsub_topic.this.id}"}),
+        ]
+
+        return module
 
     def log_source(self, pulumi_outputs, project, region) -> LogSource | None:
         name = pulumi_outputs.get("name", "")

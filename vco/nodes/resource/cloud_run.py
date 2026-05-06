@@ -33,6 +33,7 @@ import pulumi_gcp as gcp
 from nodes.base_node import (
     GCPNode, LogSource, Port, TFBlock, TFResult,
     _resource_name, _tf_name, _node_label, _node_name, _node_by_id,
+    TFModule, _std_module_variables
 )
 from nodes.port_types import PortType
 
@@ -356,6 +357,190 @@ class CloudRunNode(GCPNode):
                   "value": f"${{google_cloud_run_v2_service.{tf_id}.uri}}"},
         ))
         return result
+
+    # ------------------------------------------------------------------
+    # Terraform module  (module-per-resource architecture)
+    # ------------------------------------------------------------------
+
+    def terraform_module(self, ctx, project, region, all_nodes) -> "TFModule":
+        """
+        Emits:
+          modules/<tf_id>/
+            main.tf      — google_cloud_run_v2_service  +  optional public IAM
+            variables.tf — project_id, region, sa_email, env vars from wired nodes
+            outputs.tf   — uri, name
+
+        Cross-module wiring (injected by the engine via call_vars):
+          SA email      →  module.<sa_tf>.email
+          Pub/Sub name  →  module.<topic_tf>.name
+          GCS name      →  module.<bucket_tf>.name
+          Tasks name    →  module.<queue_tf>.name
+        """
+        node_dict = ctx.get("node", {})
+        props     = node_dict.get("props", {})
+        svc_name  = _resource_name(node_dict)
+        tf_id     = _tf_name(node_dict)
+        r         = props.get("region", region)
+
+        module = TFModule(
+            module_name=tf_id,
+            variables=_std_module_variables(),
+        )
+
+        # ── SA email: cross-module reference ──────────────────────────────────
+        sa_email_val = ""
+        sa_id = ctx.get("service_account_id", "")
+        if sa_id:
+            sa_node = _node_by_id(all_nodes, sa_id)
+            sa_tf   = _tf_name(sa_node)
+            if sa_node.get("props", {}).get("create_sa", True):
+                module.variables.append(TFBlock(
+                    "variable", ["sa_email"],
+                    {"description": "Service account email", "type": "string", "default": ""},
+                ))
+                module.call_vars["sa_email"] = f"module.{sa_tf}.email"
+                sa_email_val = "var.sa_email"
+            else:
+                sa_email_val = sa_node.get("props", {}).get("email", "")
+
+        # ── VPC: cross-module or literal ──────────────────────────────────────
+        network_val    = ""
+        subnetwork_val = ""
+        subnet_id = ctx.get("subnetwork_id", "")
+        if subnet_id:
+            sn_node = _node_by_id(all_nodes, subnet_id)
+            sn_tf   = _tf_name(sn_node)
+            module.variables += [
+                TFBlock("variable", ["vpc_network"],    {"description": "VPC network path",    "type": "string", "default": ""}),
+                TFBlock("variable", ["vpc_subnetwork"], {"description": "VPC subnetwork path", "type": "string", "default": ""}),
+            ]
+            module.call_vars["vpc_network"]    = f"module.{sn_tf}.network_path"
+            module.call_vars["vpc_subnetwork"] = f"module.{sn_tf}.subnetwork_path"
+            network_val    = "var.vpc_network"
+            subnetwork_val = "var.vpc_subnetwork"
+        elif props.get("vpc_network") and props.get("vpc_subnetwork"):
+            network_val    = props["vpc_network"]
+            subnetwork_val = props["vpc_subnetwork"]
+
+        # ── Env vars: each wired node becomes a variable + call_var ───────────
+        env_list: list[dict] = []
+
+        for tid in ctx.get("publishes_to_topics", []):
+            t    = _node_by_id(all_nodes, tid)
+            t_tf = _tf_name(t)
+            vkey = f"topic_{_resource_name(t).replace('-', '_')}"
+            module.variables.append(TFBlock(
+                "variable", [vkey],
+                {"description": f"Pub/Sub topic name ({_resource_name(t)})", "type": "string", "default": ""},
+            ))
+            module.call_vars[vkey] = f"module.{t_tf}.name"
+            env_list.append({
+                "name":  "PUBSUB_TOPIC_" + _resource_name(t).upper().replace("-", "_"),
+                "value": f"var.{vkey}",
+            })
+
+        for bid in ctx.get("bucket_ids", []):
+            b    = _node_by_id(all_nodes, bid)
+            b_tf = _tf_name(b)
+            vkey = f"bucket_{_resource_name(b).replace('-', '_')}"
+            module.variables.append(TFBlock(
+                "variable", [vkey],
+                {"description": f"GCS bucket name ({_resource_name(b)})", "type": "string", "default": ""},
+            ))
+            module.call_vars[vkey] = f"module.{b_tf}.name"
+            env_list.append({
+                "name":  "GCS_BUCKET_" + _resource_name(b).upper().replace("-", "_"),
+                "value": f"var.{vkey}",
+            })
+
+        for qid in ctx.get("task_queue_ids", []):
+            q    = _node_by_id(all_nodes, qid)
+            q_tf = _tf_name(q)
+            vkey = f"queue_{_resource_name(q).replace('-', '_')}"
+            module.variables.append(TFBlock(
+                "variable", [vkey],
+                {"description": f"Cloud Tasks queue name ({_resource_name(q)})", "type": "string", "default": ""},
+            ))
+            module.call_vars[vkey] = f"module.{q_tf}.name"
+            env_list.append({
+                "name":  "CLOUD_TASKS_QUEUE_" + _resource_name(q).upper().replace("-", "_"),
+                "value": f"var.{vkey}",
+            })
+
+        for fid in ctx.get("firestore_ids", []):
+            f_n  = _node_by_id(all_nodes, fid)
+            vkey = f"firestore_{_resource_name(f_n).replace('-', '_')}"
+            module.variables.append(TFBlock(
+                "variable", [vkey],
+                {"description": f"Firestore database id ({_resource_name(f_n)})", "type": "string", "default": "(default)"},
+            ))
+            # Firestore name comes from props directly (no separate module)
+            module.call_vars[vkey] = f'"{_resource_name(f_n)}"'
+            env_list.append({
+                "name":  "FIRESTORE_DATABASE_" + _resource_name(f_n).upper().replace("-", "_"),
+                "value": f"var.{vkey}",
+            })
+
+        # ── Assemble container + template ─────────────────────────────────────
+        container: dict = {"image": props.get("image", "gcr.io/cloudrun/hello")}
+        if env_list:
+            container["env"] = env_list
+
+        template: dict = {
+            "containers": container,
+            "scaling": {
+                "min_instance_count": int(props.get("min_instances", 0)),
+                "max_instance_count": int(props.get("max_instances", 10)),
+            },
+        }
+        if sa_email_val:
+            template["service_account"] = sa_email_val
+        if network_val and subnetwork_val:
+            template["vpc_access"] = {
+                "egress": "PRIVATE_RANGES_ONLY",
+                "network_interfaces": {
+                    "network":    network_val,
+                    "subnetwork": subnetwork_val,
+                },
+            }
+
+        module.resources.append(TFBlock(
+            block_type="resource",
+            labels=["google_cloud_run_v2_service", "this"],
+            body={
+                "name":                svc_name,
+                "location":            r,
+                "project":             "var.project_id",
+                "deletion_protection": False,
+                "ingress":             props.get("ingress", "INGRESS_TRAFFIC_INTERNAL_ONLY"),
+                "template":            template,
+            },
+            comment=f"Cloud Run service: {node_dict.get('label', svc_name)}",
+        ))
+
+        if props.get("allow_unauthenticated", False):
+            module.resources.append(TFBlock(
+                block_type="resource",
+                labels=["google_cloud_run_v2_service_iam_member", "public_invoker"],
+                body={
+                    "project":  "var.project_id",
+                    "location": r,
+                    "name":     "${google_cloud_run_v2_service.this.name}",
+                    "role":     "roles/run.invoker",
+                    "member":   "allUsers",
+                },
+            ))
+
+        module.outputs += [
+            TFBlock("output", ["uri"],
+                    {"description": f"URI of Cloud Run service {svc_name}",
+                     "value":       "${google_cloud_run_v2_service.this.uri}"}),
+            TFBlock("output", ["name"],
+                    {"description": f"Name of Cloud Run service {svc_name}",
+                     "value":       "${google_cloud_run_v2_service.this.name}"}),
+        ]
+
+        return module
 
     # ------------------------------------------------------------------
     # Post-deploy

@@ -66,7 +66,9 @@ def _save_tf_files(namespace: str, files: dict[str, str], meta: dict) -> None:
     """
     tf_dir = _tf_dir(namespace)
     for filename, content in files.items():
-        (tf_dir / filename).write_text(content, encoding="utf-8")
+        dest = tf_dir / filename
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(content, encoding="utf-8")
 
     manifest = {
         **meta,
