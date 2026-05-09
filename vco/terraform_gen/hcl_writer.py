@@ -3,20 +3,17 @@ terraform_gen/hcl_writer.py
 ============================
 Converts TFBlock dataclass objects into properly formatted Terraform HCL.
 
-TFBlock is now defined in nodes/base_node.py (single source of truth).
-This module imports it from there — no dependency on the old
-terraform_gen/generators/ package.
-
-Design principles:
-  - Strings that start with "${"  are written as quoted interpolations
-  - Bare TF references (var.x, google_type.name.attr) → unquoted
-  - Booleans → true / false  (not Python True/False)
-  - Numbers  → unquoted
-  - Lists    → [ ]
-  - Dicts    → nested blocks  { }
-  - Keys that start with "_"  are treated as comment lines (skipped as attrs)
-  - A non-empty `comment` field on the TFBlock is emitted as `# ...` above
-    the block header.
+Rules:
+  - type = string / number / bool / map(string) etc  → bare (no quotes)
+  - Bare TF references (var.x, local.x, module.x.y)  → no quotes
+  - ${...} interpolations                             → quoted
+  - true / false / null                               → bare
+  - Booleans                                          → true / false
+  - Numbers                                           → unquoted
+  - Empty dict {}                                     → = {}  (assignment, not block)
+  - Non-empty dict                                    → block  key { ... }
+  - Keys starting with "dynamic "                     → dynamic block
+  - "locals" block_type                               → locals { ... }  (no label quotes)
 """
 from __future__ import annotations
 
@@ -24,23 +21,30 @@ import re
 from typing import Any
 
 
-def _is_tf_ref(value: str) -> bool:
-    """
-    True if the string should be written WITHOUT surrounding quotes in HCL.
+# HCL primitive type keywords — never quoted
+_HCL_TYPES = {
+    "string", "number", "bool", "any",
+    "list(string)", "list(number)", "list(bool)", "list(any)",
+    "map(string)", "map(number)", "map(bool)", "map(any)",
+    "set(string)", "set(number)", "set(bool)",
+    "object({})", "tuple([])",
+}
 
-    - Bare TF references (var.x, google_type.name.attr, data.type.name.attr)
-      → bare:   project = var.project_id
-    - ${...} interpolations MUST be inside quoted strings:
-      value = "${google_pubsub_topic.x.name}"
-      → return False (caller wraps in quotes)
-    - true / false / null are HCL keywords → bare.
-    """
+
+def _is_tf_ref(value: str) -> bool:
+    """True → write bare (no quotes)."""
     if not value:
         return False
+    # HCL type keywords
+    if value in _HCL_TYPES:
+        return True
+    # HCL keywords
     if value in ("true", "false", "null"):
         return True
+    # ${...} interpolation — MUST be quoted
     if value.startswith("${"):
-        return False  # interpolation — must be quoted
+        return False
+    # Bare references: var.x  local.x  module.x.y  google_*.*.attr
     parts = value.split(".")
     if (
         len(parts) >= 2
@@ -82,77 +86,97 @@ def _format_value(value: Any, indent: int) -> str:
         return "[\n" + ",\n".join(lines) + f"\n{pad}]"
 
     if isinstance(value, dict):
+        if not value:
+            return "{}"
         lines = []
         for k, v in value.items():
             if k.startswith("_"):
                 lines.append(f"{pad_in}{v}")
                 continue
-            formatted_v = _format_value(v, indent + 1)
-            if isinstance(v, dict):
-                lines.append(f"{pad_in}{k} {{")
-                for ik, iv in v.items():
-                    if ik.startswith("_"):
-                        lines.append(f"{pad_in}  {iv}")
-                        continue
-                    fv = _format_value(iv, indent + 2)
-                    if isinstance(iv, dict):
-                        lines.append(f"{pad_in}  {ik} {{")
-                        for iik, iiv in iv.items():
-                            fiiv = _format_value(iiv, indent + 3)
-                            if isinstance(iiv, dict):
-                                lines.append(f"{pad_in}    {iik} {{")
-                                for iiik, iiiv in iiv.items():
-                                    fiiiv = _format_value(iiiv, indent + 4)
-                                    lines.append(f"{pad_in}      {iiik} = {fiiiv}")
-                                lines.append(f"{pad_in}    }}")
-                            else:
-                                lines.append(f"{pad_in}    {iik} = {fiiv}")
-                        lines.append(f"{pad_in}  }}")
-                    elif isinstance(iv, list) and iv and isinstance(iv[0], dict):
-                        for item in iv:
-                            lines.append(f"{pad_in}  {ik} {{")
-                            for lk, lv in item.items():
-                                flv = _format_value(lv, indent + 3)
-                                lines.append(f"{pad_in}    {lk} = {flv}")
-                            lines.append(f"{pad_in}  }}")
-                    else:
-                        lines.append(f"{pad_in}  {ik} = {fv}")
-                lines.append(f"{pad_in}}}")
-            elif isinstance(v, list) and v and isinstance(v[0], dict):
-                for item in v:
-                    lines.append(f"{pad_in}{k} {{")
-                    for lk, lv in item.items():
-                        flv = _format_value(lv, indent + 2)
-                        lines.append(f"{pad_in}  {lk} = {flv}")
-                    lines.append(f"{pad_in}}}")
-            else:
-                lines.append(f"{pad_in}{k} = {formatted_v}")
+            _write_kv(lines, k, v, indent)
         return "{\n" + "\n".join(lines) + f"\n{pad}}}"
 
     return f'"{value}"'
 
 
+def _write_kv(lines: list[str], key: str, value: Any, indent: int) -> None:
+    """Write one key/value pair into lines[] at the given indent level."""
+    pad_in = "  " * (indent + 1)
+
+    # dynamic block:  "dynamic env" or "dynamic vpc_access"
+    if key.startswith("dynamic "):
+        block_label = key[len("dynamic "):]
+        lines.append(f"{pad_in}dynamic \"{block_label}\" {{")
+        if isinstance(value, dict):
+            inner = indent + 2
+            pad2  = "  " * inner
+            pad3  = "  " * (inner + 1)
+            for ik, iv in value.items():
+                if ik == "content":
+                    lines.append(f"{pad2}content {{")
+                    if isinstance(iv, dict):
+                        for ck, cv in iv.items():
+                            lines.append(f"{pad3}{ck} = {_format_value(cv, inner + 1)}")
+                    lines.append(f"{pad2}}}")
+                else:
+                    lines.append(f"{pad2}{ik} = {_format_value(iv, inner)}")
+        lines.append(f"{pad_in}}}")
+        return
+
+    formatted = _format_value(value, indent + 1)
+
+    if isinstance(value, dict) and value:
+        # Non-empty dict → block syntax  key { ... }
+        lines.append(f"{pad_in}{key} {formatted}")
+    elif isinstance(value, list) and value and isinstance(value[0], dict):
+        # List of dicts → repeated blocks
+        for item in value:
+            lines.append(f"{pad_in}{key} {{")
+            inner_pad = "  " * (indent + 2)
+            for lk, lv in item.items():
+                lines.append(f"{inner_pad}{lk} = {_format_value(lv, indent + 2)}")
+            lines.append(f"{pad_in}}}")
+    else:
+        # Assignment
+        lines.append(f"{pad_in}{key} = {formatted}")
+
+
 def block_to_hcl(block) -> str:
-    """
-    Convert a single TFBlock to an HCL string.
-
-    TFBlock is imported from nodes.base_node — this function accepts any
-    object that has .block_type, .labels, .body, and .comment attributes.
-
-    Example output:
-      resource "google_pubsub_topic" "my_topic" {
-        name    = "my-topic"
-        project = var.project_id
-      }
-    """
+    """Convert a single TFBlock to HCL string."""
     lines: list[str] = []
 
     if block.comment:
         for c_line in block.comment.splitlines():
-            if c_line.startswith("#"):
-                lines.append(c_line)
+            lines.append(c_line if c_line.startswith("#") else f"# {c_line.lstrip('# ')}")
+
+    # locals block has no labels and no quotes
+    if block.block_type == "locals":
+        lines.append("locals {")
+        for key, value in block.body.items():
+            pad_in = "  "
+            if key.startswith("_"):
+                lines.append(f"  {value}")
             else:
-                lines.append(f"# {c_line.lstrip('# ')}")
+                lines.append(f"  {key} = {_format_value(value, 1)}")
+        lines.append("}")
+        return "\n".join(lines)
+
+    # variable block: type value must be bare (string not "string")
+    if block.block_type == "variable":
+        label_str = " ".join(f'"{lbl}"' for lbl in block.labels)
+        lines.append(f"variable {label_str} {{")
+        for key, value in block.body.items():
+            if key == "type":
+                # Always bare for type declarations
+                lines.append(f"  type = {value}")
+            elif key == "default" and isinstance(value, dict) and not value:
+                lines.append("  default = {}")
+            elif key.startswith("_"):
+                lines.append(f"  {value}")
+            else:
+                lines.append(f"  {key} = {_format_value(value, 1)}")
+        lines.append("}")
+        return "\n".join(lines)
 
     label_str = " ".join(f'"{lbl}"' for lbl in block.labels)
     lines.append(f"{block.block_type} {label_str} {{")
@@ -161,23 +185,11 @@ def block_to_hcl(block) -> str:
         if key.startswith("_"):
             lines.append(f"  {value}")
             continue
-        formatted = _format_value(value, indent=1)
-        if isinstance(value, dict):
-            lines.append(f"  {key} {formatted}")
-        elif isinstance(value, list) and value and isinstance(value[0], dict):
-            for item in value:
-                lines.append(f"  {key} {{")
-                for lk, lv in item.items():
-                    flv = _format_value(lv, 2)
-                    lines.append(f"    {lk} = {flv}")
-                lines.append("  }")
-        else:
-            lines.append(f"  {key} = {formatted}")
+        _write_kv(lines, key, value, indent=0)
 
     lines.append("}")
     return "\n".join(lines)
 
 
 def blocks_to_hcl(blocks: list) -> str:
-    """Join multiple TFBlock objects with blank lines between them."""
     return "\n\n".join(block_to_hcl(b) for b in blocks)

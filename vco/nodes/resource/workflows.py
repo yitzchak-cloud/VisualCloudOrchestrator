@@ -274,7 +274,57 @@ class WorkflowNode(GCPNode):
         return program
 
     # ------------------------------------------------------------------
-    # Terraform blocks
+    # Terraform static-module interface
+    # ------------------------------------------------------------------
+
+    @property
+    def terraform_dir(self):
+        from pathlib import Path
+        return Path(__file__).parent / "terraform" / "workflow"
+
+    @property
+    def terraform_instance_prefix(self): return "workflow"
+
+    def terraform_call_vars(self, ctx, project, region, all_nodes):
+        import re as _re
+        node_dict   = ctx.get("node", {})
+        props       = node_dict.get("props", {})
+        wf_name     = props.get("name") or _resource_name(node_dict)
+        source_yaml = (props.get("source_yaml") or "").strip()
+        if not source_yaml:
+            http_path = props.get("http_path", "/")
+            steps: list[str] = []
+            for rid in ctx.get("target_run_ids", []):
+                sname = _re.sub(r"[^a-z0-9_]", "_", _node_name(all_nodes, rid).lower())
+                cr_tf = _tf_name(_node_by_id(all_nodes, rid))
+                steps.append(
+                    f"  - {sname}:\n"
+                    f"      call: http.post\n"
+                    f"      args:\n"
+                    f"        url: ${{module.cr_{cr_tf}.uri}}{http_path}\n"
+                    f"        auth:\n"
+                    f"          type: OIDC\n"
+                    f"      result: {sname}_result"
+                )
+            source_yaml = (
+                "main:\n  steps:\n" + "\n".join(steps) + "\n  - done:\n      return: done"
+                if steps else "main:\n  steps:\n  - done:\n      return: done"
+            )
+        yaml_hcl = "<<-EOT\n" + source_yaml.replace("${", "$${") + "\nEOT"
+        cv = {
+            "name":        f'"{wf_name}"',
+            "source_yaml": yaml_hcl,
+        }
+        wf_region = props.get("region", region)
+        if wf_region != region:
+            cv["workflow_region"] = f'"{wf_region}"'
+        sa_id = ctx.get("service_account_id", "")
+        if sa_id:
+            cv["sa_email"] = f"module.sa_{_tf_name(_node_by_id(all_nodes, sa_id))}.email"
+        return cv
+
+    # ------------------------------------------------------------------
+    # Terraform blocks  (legacy)
     # ------------------------------------------------------------------
 
     def terraform_blocks(self, ctx, project, region, all_nodes) -> "TFResult":

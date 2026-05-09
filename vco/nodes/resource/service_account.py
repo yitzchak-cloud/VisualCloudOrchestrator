@@ -31,7 +31,6 @@ import pulumi_gcp as gcp
 from nodes.base_node import (
     GCPNode, Port, TFBlock, TFResult,
     _resource_name, _tf_name, _node_by_id,
-    TFModule, _std_module_variables
 )
 from nodes.port_types import PortType
 
@@ -227,7 +226,34 @@ class ServiceAccountNode(GCPNode):
         return program
 
     # ------------------------------------------------------------------
-    # Terraform blocks
+    # Terraform static-module interface
+    # ------------------------------------------------------------------
+
+    @property
+    def terraform_dir(self):
+        from pathlib import Path
+        return Path(__file__).parent / "terraform" / "service_account"
+
+    @property
+    def terraform_instance_prefix(self): return "sa"
+
+    def terraform_call_vars(self, ctx, project, region, all_nodes):
+        node_dict = ctx.get("node", {})
+        props     = node_dict.get("props", {})
+        roles     = _parse_project_roles(props.get("project_roles", ""))
+        roles_hcl = "[" + ", ".join(f'"{r}"' for r in roles) + "]"
+        cv = {
+            "account_id":    f'"{props.get("account_id") or _resource_name(node_dict)}"',
+            "display_name":  f'"{props.get("display_name") or node_dict.get("label","")}"',
+            "create_sa":     "false" if not props.get("create_sa", True) else "true",
+            "project_roles": roles_hcl,
+        }
+        if not props.get("create_sa", True) and props.get("email"):
+            cv["existing_email"] = f'"{props["email"]}"'
+        return cv
+
+    # ------------------------------------------------------------------
+    # Terraform blocks  (legacy flat-file, kept for compat)
     # ------------------------------------------------------------------
 
     def terraform_blocks(self, ctx, project, region, all_nodes) -> TFResult:
@@ -308,156 +334,6 @@ class ServiceAccountNode(GCPNode):
             )
 
         return result
-
-    # ------------------------------------------------------------------
-    # Terraform module  (module-per-resource architecture)
-    # ------------------------------------------------------------------
-
-    def terraform_module(self, ctx, project, region, all_nodes) -> "TFModule":
-        """
-        Emits:
-          modules/<tf_id>/
-            main.tf      — google_service_account  +  IAM bindings
-            variables.tf — project_id, region  (standard)
-            outputs.tf   — email
-
-        Root main.tf:
-          module "<tf_id>" {
-            source     = "./modules/<tf_id>"
-            project_id = var.project_id
-            region     = var.region
-          }
-
-        Cross-module consumers reference the email as:
-          module.<tf_id>.email
-        """
-        node_dict = ctx.get("node", {})
-        props     = node_dict.get("props", {})
-
-        create_sa    = props.get("create_sa", True)
-        account_id   = (props.get("account_id") or _resource_name(node_dict)).strip()
-        display_name = (props.get("display_name") or node_dict.get("label") or account_id)
-        ref_email    = props.get("email", "").strip()
-        tf_id        = _tf_name(node_dict)
-
-        project_roles     = _parse_project_roles(props.get("project_roles", ""))
-        resource_bindings = _parse_resource_bindings(props.get("resource_bindings", "[]"))
-
-        module = TFModule(
-            module_name=tf_id,
-            variables=_std_module_variables(),
-        )
-
-        # ── 1. SA resource ────────────────────────────────────────────────────
-        if create_sa:
-            module.resources.append(TFBlock(
-                block_type="resource",
-                labels=["google_service_account", "this"],
-                body={
-                    "account_id":   account_id,
-                    "display_name": display_name,
-                    "project":      "var.project_id",
-                },
-                comment=f"Service Account: {node_dict.get('label', account_id)}",
-            ))
-            # Inside the module, "this" is unambiguous
-            email_value  = "${google_service_account.this.email}"
-            member_value = "serviceAccount:${google_service_account.this.email}"
-        else:
-            # Reference-only — no resource created
-            email_value  = ref_email
-            member_value = f"serviceAccount:{ref_email}"
-
-        # ── 2. Output: email ──────────────────────────────────────────────────
-        # Consumers in root main.tf use:  module.<tf_id>.email
-        module.outputs.append(TFBlock(
-            block_type="output",
-            labels=["email"],
-            body={
-                "description": f"Email for SA {account_id}",
-                "value":       email_value,
-            },
-        ))
-
-        # ── 3. Project-level IAM bindings ─────────────────────────────────────
-        for role in project_roles:
-            safe = role.replace("/", "_").replace(".", "_")
-            module.resources.append(TFBlock(
-                block_type="resource",
-                labels=["google_project_iam_member", f"proj_{safe}"],
-                body={
-                    "project": "var.project_id",
-                    "role":    role,
-                    "member":  member_value,
-                },
-                comment=f"Project IAM: {role}",
-            ))
-
-        # ── 4. Resource-scoped IAM bindings ───────────────────────────────────
-        # Inside a module we reference sibling modules via var.<target_name>,
-        # injected through call_vars.  e.g. var.cr_name for a CR service name.
-        for idx, binding in enumerate(resource_bindings):
-            rtype  = binding.get("resource_type", "")
-            ref_id = binding.get("resource_ref", "")
-            role   = binding.get("role", "")
-            if not rtype or not role:
-                continue
-
-            target_node = _node_by_id(all_nodes, ref_id) if ref_id else {}
-            target_tf   = _tf_name(target_node) if target_node else ""
-
-            # Variable name for the target resource's name/id
-            var_key = f"target_{idx}_{rtype.replace('-', '_')}_name"
-            module.variables.append(TFBlock(
-                "variable", [var_key],
-                {"description": f"Name of {rtype} target for binding {idx}", "type": "string", "default": ""},
-            ))
-            target_ref = f"var.{var_key}"
-
-            # Pass the name from the target module
-            if target_tf:
-                if rtype == "cloud_run_service":
-                    module.call_vars[var_key] = f"module.{target_tf}.name"
-                elif rtype == "cloud_function":
-                    module.call_vars[var_key] = f"module.{target_tf}.name"
-                elif rtype == "cloud_tasks_queue":
-                    module.call_vars[var_key] = f"module.{target_tf}.name"
-
-            # Emit the correct IAM resource
-            if rtype == "cloud_run_service" and target_tf:
-                module.resources.append(TFBlock(
-                    "resource",
-                    ["google_cloud_run_v2_service_iam_member", f"res_{idx}"],
-                    {"project": "var.project_id", "location": "var.region",
-                     "name": target_ref, "role": role, "member": member_value},
-                    comment=f"IAM: {role} on Cloud Run service",
-                ))
-            elif rtype == "cloud_function" and target_tf:
-                module.resources.append(TFBlock(
-                    "resource",
-                    ["google_cloudfunctions_function_iam_member", f"res_{idx}"],
-                    {"project": "var.project_id", "region": "var.region",
-                     "cloud_function": target_ref, "role": role, "member": member_value},
-                    comment=f"IAM: {role} on Cloud Function",
-                ))
-            elif rtype == "cloud_tasks_queue" and target_tf:
-                module.resources.append(TFBlock(
-                    "resource",
-                    ["google_cloud_tasks_queue_iam_member", f"res_{idx}"],
-                    {"project": "var.project_id", "location": "var.region",
-                     "name": target_ref, "role": role, "member": member_value},
-                    comment=f"IAM: {role} on Cloud Tasks queue",
-                ))
-            else:
-                # Fallback: project-level
-                module.resources.append(TFBlock(
-                    "resource",
-                    ["google_project_iam_member", f"res_{idx}_fallback"],
-                    {"project": "var.project_id", "role": role, "member": member_value},
-                    comment=f"IAM: {role} (project-level fallback for {rtype})",
-                ))
-
-        return module
 
     # ------------------------------------------------------------------
     # Post-deploy

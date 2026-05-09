@@ -86,6 +86,39 @@ class CloudTasksQueueNode(GCPNode):
     description: ClassVar = "Asynchronous task execution queue"
 
     # ------------------------------------------------------------------
+    # Terraform static-module interface
+    # ------------------------------------------------------------------
+
+    @property
+    def terraform_dir(self):
+        from pathlib import Path
+        return Path(__file__).parent / "terraform" / "cloud_tasks_queue"
+
+    @property
+    def terraform_instance_prefix(self): return "queue"
+
+    def terraform_call_vars(self, ctx, project, region, all_nodes):
+        from nodes.base_node import _resource_name, _tf_name, _node_by_id
+        node_dict = ctx.get("node", {})
+        props     = node_dict.get("props", {})
+        cv = {
+            "name":                      f'"{props.get("name") or _resource_name(node_dict)}"',
+            "max_concurrent":            str(int(props.get("max_concurrent", 100))),
+            "max_dispatches_per_second": str(int(props.get("max_dispatches_per_second", 500))),
+            "max_attempts":              str(int(props.get("max_attempts", 5))),
+            "min_backoff":               str(int(props.get("min_backoff", 10))),
+            "max_backoff":               str(int(props.get("max_backoff", 300))),
+            "handler_path":              f'"{props.get("http_path", "/tasks/handle")}"',
+        }
+        run_ids = ctx.get("target_run_ids", [])
+        if run_ids:
+            cv["handler_uri"] = f"module.cr_{_tf_name(_node_by_id(all_nodes, run_ids[0]))}.uri"
+        sa_id = ctx.get("service_account_id", "")
+        if sa_id:
+            cv["sa_email"] = f"module.sa_{_tf_name(_node_by_id(all_nodes, sa_id))}.email"
+        return cv
+
+    # ------------------------------------------------------------------
     # Edge wiring
     # ------------------------------------------------------------------
 

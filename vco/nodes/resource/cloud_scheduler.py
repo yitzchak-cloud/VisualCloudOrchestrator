@@ -90,6 +90,44 @@ class CloudSchedulerNode(GCPNode):
     description: ClassVar = "Managed cron job service"
 
     # ------------------------------------------------------------------
+    # Terraform static-module interface
+    # ------------------------------------------------------------------
+
+    @property
+    def terraform_dir(self):
+        from pathlib import Path
+        return Path(__file__).parent / "terraform" / "cloud_scheduler"
+
+    @property
+    def terraform_instance_prefix(self): return "scheduler"
+
+    def terraform_call_vars(self, ctx, project, region, all_nodes):
+        node_dict = ctx.get("node", {})
+        props     = node_dict.get("props", {})
+        cv = {
+            "name":        f'"{props.get("name") or _resource_name(node_dict)}"',
+            "schedule":    f'"{props.get("schedule", "0 * * * *")}"',
+            "timezone":    f'"{props.get("timezone", "UTC")}"',
+            "retry_count": str(int(props.get("retry_count", 3))),
+            "http_method": f'"{props.get("http_method", "POST")}"',
+            "http_body":   f'"{props.get("http_body", "{}")}"',
+        }
+        run_ids   = ctx.get("target_run_ids", [])
+        topic_ids = ctx.get("target_topic_ids", [])
+        if run_ids:
+            cr_tf = _tf_name(_node_by_id(all_nodes, run_ids[0]))
+            path  = props.get("http_path", "/")
+            cv["http_uri"] = f'"${{module.cr_{cr_tf}.uri}}{path}"'
+        if topic_ids:
+            t_tf = _tf_name(_node_by_id(all_nodes, topic_ids[0]))
+            cv["pubsub_topic"]   = f'"projects/{project}/topics/${{module.topic_{t_tf}.name}}"'
+            cv["pubsub_message"] = f'"{props.get("pubsub_message", "{}")}"'
+        sa_id = ctx.get("service_account_id", "")
+        if sa_id:
+            cv["sa_email"] = f"module.sa_{_tf_name(_node_by_id(all_nodes, sa_id))}.email"
+        return cv
+
+    # ------------------------------------------------------------------
     # Edge wiring
     # ------------------------------------------------------------------
 

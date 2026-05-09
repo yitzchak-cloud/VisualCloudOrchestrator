@@ -118,6 +118,59 @@ class EventarcTriggerNode(GCPNode):
     description: ClassVar = "Modern event delivery — Cloud Run and Workflows"
 
     # ------------------------------------------------------------------
+    # Terraform static-module interface
+    # ------------------------------------------------------------------
+
+    @property
+    def terraform_dir(self):
+        from pathlib import Path
+        return Path(__file__).parent / "terraform" / "eventarc_trigger"
+
+    @property
+    def terraform_instance_prefix(self): return "trigger"
+
+    def terraform_call_vars(self, ctx, project, region, all_nodes):
+        from nodes.base_node import _resource_name, _tf_name, _node_by_id
+        node_dict  = ctx.get("node", {})
+        props      = node_dict.get("props", {})
+        cv = {
+            "name":      f'"{props.get("name") or _resource_name(node_dict)}"',
+            "http_path": f'"{props.get("http_path", "/")}"',
+        }
+        criterias: list[str] = []
+        topic_src  = ctx.get("topic_source_id", "")
+        bucket_src = ctx.get("bucket_source_id", "")
+        if topic_src:
+            t_tf = _tf_name(_node_by_id(all_nodes, topic_src))
+            cv["pubsub_topic"] = f"module.topic_{t_tf}.id"
+            criterias.append('{ attribute = "type", value = "google.cloud.pubsub.topic.v1.messagePublished" }')
+        elif bucket_src:
+            b_tf = _tf_name(_node_by_id(all_nodes, bucket_src))
+            evt  = props.get("gcs_event_type", "google.cloud.storage.object.v1.finalized")
+            criterias.append(f'{{ attribute = "type", value = "{evt}" }}')
+            criterias.append(f'{{ attribute = "bucket", value = module.bucket_{b_tf}.name }}')
+        else:
+            evt = props.get("direct_event_type", "")
+            svc = props.get("direct_service", "")
+            if evt: criterias.append(f'{{ attribute = "type", value = "{evt}" }}')
+            if svc: criterias.append(f'{{ attribute = "serviceName", value = "{svc}" }}')
+        cv["matching_criteria"] = (
+            "[\n    " + ",\n    ".join(criterias) + "\n  ]" if criterias else "[]"
+        )
+        run_ids = ctx.get("target_run_ids", [])
+        wf_ids  = ctx.get("target_workflow_ids", [])
+        if run_ids:
+            cv["destination_type"] = '"cloud_run"'
+            cv["destination_name"] = f"module.cr_{_tf_name(_node_by_id(all_nodes, run_ids[0]))}.name"
+        elif wf_ids:
+            cv["destination_type"] = '"workflow"'
+            cv["destination_name"] = f"module.workflow_{_tf_name(_node_by_id(all_nodes, wf_ids[0]))}.name"
+        sa_id = ctx.get("service_account_id", "")
+        if sa_id:
+            cv["sa_email"] = f"module.sa_{_tf_name(_node_by_id(all_nodes, sa_id))}.email"
+        return cv
+
+    # ------------------------------------------------------------------
     # Edge wiring
     # ------------------------------------------------------------------
 

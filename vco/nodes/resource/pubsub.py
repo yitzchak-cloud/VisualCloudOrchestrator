@@ -5,16 +5,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable, ClassVar
 
 import pulumi
 import pulumi_gcp as gcp
 
-from nodes.base_node import (
-    GCPNode, LogSource, Port, TFBlock, 
-    _resource_name, _node_label, _tf_name,
-    TFModule, _std_module_variables, TFBlock
-    )
+from nodes.base_node import GCPNode, LogSource, Port, _resource_name, _node_label
 from nodes.port_types import PortType
 
 logger = logging.getLogger(__name__)
@@ -70,53 +67,25 @@ class PubsubTopicNode(GCPNode):
 
         return program
 
+
+    @property
+    def terraform_dir(self):
+        return Path(__file__).parent / "terraform" / "pubsub_topic"
+
+    @property
+    def terraform_instance_prefix(self): return "topic"
+
+    def terraform_call_vars(self, ctx, project, region, all_nodes):
+        from nodes.base_node import _resource_name, _tf_name
+        props = ctx.get("node", {}).get("props", {})
+        return {
+            "name":      f'"{props.get("name") or _resource_name(ctx.get("node",{}))}"  ',
+            "retention": f'"{props.get("message_retention_duration", "604800s")}"',
+        }
+
     def live_outputs(self, pulumi_outputs, project, region) -> dict:
         # Topics have no interesting URL to show, just expose the name
         return {"topic_name": pulumi_outputs.get("name", "")}
-
-    def terraform_module(self, ctx, project, region, all_nodes) -> "TFModule":
-        """
-        Emits:
-          modules/<tf_id>/
-            main.tf      — google_pubsub_topic
-            variables.tf — project_id, region
-            outputs.tf   — name, id
-
-        Consumers (CloudRunNode, WorkflowNode) reference the topic as:
-          module.<tf_id>.name
-        """
-
-        node_dict = ctx.get("node", {})
-        props     = node_dict.get("props", {})
-        name      = props.get("name") or _resource_name(node_dict)
-        tf_id     = _tf_name(node_dict)
-
-        module = TFModule(
-            module_name=tf_id,
-            variables=_std_module_variables(),
-        )
-
-        module.resources.append(TFBlock(
-            block_type="resource",
-            labels=["google_pubsub_topic", "this"],
-            body={
-                "name":                       name,
-                "project":                    "var.project_id",
-                "message_retention_duration": props.get("message_retention_duration", "604800s"),
-            },
-            comment=f"Pub/Sub Topic: {node_dict.get('label', name)}",
-        ))
-
-        module.outputs += [
-            TFBlock("output", ["name"],
-                    {"description": f"Name of Pub/Sub topic {name}",
-                     "value":       "${google_pubsub_topic.this.name}"}),
-            TFBlock("output", ["id"],
-                    {"description": f"ID of Pub/Sub topic {name}",
-                     "value":       "${google_pubsub_topic.this.id}"}),
-        ]
-
-        return module
 
     def log_source(self, pulumi_outputs, project, region) -> LogSource | None:
         name = pulumi_outputs.get("name", "")
@@ -188,6 +157,30 @@ class PubsubPullSubscriptionNode(GCPNode):
             pulumi.export("id",   sub.id)
 
         return program
+
+
+    @property
+    def terraform_dir(self):
+        return Path(__file__).parent / "terraform" / "pubsub_pull_subscription"
+
+    @property
+    def terraform_instance_prefix(self): return "pull_sub"
+
+    def terraform_call_vars(self, ctx, project, region, all_nodes):
+        from nodes.base_node import _resource_name, _tf_name, _node_by_id
+        node_dict = ctx.get("node", {})
+        props     = node_dict.get("props", {})
+        cv = {
+            "name":                         f'"{_resource_name(node_dict)}"',
+            "ack_deadline_seconds":         str(int(props.get("ack_deadline_seconds", 20))),
+            "enable_message_ordering":      "true" if props.get("enable_message_ordering") else "false",
+            "enable_exactly_once_delivery": "true" if props.get("enable_exactly_once_delivery") else "false",
+        }
+        topic_id = ctx.get("topic_id", "")
+        cv["topic_name"] = f"module.topic_{_tf_name(_node_by_id(all_nodes, topic_id))}.name" if topic_id else '""'
+        if props.get("filter", "").strip():
+            cv["filter"] = f'"{props["filter"].strip()}"' 
+        return cv
 
     def live_outputs(self, pulumi_outputs, project, region) -> dict:
         return {"subscription_name": pulumi_outputs.get("name", "")}
@@ -281,6 +274,35 @@ class PubsubPushSubscriptionNode(GCPNode):
             pulumi.export("id",   sub.id)
 
         return program
+
+
+    @property
+    def terraform_dir(self):
+        return Path(__file__).parent / "terraform" / "pubsub_push_subscription"
+
+    @property
+    def terraform_instance_prefix(self): return "push_sub"
+
+    def terraform_call_vars(self, ctx, project, region, all_nodes):
+        from nodes.base_node import _resource_name, _tf_name, _node_by_id
+        node_dict = ctx.get("node", {})
+        props     = node_dict.get("props", {})
+        cv = {
+            "name":                 f'"{_resource_name(node_dict)}"',
+            "ack_deadline_seconds": str(int(props.get("ack_deadline_seconds", 20))),
+        }
+        topic_id = ctx.get("topic_id", "")
+        cv["topic_name"] = f"module.topic_{_tf_name(_node_by_id(all_nodes, topic_id))}.name" if topic_id else '""'
+        push_ids = ctx.get("push_target_ids", [])
+        cv["push_endpoint"] = f"module.cr_{_tf_name(_node_by_id(all_nodes, push_ids[0]))}.uri" if push_ids else f'"{props.get("push_endpoint","")}"'
+        sa_id = ctx.get("service_account_id", "")
+        if sa_id:
+            cv["oidc_sa_email"] = f"module.sa_{_tf_name(_node_by_id(all_nodes, sa_id))}.email"
+        elif props.get("oidc_service_account_email"):
+            cv["oidc_sa_email"] = f'"{props["oidc_service_account_email"]}"' 
+        if props.get("filter", "").strip():
+            cv["filter"] = f'"{props["filter"].strip()}"'
+        return cv
 
     def live_outputs(self, pulumi_outputs, project, region) -> dict:
         return {"subscription_name": pulumi_outputs.get("name", "")}

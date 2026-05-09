@@ -282,23 +282,61 @@ class GCPNode:
         region:    str,
         all_nodes: list[dict],
     ) -> TFModule | None:
+        return None
+
+    # ── Terraform static-module interface ──────────────────────────────────────
+    # Each node subclass overrides:
+    #   terraform_dir        — path to the static HCL module directory
+    #                          (relative to the node's own Python file)
+    #                          e.g. Path(__file__).parent / "terraform"
+    #   terraform_call_vars  — returns the per-instance variable assignments
+    #                          that go into the root main.tf module{} call block
+    #
+    # engine.py reads these two and does nothing else:
+    #   1. copies terraform_dir/* into the output zip as modules/<type>/
+    #   2. writes one module{} call block per instance using terraform_call_vars()
+    #
+    # Node types without terraform_dir are silently skipped (no TF output).
+
+    @property
+    def terraform_dir(self) -> "Path | None":
         """
-        Return a TFModule describing this node's Terraform module directory.
-
-        The engine places the result under  modules/<module_name>/  and adds
-        a module{} call block to the root main.tf.
-
-        Cross-resource references go through call_vars:
-            sa_id = ctx.get("service_account_id", "")
-            if sa_id:
-                sa_tf = _tf_name(_node_by_id(all_nodes, sa_id))
-                module.call_vars["sa_email"] = f"module.{sa_tf}.email"
-
-        Return None to skip Terraform generation (visual/UI-only nodes).
-
-        Default: None.
+        Path to the static Terraform module directory for this node type.
+        Override in subclasses:
+            from pathlib import Path
+            @property
+            def terraform_dir(self):
+                return Path(__file__).parent / "terraform"
         """
         return None
+
+    @property
+    def terraform_instance_prefix(self) -> str:
+        """
+        Short prefix for the module instance name in root main.tf.
+        e.g. "cr" → module "cr_my_service" { ... }
+        Override in subclasses. Default: lowercase class name without "Node".
+        """
+        import re
+        name = self.__class__.__name__.replace("Node", "")
+        return re.sub(r"[^a-z0-9]", "_", name.lower()).strip("_")
+
+    def terraform_call_vars(
+        self,
+        ctx:       dict[str, Any],
+        project:   str,
+        region:    str,
+        all_nodes: list[dict],
+    ) -> "dict[str, str]":
+        """
+        Return per-instance variable assignments for the root main.tf
+        module{} call block.  Values are raw HCL expressions (not Python):
+            "name"      → '"my-service"'        (quoted string literal)
+            "sa_email"  → 'module.sa_worker.email'  (bare reference)
+            "env_vars"  → '{ KEY = "val" }'     (HCL object literal)
+        Return {} to skip this node (no module call written).
+        """
+        return {}
 
     # ── Post-deploy ────────────────────────────────────────────────────────────
 

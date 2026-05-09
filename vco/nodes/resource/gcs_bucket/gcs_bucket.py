@@ -152,6 +152,33 @@ class GcsBucketNode(GCPNode):
         return [x.strip() for x in raw.split(",") if x.strip()]
 
     # ------------------------------------------------------------------
+    # Terraform static-module interface
+    # ------------------------------------------------------------------
+
+    @property
+    def terraform_dir(self):
+        from pathlib import Path
+        return Path(__file__).parent / "terraform" / "gcs_bucket"
+
+    @property
+    def terraform_instance_prefix(self): return "bucket"
+
+    def terraform_call_vars(self, ctx, project, region, all_nodes):
+        from nodes.base_node import _resource_name
+        node_dict = ctx.get("node", {})
+        props     = node_dict.get("props", {})
+        return {
+            "name":          f'"{props.get("name") or _resource_name(node_dict)}"',
+            "location":      f'"{props.get("location", "EU")}"',
+            "storage_class": f'"{props.get("storage_class", "STANDARD")}"',
+            "versioning":    "true" if props.get("versioning") else "false",
+            "public_access": "true" if props.get("public_access") else "false",
+            "lifecycle_age": str(int(props.get("lifecycle_age", 0))),
+            "website_main":  f'"{props.get("website_main_page", "")}"',
+            "website_404":   f'"{props.get("website_not_found_page", "")}"',
+        }
+
+    # ------------------------------------------------------------------
     # Pulumi program
     # ------------------------------------------------------------------
 

@@ -360,3 +360,72 @@ terraform {{
 }}
 ```
 """
+
+
+# """
+# PATCH for api/routes/terraform.py
+# ===================================
+# Replace the _save_tf_files and _load_tf_files functions with these versions.
+
+# The only change from the original is that _save_tf_files now calls
+#   fp.parent.mkdir(parents=True, exist_ok=True)
+# before writing each file, so that module subdirectories
+# (e.g.  state/namespaces/default/terraform/modules/my_sa/)
+# are created automatically.
+
+# _load_tf_files is unchanged — it already reads filenames from the manifest
+# and handles nested paths correctly via  tf_dir / fname.
+# """
+
+
+# def _save_tf_files(namespace: str, files: dict, meta: dict) -> None:
+#     """
+#     Write every file to state/namespaces/<ns>/terraform/ and save manifest.json.
+#     Creates intermediate subdirectories (for modules/) automatically.
+#     """
+#     from pathlib import Path
+#     import json
+#     from datetime import datetime, timezone
+
+#     tf_dir = _tf_dir(namespace)
+#     for filename, content in files.items():
+#         fp = tf_dir / filename
+#         fp.parent.mkdir(parents=True, exist_ok=True)   # ← key addition
+#         fp.write_text(content, encoding="utf-8")
+
+#     manifest = {
+#         **meta,
+#         "generated_at": datetime.now(timezone.utc).isoformat(),
+#         "files": list(files.keys()),
+#     }
+#     (tf_dir / "manifest.json").write_text(
+#         json.dumps(manifest, indent=2, ensure_ascii=False),
+#         encoding="utf-8",
+#     )
+
+
+# def _load_tf_files(namespace: str) -> tuple:
+#     """Load previously saved files from manifest. Unchanged from original."""
+#     import json
+#     tf_dir = _tf_dir(namespace)
+#     manifest_path = tf_dir / "manifest.json"
+#     if not manifest_path.exists():
+#         raise FileNotFoundError(f"No Terraform workspace found for namespace '{namespace}'")
+#     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+#     files = {}
+#     for fname in manifest.get("files", []):
+#         fp = tf_dir / fname
+#         if fp.exists():
+#             files[fname] = fp.read_text(encoding="utf-8")
+#     return files, manifest
+
+
+# def _build_zip(files: dict, folder: str = "vco-terraform"):
+#     """Build zip preserving module subdirectory structure. Unchanged."""
+#     import io, zipfile
+#     buf = io.BytesIO()
+#     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+#         for filename, content in files.items():
+#             zf.writestr(f"{folder}/{filename}", content.encode("utf-8"))
+#     buf.seek(0)
+#     return buf
