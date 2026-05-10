@@ -39,9 +39,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import importlib
 import re
+import sys
 from typing import Any, Callable, ClassVar
 from pathlib import Path as LocalPath
 import yaml
+from pathlib import Path
 
 from nodes.port_types import PortType, PORT_META
 
@@ -298,8 +300,10 @@ class GCPNode:
     #
     # Node types without terraform_dir are silently skipped (no TF output).
 
+
+        
     @property
-    def terraform_dir(self) -> "Path | None":
+    def terraform_dir(self) -> Path:
         """
         Path to the static Terraform module directory for this node type.
         Override in subclasses:
@@ -308,7 +312,9 @@ class GCPNode:
             def terraform_dir(self):
                 return Path(__file__).parent / "terraform"
         """
-        return None
+        module = sys.modules[self.__class__.__module__]
+        base_path = Path(module.__file__).parent
+        return base_path  / "terraform"
 
     @property
     def terraform_instance_prefix(self) -> str:

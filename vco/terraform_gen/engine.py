@@ -175,8 +175,11 @@ def generate_terraform(
             unsupported.append(f"{node.get('label', node['id'])} ({ntype})")
             continue
 
-        # module_type = directory name (e.g. "cloud_run", "pubsub_topic")
-        module_type = tf_dir.name
+        # module_type = the node's folder name, e.g.:
+        #   nodes/resource/clod_run/terraform/  → parent.name = "clod_run"
+        #   nodes/resource/pubsub_topic/terraform/ → parent.name = "pubsub_topic"
+        # This is always unique per resource type.
+        module_type = tf_dir.parent.name
 
         # ── 2. Copy static module files (once per module type) ────────────────
         if module_type not in copied_modules:

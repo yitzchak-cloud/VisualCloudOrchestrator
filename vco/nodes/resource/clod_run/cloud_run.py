@@ -362,11 +362,11 @@ class CloudRunNode(GCPNode):
     # Terraform static-module interface
     # ------------------------------------------------------------------
 
-    @property
-    def terraform_dir(self):
-        return Path(__file__).parent / "terraform" / "cloud_run"
+    # @property
+    # def terraform_dir(self):
+    #     return Path(__file__).parent  / "terraform"
 
-    @property
+    @property 
     def terraform_instance_prefix(self):
         return "cr"
 
