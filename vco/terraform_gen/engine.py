@@ -31,7 +31,7 @@ from typing import Any
 
 from core.registry import NODE_REGISTRY
 from deploy.graph_resolver import resolve_graph
-from nodes.base_node import _resource_name, _tf_name
+from nodes.base_node import GCPNode, _resource_name, _tf_name
 
 logger = logging.getLogger(__name__)
 
@@ -159,7 +159,7 @@ def generate_terraform(
             continue
 
         # Instantiate node (cheap — no I/O)
-        node_inst = cls(node_id=node["id"], label=node.get("label", ""))
+        node_inst: GCPNode = cls(node_id=node["id"], label=node.get("label", ""))
         node_ctx  = ctx.get(node["id"], {"node": node})
 
         # ── 1. Get the static HCL module directory ────────────────────────────

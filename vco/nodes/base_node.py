@@ -313,8 +313,14 @@ class GCPNode:
                 return Path(__file__).parent / "terraform"
         """
         module = sys.modules[self.__class__.__module__]
-        base_path = Path(module.__file__).parent
-        return base_path  / "terraform"
+        file_path = module.__file__
+
+        # This satisfies the type checker and provides a runtime error if file_path is missing
+        assert file_path is not None, f"Module {module} has no __file__ attribute"
+
+        base_path = Path(file_path).parent
+        return base_path / "terraform"
+
 
     @property
     def terraform_instance_prefix(self) -> str:
