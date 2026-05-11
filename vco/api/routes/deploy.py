@@ -20,6 +20,7 @@ from core.state import stack_dir as _stack_dir
 from core.ws_manager import manager
 from pulumi_synth import synthesize_and_deploy, synthesize_only
 
+
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["deploy"])
 

@@ -52,26 +52,7 @@ class CloudRunNode(GCPNode):
     port:          int  = 8080
     env_vars:      dict = field(default_factory=dict)
     service_url:   str  = ""
-
-    params_schema: ClassVar = [
-        {"key": "name",          "label": "Service Name",    "type": "text",   "default": "", "placeholder": "your-service-name"},
-        {"key": "image",         "label": "Container Image", "type": "text",   "default": "", "placeholder": "gcr.io/project/image:tag"},
-        {"key": "memory",        "label": "Memory",          "type": "select", "options": ["256Mi","512Mi","1Gi","2Gi","4Gi","8Gi"], "default": "512Mi"},
-        {"key": "cpu",           "label": "CPU",             "type": "select", "options": ["1","2","4","8"], "default": "1"},
-        {"key": "min_instances", "label": "Min Instances",   "type": "number", "default": 0},
-        {"key": "max_instances", "label": "Max Instances",   "type": "number", "default": 10},
-        {"key": "port",          "label": "Port",            "type": "number", "default": 8080},
-        {"key": "region",        "label": "Region",          "type": "select", "options": ["me-west1","us-central1","us-east1"], "default": "me-west1"},
-        {"key": "service_url",   "label": "Service URL",     "type": "text",   "default": "", "placeholder": "https://my-service.run.app"},
-        {"key": "allow_unauthenticated", "label": "Allow Unauthenticated (public access)", "type": "checkbox", "default": False},
-        {
-            "key": "ingress", "label": "Ingress", "type": "select",
-            "options": ["INGRESS_TRAFFIC_ALL", "INGRESS_TRAFFIC_INTERNAL_ONLY", "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"],
-            "default": "INGRESS_TRAFFIC_INTERNAL_ONLY",
-        },
-        {"key": "vpc_network",    "label": "VPC Network (fallback)",    "type": "text", "default": "", "placeholder": "projects/HOST_PROJECT/global/networks/NETWORK"},
-        {"key": "vpc_subnetwork", "label": "VPC Subnetwork (fallback)", "type": "text", "default": "", "placeholder": "projects/HOST_PROJECT/regions/REGION/subnetworks/SUBNET"},
-    ]
+    
     url_field: ClassVar = "service_url"
 
     inputs: ClassVar = [
@@ -361,10 +342,6 @@ class CloudRunNode(GCPNode):
     # ------------------------------------------------------------------
     # Terraform static-module interface
     # ------------------------------------------------------------------
-
-    # @property
-    # def terraform_dir(self):
-    #     return Path(__file__).parent  / "terraform"
 
     @property 
     def terraform_instance_prefix(self):

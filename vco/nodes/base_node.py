@@ -209,7 +209,7 @@ class GCPNode:
             module = importlib.import_module(cls.__module__)
             if hasattr(module, "__file__") and module.__file__:
                 class_dir = LocalPath(module.__file__).parent
-                yaml_files = list(class_dir.glob("*_params.yaml"))
+                yaml_files = list(class_dir.glob("*params.yaml"))
                 if yaml_files:
                     with open(yaml_files[0], "r", encoding="utf-8") as f:
                         data = yaml.safe_load(f)

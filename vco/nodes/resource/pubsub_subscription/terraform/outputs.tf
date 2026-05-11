@@ -1,3 +1,5 @@
+# modules/pubsub_subscription/outputs.tf
+
 output "name" {
   description = "Subscription name"
   value       = google_pubsub_subscription.this.name

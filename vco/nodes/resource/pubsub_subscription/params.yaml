@@ -1,0 +1,104 @@
+# nodes/resource/pubsub_subscription/params.yaml
+# ─────────────────────────────────────────────
+# All parameters for PubsubSubscriptionNode.
+# The UI reads this file; no params are hard-coded in the Python class.
+#
+# Dynamic port logic:
+#   subscription_type = "pull"  → "messages" output port accepts many edges
+#   subscription_type = "push"  → "messages" output port accepts exactly 1 edge
+
+# ── Identity ──────────────────────────────────────────────────────────────────
+- key: name
+  label: Subscription Name
+  type: text
+  default: ""
+  placeholder: my-subscription
+  category: Basic
+  description: >
+    The unique name of this Pub/Sub subscription.
+    Must be 3–255 characters; letters, numbers, hyphens, dots, underscores, and tildes.
+
+# ── Type selector — controls dynamic port behaviour ──────────────────────────
+- key: subscription_type
+  label: Subscription Type
+  type: select
+  options:
+    - pull
+    - push
+  default: pull
+  category: Basic
+  description: >
+    "pull" — consumers call the API to receive messages (multi-consumer supported).
+    "push" — Pub/Sub delivers messages to a single HTTPS endpoint automatically.
+    Changing this value switches the output port between multi-edge (pull)
+    and single-edge (push).
+  dynamic_port: messages   # tells the UI to re-evaluate port multiplicity on change
+
+# ── Common ────────────────────────────────────────────────────────────────────
+- key: ack_deadline_seconds
+  label: Ack Deadline (s)
+  type: number
+  default: 20
+  category: Basic
+  description: >
+    Maximum time in seconds the subscriber has to acknowledge receipt of a message
+    before it is re-delivered. Must be between 10 and 600 seconds.
+
+- key: filter
+  label: Filter Expression
+  type: text
+  default: ""
+  category: Basic
+  description: >
+    Optional server-side filter expression.
+    Only messages matching the filter are delivered.
+    Example: attributes.env = "prod"
+
+# ── Pull-only params ─────────────────────────────────────────────────────────
+- key: enable_message_ordering
+  label: Message Ordering
+  type: checkbox
+  default: false
+  category: Pull Options
+  description: >
+    (pull only) When enabled, messages with the same ordering_key are delivered
+    in the order they were published.
+
+- key: enable_exactly_once_delivery
+  label: Exactly-Once Delivery
+  type: checkbox
+  default: false
+  category: Pull Options
+  description: >
+    (pull only) Guarantees that each message is delivered exactly once.
+    Requires acknowledgement with the provided ack_id.
+
+- key: dead_letter_topic
+  label: Dead Letter Topic Name
+  type: text
+  default: ""
+  category: Pull Options
+  description: >
+    (pull only) Name of a dead-letter topic for undeliverable messages.
+    Leave blank to disable.
+
+# ── Push-only params ──────────────────────────────────────────────────────────
+- key: push_endpoint
+  label: Push Endpoint URL (fallback)
+  type: text
+  default: ""
+  placeholder: "https://my-service.run.app/pubsub"
+  category: Push Options
+  description: >
+    (push only) HTTPS endpoint to which messages are delivered.
+    If a CloudRunNode is connected via the "messages" port, its URI is used
+    automatically and this field is ignored.
+
+- key: oidc_service_account_email
+  label: OIDC Service Account Email
+  type: text
+  default: ""
+  category: Push Options
+  description: >
+    (push only) Service account email used to generate OIDC tokens for
+    authenticating push requests. Leave blank to disable OIDC.

@@ -3797,6 +3797,18 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
             }
           }
 
+          // ── multi guard (source) ──
+          if (sourcePort && sourcePort.multi === false) {
+            const alreadyConnected = edges.some(
+              e => e.source === params.source && e.sourceHandle === params.sourceHandle
+            );
+            if (alreadyConnected) {
+              showToast(`Port "${sourcePort.name}" allows only one outgoing connection`, 'error');
+              addLog(`Blocked: port ${sourceNode.data.label}.${sourcePort.name} already connected`, 'err');
+              return;
+            }
+          }
+          
           const color = sourcePort?.color || '#60a5fa';
 
           // ── auto_from_port: embed detectedProvider when wiring into a direct_event input ──

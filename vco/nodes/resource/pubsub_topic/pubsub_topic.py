@@ -1,5 +1,5 @@
 """
-nodes/pubsub.py — Pub/Sub resource nodes (fully self-describing).
+nodes/resource/pubsub_topic/pubsub_topic.py — Pub/Sub resource nodes (fully self-describing).
 """
 from __future__ import annotations
 
@@ -25,12 +25,8 @@ class PubsubTopicNode(GCPNode):
     # test_message:         str = ""    
     message_retention_duration: str = "604800s"
     kms_key_name:               str = ""
-
-    params_schema: ClassVar = [
-        {"key": "name",                 "label": "Topic Name",         "type": "text", "default": "", "placeholder": "your-topic-name"},
-        {"key": "message_retention_duration", "label": "Retention Duration", "type": "text", "default": "604800s"},
-        {"key": "kms_key_name",               "label": "KMS Key Name",       "type": "text", "default": ""},
-    ]   
+    
+     
     inputs:  ClassVar = [Port("publishers",    PortType.TOPIC,        multi_in=True)]
     outputs: ClassVar = [Port("subscriptions", PortType.SUBSCRIPTION, multi=True)]
     node_color:  ClassVar = "#3b82f6"
