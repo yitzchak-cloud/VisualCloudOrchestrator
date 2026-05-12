@@ -52,3 +52,8 @@ class EdgeValidation(BaseModel):
     """Quick validation check before the UI draws an edge."""
     source_type: str
     target_type: str
+    
+
+class NodeSchemaRequest(BaseModel):
+    node_type: str
+    props: dict = {}

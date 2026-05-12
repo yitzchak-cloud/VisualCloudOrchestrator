@@ -213,6 +213,7 @@ class GCPNode:
                 if yaml_files:
                     with open(yaml_files[0], "r", encoding="utf-8") as f:
                         data = yaml.safe_load(f)
+                        print(f"Loaded params schema for {cls.__name__} from {yaml_files[0].name}: {data}")
                         if isinstance(data, list):
                             cls.params_schema = data
         except Exception:

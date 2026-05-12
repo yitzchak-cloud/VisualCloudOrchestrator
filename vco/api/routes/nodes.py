@@ -8,10 +8,11 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
-from api.models import EdgeValidation
+from api.models import EdgeValidation, NodeSchemaRequest
 from core.registry import NODE_REGISTRY
+from nodes.port_types import PORT_META
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["nodes"])
@@ -39,3 +40,49 @@ def validate_edge(body: EdgeValidation):
     reason = None if valid else f"Cannot connect {body.source_type} → {body.target_type}"
     logger.debug("validate-edge %s → %s : valid=%s", body.source_type, body.target_type, valid)
     return {"valid": valid, "reason": reason}
+
+
+@router.post("/node-schema")
+def get_node_schema(body: NodeSchemaRequest):
+    """
+    Return the live schema for a specific node instance,
+    given its type + current props. Used when a param with
+    triggers_refresh=true changes.
+    """
+    cls = NODE_REGISTRY.get(body.node_type)
+    if not cls:
+        raise HTTPException(status_code=404, detail=f"Unknown type: {body.node_type}")
+
+    # Instantiate with a dummy id so get_inputs / get_outputs work
+    instance = cls(node_id="__preview__", label="__preview__")
+    instance._props = body.props
+
+    schema = cls.ui_schema()
+
+    # Override ports if the node implements dynamic port methods
+    if hasattr(instance, "get_inputs"):
+        schema["inputs"] = [
+            {
+                "name":     p.name,
+                "type":     p.port_type.value,
+                "multi":    p.multi,
+                "multi_in": p.multi_in,
+                "required": p.required,
+                "color":    PORT_META[p.port_type.value]["color"],
+                "label":    PORT_META[p.port_type.value]["label"],
+            }
+            for p in instance.get_inputs()
+        ]
+    if hasattr(instance, "get_outputs"):
+        schema["outputs"] = [
+            {
+                "name":  p.name,
+                "type":  p.port_type.value,
+                "multi": p.multi,
+                "color": PORT_META[p.port_type.value]["color"],
+                "label": PORT_META[p.port_type.value]["label"],
+            }
+            for p in instance.get_outputs()
+        ]
+
+    return schema

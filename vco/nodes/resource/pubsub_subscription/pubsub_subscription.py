@@ -41,14 +41,21 @@ logger = logging.getLogger(__name__)
 
 # ── Port definitions ──────────────────────────────────────────────────────────
 
-# Input port is the same for both subscription types.
+# Input ports — topic_link is required; oidc_service_account is optional (push only).
+# When a ServiceAccountNode is wired to oidc_service_account the OIDC SA email is
+# resolved automatically instead of having to be typed manually.
 _INPUT_PORTS: list[Port] = [
-    Port("topic_link", PortType.SUBSCRIPTION, required=True),
+    Port("topic_link",           PortType.SUBSCRIPTION,    required=True),
+]
+
+_PUSH_INPUT_PORTS: list[Port] = [
+    Port("topic_link",           PortType.SUBSCRIPTION,    required=True),
+    Port("oidc_service_account", PortType.SERVICE_ACCOUNT, required=False),
 ]
 
 # Output ports differ by type — computed dynamically (see `outputs` property).
-_PULL_OUTPUT = Port("messages", PortType.MESSAGE, multi=True)   # many consumers
-_PUSH_OUTPUT = Port("messages", PortType.MESSAGE, multi=False)  # single CR endpoint
+_PULL_OUTPUT = [Port("messages", PortType.MESSAGE, multi=True) ]  # many consumers
+_PUSH_OUTPUT = [Port("messages", PortType.MESSAGE, multi=False)]  # single CR endpoint
 
 
 # ── Node ──────────────────────────────────────────────────────────────────────
@@ -72,7 +79,7 @@ class PubsubSubscriptionNode(GCPNode):
     # the ClassVar convention used by other nodes.  We keep a ClassVar
     # fallback for the /api/node-types palette (which instantiates without
     # props), defaulting to pull semantics.
-    outputs: ClassVar = [_PULL_OUTPUT]
+    outputs: ClassVar = _PULL_OUTPUT
 
     node_color:  ClassVar = "#ec485b"
     icon:        ClassVar = "pubsub"
@@ -92,7 +99,16 @@ class PubsubSubscriptionNode(GCPNode):
         Called by base_node when serialising the live schema for the UI.
         """
         sub_type = self._current_sub_type()
-        return [_PUSH_OUTPUT if sub_type == "push" else _PULL_OUTPUT]
+        return _PUSH_OUTPUT if sub_type == "push" else _PULL_OUTPUT
+    
+    def get_inputs(self) -> list[Port]:
+        """
+        Returns the correct input ports for the current subscription_type.
+        Called by base_node when serialising the live schema for the UI.
+        """
+        sub_type = self._current_sub_type()
+        return _PUSH_INPUT_PORTS if sub_type == "push" else _INPUT_PORTS
+
 
     def _current_sub_type(self) -> str:
         """
@@ -111,18 +127,30 @@ class PubsubSubscriptionNode(GCPNode):
     def resolve_edges(self, src_id, tgt_id, src_type, tgt_type, ctx) -> bool:
         sub_type = self._current_sub_type()
 
-        if sub_type == "push":
-            # Push: record the single target Cloud Run for endpoint resolution
-            if src_id == self.node_id and src_type == "PubsubSubscriptionNode":
+        # ── Subscription is the TARGET (something connects into it) ──────────
+
+        # ServiceAccountNode → sub: wire OIDC SA for push auth
+        if tgt_id == self.node_id and src_type == "ServiceAccountNode":
+            ctx[self.node_id]["service_account_id"] = src_id
+            return True
+        
+        if tgt_id == self.node_id and src_type == "CloudRunNode" and sub_type == "push":
+            ctx[self.node_id]["push_target_ids"] = [src_id]  # single target for push
+            ctx[self.node_id].setdefault("push_ids", []).append(src_id)
+            return True
+
+        # ── Subscription is the SOURCE (it connects out to a consumer) ────────
+
+        if src_id == self.node_id and src_type == "PubsubSubscriptionNode":
+            if sub_type == "push":
+                # Push: record the single target Cloud Run for push_endpoint resolution
                 ctx[self.node_id].setdefault("push_target_ids", []).append(tgt_id)
                 ctx[tgt_id].setdefault("receives_from_subs", []).append(self.node_id)
-                return True
-        else:
-            # Pull: any number of consumers
-            if src_id == self.node_id and src_type == "PubsubSubscriptionNode":
+            else:
+                # Pull: any number of consumers
                 ctx[self.node_id].setdefault("consumer_ids", []).append(tgt_id)
                 ctx[tgt_id].setdefault("receives_from_subs", []).append(self.node_id)
-                return True
+            return True
 
         return False
 
@@ -136,6 +164,9 @@ class PubsubSubscriptionNode(GCPNode):
             deps.append(ctx["topic_id"])
         # Push needs the target CR to be deployed first (for its URI)
         deps.extend(ctx.get("push_target_ids", []))
+        # Push with wired SA: SA must be deployed before we can read its email
+        if ctx.get("service_account_id"):
+            deps.append(ctx["service_account_id"])
         return deps
 
     # ------------------------------------------------------------------

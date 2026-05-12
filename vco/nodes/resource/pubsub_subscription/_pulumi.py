@@ -88,7 +88,14 @@ def _make_push_program(node_obj, node_dict, props, ctx, project, topic_name, dep
         if push_target_ids and push_target_ids[0] in deployed_outputs
         else props.get("push_endpoint", "")
     )
-    oidc_sa = props.get("oidc_service_account_email", "")
+
+    # Resolve OIDC SA: wired ServiceAccountNode takes precedence over manual prop
+    sa_id   = ctx.get("service_account_id", "")
+    oidc_sa = (
+        deployed_outputs.get(sa_id, {}).get("email", "")
+        if sa_id
+        else props.get("oidc_service_account_email", "")
+    )
 
     def program() -> None:
         sub = gcp.pubsub.Subscription(

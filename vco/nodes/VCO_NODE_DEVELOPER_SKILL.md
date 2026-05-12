@@ -562,7 +562,91 @@ ctx = {
 □ log_source מחזיר LogSource או None
 □ אם יש show_if: patch בJS נוסף (סעיף 7)
 □ אם יש dynamic ports: handlePropChange + rehydrate (סעיף 8)
+□ כל פרמטר שניתן לפתור מחיבור edge — מוגדר כ-auto-from-edge (סעיף 13)
 ```
+
+---
+
+## 13. עיקרון ה-Connection-Driven Parameters (חובה לעקוב)
+
+> **כלל היסוד**: כל ערך שניתן להסיק מחיבור edge בין שני צמתים **חייב** להיפתר
+> אוטומטית דרך החיבור — ולא לדרוש הקלדה ידנית בלבד.
+> ערך ידני נשאר תמיד כ-fallback, אך לא כדרך העיקרית.
+
+### מה זה אומר בפועל
+
+כאשר נוד A מחובר לנוד B ו-A מספק מידע ש-B צריך:
+1. `resolve_edges` של B (או A) שומר את `src_id` / `tgt_id` ב-`ctx`
+2. `dag_deps` של B מחזיר את `src_id` כדי שA יפרוס קודם
+3. `pulumi_program` של B מביא את הערך מ-`deployed_outputs[src_id]`
+4. `terraform_call_vars` / `terraform_blocks` של B בונה reference ל-Terraform output של A
+
+### דוגמאות לחיבורים שחייבים לפתור פרמטרים אוטומטית
+
+| חיבור (src → tgt)                | פרמטר שנפתר ב-tgt         | מפתח ב-ctx          | output מ-src          |
+|-----------------------------------|---------------------------|---------------------|-----------------------|
+| `PubsubTopicNode → Sub`           | `topic_name`              | `topic_id`          | `name`                |
+| `Sub(push) → CloudRunNode`        | `push_endpoint`           | `push_target_ids`   | `uri`                 |
+| `ServiceAccountNode → CloudRun`   | `service_account_email`   | `service_account_id`| `email`               |
+| `ServiceAccountNode → Sub(push)`  | `oidc_sa_email`           | `service_account_id`| `email`               |
+| `ServiceAccountNode → IamBinding` | `principal`               | `service_account_id`| `email`               |
+| `SubnetworkNode → CloudRun`       | `vpc_network/subnetwork`  | `subnetwork_id`     | `network_path/...`    |
+| `CloudTasksQueueNode → CloudRun`  | `CLOUD_TASKS_QUEUE_*` env | `task_queue_ids`    | `queue_name`          |
+| `PubsubTopicNode → CloudRun`      | `PUBSUB_TOPIC_*` env      | `publishes_to_topics`| `name`               |
+
+### מה כבר עובד נכון ✅
+
+- **ServiceAccount → CloudRun**: `service_account_id` ב-ctx → `sa_email` מ-deployed_outputs ← ✅
+- **Topic → Subscription**: `topic_id` ב-ctx → `topic_name` ← ✅
+- **Sub(push) → CloudRun**: `push_target_ids` ב-ctx → `push_endpoint` מ-uri ← ✅
+- **ServiceAccount → IamBinding**: `service_account_id` ב-ctx → `principal` ← ✅
+- **IamBinding → CloudRun/GCS/etc**: `target_bindings` ב-ctx → resource-level IAM inline ← ✅
+
+### מה לא עבד ותוקן 🔧
+
+- **ServiceAccount → Sub(push)**: נוסף פורט כניסה `oidc_service_account` ל-`PubsubSubscriptionNode`;
+  `resolve_edges` של הסאב מטפל כעת ב-`src_type == "ServiceAccountNode"` ושומר `service_account_id`;
+  `_pulumi.py` ו-`_terraform.py` כבר קוראים `ctx["service_account_id"]` לפיתרון ה-OIDC email.
+- **IamBinding → PubsubSubscription/Topic**: נוספו ל-`_RESOURCE_TYPE_MAP` ול-`_TF_RESOURCE`
+  ב-`iam_binding.py`; נוסף טיפול Pulumi ב-`SubscriptionIAMMember` / `TopicIAMMember`.
+
+### תבנית resolve_edges לנוד שמקבל חיבורים מסוגים שונים
+
+```python
+def resolve_edges(self, src_id, tgt_id, src_type, tgt_type, ctx) -> bool:
+    # ── אני ה-TARGET (מישהו מתחבר אלי) ──────────────────────────────────
+    if tgt_id == self.node_id:
+        if src_type == "ServiceAccountNode":
+            ctx[self.node_id]["service_account_id"] = src_id
+            return True
+        if src_type == "SubnetworkNode":
+            ctx[self.node_id]["subnetwork_id"] = src_id
+            return True
+        if src_type == "SomeOtherNode":
+            ctx[self.node_id].setdefault("other_ids", []).append(src_id)
+            return True
+
+    # ── אני ה-SOURCE (אני מתחבר למישהו) ─────────────────────────────────
+    if src_id == self.node_id:
+        ctx[tgt_id]["parent_id"] = self.node_id
+        return True
+
+    return False
+```
+
+### טיפול ב-Terraform — resource-level vs project-level
+
+**בעיה**: כל resource type ב-GCP דורש Terraform resource שונה לIAM
+(למשל `google_cloud_run_v2_service_iam_member` vs `google_storage_bucket_iam_member`).
+לא ניתן לטפל בזה דרך module גנרי.
+
+**פתרון**: נודים כמו `IamBindingNode` ו-`ServiceAccountNode` משתמשים ב-`terraform_blocks()`
+(inline path) ולא ב-`terraform_call_vars()` (static module path).
+`terraform_blocks()` מבצע dispatch לפי `resource_type` ובונה את בלוק HCL הנכון.
+
+**כלל**: כאשר כותבים נוד שמייצר IAM bindings לסוגים שונים של resources —
+תמיד ממש את `terraform_blocks()` עם dispatch על `resource_type`,
+ואל תסתמך על module גנרי.
 
 ---
 

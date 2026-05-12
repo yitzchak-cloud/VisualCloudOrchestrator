@@ -1,13 +1,13 @@
 """
-nodes/service_account.py — Service Account resource node (fully self-describing).
-
-Both pulumi_program() and terraform_blocks() live here.
-No separate terraform_gen generator is needed.
+nodes/resource/service_account/service_account.py
+──────────────────────────────────────────────────────────────────────────────
+ServiceAccountNode — create or reference a GCP Service Account, with inline
+project-level and resource-level IAM bindings.
 
 Terraform output
 ----------------
-  ServiceAccountNode (create_sa=True)  → google_service_account
-  ServiceAccountNode (create_sa=False) → no resource (reference only)
+  create_sa=True   → google_service_account
+  create_sa=False  → no resource (reference only, bindings still applied)
 
   Project-level IAM bindings (project_roles)
     → google_project_iam_member  (one per role)
@@ -17,19 +17,28 @@ Terraform output
     cloud_function     → google_cloudfunctions_function_iam_member
     workflow           → google_project_iam_member  (project-level fallback)
     cloud_tasks_queue  → google_cloud_tasks_queue_iam_member
+
+What changed vs previous version
+─────────────────────────────────
+* params_schema moved to service_account_params.yaml (categories + descriptions).
+* Pulumi cloud_run_service binding uses gcp.cloudrunv2.ServiceIamMember (not v1).
+* terraform_dir removed — path convention follows node directory standard.
+* terraform_call_vars now includes resource_bindings serialised for the module.
+* _append_tf_resource_binding: location/region hardcoded strings → "var.region".
+* terraform/variables.tf, main.tf, outputs.tf added.
 """
 from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, ClassVar
 
 import pulumi
 import pulumi_gcp as gcp
 
 from nodes.base_node import (
-    GCPNode, Port, TFBlock, TFResult,
+    GCPNode, LogSource, Port, TFBlock, TFResult,
     _resource_name, _tf_name, _node_by_id,
 )
 from nodes.port_types import PortType
@@ -43,76 +52,20 @@ _RESOURCE_BINDING_TYPES = [
     "cloud_tasks_queue",
 ]
 
-_PROJECT_ROLE_SUGGESTIONS = "\n".join([
-    "# Project-level roles — one per line",
-    "# roles/datastore.user",
-    "# roles/cloudtasks.enqueuer",
-    "# roles/logging.logWriter",
-    "# roles/workflows.invoker",
-    "# roles/eventarc.eventReceiver",
-    "# roles/iam.serviceAccountUser",
-    "# roles/pubsub.publisher",
-    "# roles/storage.objectCreator",
-])
-
 
 @dataclass
 class ServiceAccountNode(GCPNode):
     """
     Service Account node — create or reference, with inline IAM role grants.
+
+    create_sa=True  → creates google_service_account + all IAM bindings.
+    create_sa=False → references an existing SA by email; bindings still applied.
+
+    Wire the output port to any node that accepts a SERVICE_ACCOUNT input
+    (CloudRunNode, IamBindingNode, etc.) to propagate the SA email.
     """
 
-    params_schema: ClassVar = [
-        {
-            "key":         "account_id",
-            "label":       "Account ID",
-            "type":        "text",
-            "default":     "",
-            "placeholder": "my-service-runner",
-        },
-        {
-            "key":         "display_name",
-            "label":       "Display Name",
-            "type":        "text",
-            "default":     "",
-            "placeholder": "My Service Runner SA",
-        },
-        {
-            "key":         "email",
-            "label":       "Existing SA Email (reference mode)",
-            "type":        "text",
-            "default":     "",
-            "placeholder": "sa@project.iam.gserviceaccount.com",
-        },
-        {
-            "key":     "create_sa",
-            "label":   "Create SA (uncheck to reference existing)",
-            "type":    "checkbox",
-            "default": True,
-        },
-        {
-            "key":         "project_roles",
-            "label":       "Project-Level Roles (one per line)",
-            "type":        "textarea",
-            "default":     "",
-            "placeholder": "roles/logging.logWriter\nroles/datastore.user",
-        },
-        {
-            "key":         "resource_bindings",
-            "label":       "Resource-Level Bindings (JSON)",
-            "type":        "json",
-            "default":     "[]",
-            "placeholder": (
-                '[\n'
-                '  {\n'
-                '    "resource_type": "cloud_run_service",\n'
-                '    "resource_ref":  "<node_id>",\n'
-                '    "role":          "roles/run.invoker"\n'
-                '  }\n'
-                ']'
-            ),
-        },
-    ]
+    # params loaded from service_account_params.yaml automatically by base_node
 
     inputs:  ClassVar = []
     outputs: ClassVar = [Port("service_account", PortType.SERVICE_ACCOUNT, multi=True)]
@@ -125,9 +78,9 @@ class ServiceAccountNode(GCPNode):
         "resource-level IAM bindings inline."
     )
 
-    # ------------------------------------------------------------------
+    # ──────────────────────────────────────────────────────────────────────────
     # Edge wiring
-    # ------------------------------------------------------------------
+    # ──────────────────────────────────────────────────────────────────────────
 
     def resolve_edges(self, src_id, tgt_id, src_type, tgt_type, ctx) -> bool:
         if src_id == self.node_id and src_type == "ServiceAccountNode":
@@ -135,15 +88,19 @@ class ServiceAccountNode(GCPNode):
             return True
         return False
 
+    # ──────────────────────────────────────────────────────────────────────────
+    # DAG dependencies
+    # ──────────────────────────────────────────────────────────────────────────
+
     def dag_deps(self, ctx) -> list[str]:
         node_dict = ctx.get("node", {})
         props     = node_dict.get("props", {})
         bindings  = _parse_resource_bindings(props.get("resource_bindings", "[]"))
         return [b["resource_ref"] for b in bindings if b.get("resource_ref")]
 
-    # ------------------------------------------------------------------
+    # ──────────────────────────────────────────────────────────────────────────
     # Pulumi program
-    # ------------------------------------------------------------------
+    # ──────────────────────────────────────────────────────────────────────────
 
     def pulumi_program(
         self,
@@ -162,8 +119,7 @@ class ServiceAccountNode(GCPNode):
         display_name = props.get("display_name", account_id)
         ref_email    = props.get("email", "").strip()
 
-        raw_roles         = props.get("project_roles", "")
-        project_roles     = _parse_project_roles(raw_roles)
+        project_roles     = _parse_project_roles(props.get("project_roles", ""))
         resource_bindings = _parse_resource_bindings(props.get("resource_bindings", "[]"))
 
         def program() -> None:
@@ -175,9 +131,9 @@ class ServiceAccountNode(GCPNode):
                     )
                 sa = gcp.serviceaccount.Account(
                     self.node_id,
-                    account_id=account_id,
-                    display_name=display_name or account_id,
-                    project=project,
+                    account_id   = account_id,
+                    display_name = display_name or account_id,
+                    project      = project,
                 )
                 sa_email = sa.email
                 pulumi.export("email",      sa.email)
@@ -193,21 +149,27 @@ class ServiceAccountNode(GCPNode):
                 pulumi.export("email",      ref_email)
                 pulumi.export("account_id", ref_email.split("@")[0] if ref_email else "")
 
-            member = sa_email.apply(lambda e: f"serviceAccount:{e}") if create_sa \
-                     else f"serviceAccount:{sa_email}"
+            # member string — Output[str] when created, plain str when referenced
+            member = (
+                sa_email.apply(lambda e: f"serviceAccount:{e}")
+                if create_sa
+                else f"serviceAccount:{sa_email}"
+            )
 
+            # Project-level bindings
             for idx, role in enumerate(project_roles):
                 gcp.projects.IAMMember(
                     f"{self.node_id}-proj-{idx}",
-                    project=project,
-                    role=role,
-                    member=member,
+                    project = project,
+                    role    = role,
+                    member  = member,
                 )
 
+            # Resource-level bindings
             for idx, binding in enumerate(resource_bindings):
-                rtype   = binding.get("resource_type", "")
-                ref_id  = binding.get("resource_ref",  "")
-                role    = binding.get("role",           "")
+                rtype  = binding.get("resource_type", "")
+                ref_id = binding.get("resource_ref",  "")
+                role   = binding.get("role",           "")
                 outputs = deployed_outputs.get(ref_id, {})
 
                 if not rtype or not role:
@@ -225,36 +187,9 @@ class ServiceAccountNode(GCPNode):
 
         return program
 
-    # ------------------------------------------------------------------
-    # Terraform static-module interface
-    # ------------------------------------------------------------------
-
-    @property
-    def terraform_dir(self):
-        from pathlib import Path
-        return Path(__file__).parent / "terraform" / "service_account"
-
-    @property
-    def terraform_instance_prefix(self): return "sa"
-
-    def terraform_call_vars(self, ctx, project, region, all_nodes):
-        node_dict = ctx.get("node", {})
-        props     = node_dict.get("props", {})
-        roles     = _parse_project_roles(props.get("project_roles", ""))
-        roles_hcl = "[" + ", ".join(f'"{r}"' for r in roles) + "]"
-        cv = {
-            "account_id":    f'"{props.get("account_id") or _resource_name(node_dict)}"',
-            "display_name":  f'"{props.get("display_name") or node_dict.get("label","")}"',
-            "create_sa":     "false" if not props.get("create_sa", True) else "true",
-            "project_roles": roles_hcl,
-        }
-        if not props.get("create_sa", True) and props.get("email"):
-            cv["existing_email"] = f'"{props["email"]}"'
-        return cv
-
-    # ------------------------------------------------------------------
-    # Terraform blocks  (legacy flat-file, kept for compat)
-    # ------------------------------------------------------------------
+    # ──────────────────────────────────────────────────────────────────────────
+    # Terraform — inline blocks
+    # ──────────────────────────────────────────────────────────────────────────
 
     def terraform_blocks(self, ctx, project, region, all_nodes) -> TFResult:
         result    = TFResult()
@@ -330,23 +265,54 @@ class ServiceAccountNode(GCPNode):
                 role        = role,
                 member_ref  = member_ref,
                 target_tf   = target_tf,
-                region      = region,
             )
 
         return result
 
-    # ------------------------------------------------------------------
+    # ──────────────────────────────────────────────────────────────────────────
+    # Terraform — static module interface
+    # ──────────────────────────────────────────────────────────────────────────
+
+    @property
+    def terraform_instance_prefix(self) -> str:
+        return "sa"
+
+    def terraform_call_vars(self, ctx, project, region, all_nodes) -> dict:
+        node_dict = ctx.get("node", {})
+        props     = node_dict.get("props", {})
+
+        roles     = _parse_project_roles(props.get("project_roles", ""))
+        roles_hcl = "[" + ", ".join(f'"{r}"' for r in roles) + "]"
+
+        # Serialise resource_bindings for the TF module as a JSON string variable
+        bindings     = _parse_resource_bindings(props.get("resource_bindings", "[]"))
+        bindings_hcl = json.dumps(bindings)   # module receives as jsonencode-compatible string
+
+        cv: dict[str, str] = {
+            "account_id":        f'"{props.get("account_id") or _resource_name(node_dict)}"',
+            "display_name":      f'"{props.get("display_name") or node_dict.get("label", "")}"',
+            "create_sa":         "false" if not props.get("create_sa", True) else "true",
+            "project_roles":     roles_hcl,
+            "resource_bindings": f'"{bindings_hcl}"',
+        }
+
+        if not props.get("create_sa", True) and props.get("email"):
+            cv["existing_email"] = f'"{props["email"]}"'
+
+        return cv
+
+    # ──────────────────────────────────────────────────────────────────────────
     # Post-deploy
-    # ------------------------------------------------------------------
+    # ──────────────────────────────────────────────────────────────────────────
 
     def live_outputs(self, pulumi_outputs, project, region) -> dict:
         return {"email": pulumi_outputs.get("email", "")}
 
-    def log_source(self, pulumi_outputs, project, region):
+    def log_source(self, pulumi_outputs, project, region) -> LogSource | None:
         return None
 
 
-# ── Pulumi helper ──────────────────────────────────────────────────────────────
+# ── Pulumi IAM helper ─────────────────────────────────────────────────────────
 
 def _create_pulumi_resource_binding(
     resource_id:   str,
@@ -357,32 +323,43 @@ def _create_pulumi_resource_binding(
     project:       str,
     region:        str,
 ) -> None:
+    """
+    Create a Pulumi IAM member resource for a specific GCP resource type.
+
+      cloud_run_service  → gcp.cloudrunv2.ServiceIamMember   (v2, not v1)
+      cloud_function     → gcp.cloudfunctions.FunctionIamMember
+      workflow           → gcp.projects.IAMMember             (no SDK resource-level)
+      cloud_tasks_queue  → gcp.cloudtasks.QueueIamMember
+    """
     if resource_type == "cloud_run_service":
         svc_name = outputs.get("name", "")
         if not svc_name:
-            logger.warning("IAM binding %s: no 'name' export — skip", resource_id)
+            logger.warning("IAM binding %s: no 'name' export from CloudRunNode — skip", resource_id)
             return
-        gcp.cloudrun.IamMember(
+        # Uses cloudrunv2 (not the deprecated cloudrun v1 IamMember)
+        gcp.cloudrunv2.ServiceIamMember(
             resource_id,
-            location=region,
-            project=project,
-            service=svc_name,
-            role=role,
-            member=member,
+            project  = project,
+            location = region,
+            name     = svc_name,
+            role     = role,
+            member   = member,
         )
+
     elif resource_type == "cloud_function":
         fn_name = outputs.get("name", "")
         if not fn_name:
-            logger.warning("IAM binding %s: no 'name' export — skip", resource_id)
+            logger.warning("IAM binding %s: no 'name' export from CloudFunctionsNode — skip", resource_id)
             return
         gcp.cloudfunctions.FunctionIamMember(
             resource_id,
-            project=project,
-            region=region,
-            cloud_function=fn_name,
-            role=role,
-            member=member,
+            project        = project,
+            region         = region,
+            cloud_function = fn_name,
+            role           = role,
+            member         = member,
         )
+
     elif resource_type == "workflow":
         logger.warning(
             "IAM binding %s: no WorkflowIamMember in pulumi_gcp — "
@@ -390,43 +367,49 @@ def _create_pulumi_resource_binding(
             resource_id, role,
         )
         gcp.projects.IAMMember(resource_id, project=project, role=role, member=member)
+
     elif resource_type == "cloud_tasks_queue":
         queue_name = outputs.get("queue_name", "")
         if not queue_name:
-            logger.warning("IAM binding %s: no 'queue_name' export — skip", resource_id)
+            logger.warning("IAM binding %s: no 'queue_name' export from CloudTasksQueueNode — skip", resource_id)
             return
         gcp.cloudtasks.QueueIamMember(
             resource_id,
-            project=project,
-            location=region,
-            name=queue_name,
-            role=role,
-            member=member,
+            project  = project,
+            location = region,
+            name     = queue_name,
+            role     = role,
+            member   = member,
         )
+
     else:
-        logger.warning("IAM binding %s: unsupported resource_type '%s' — skip", resource_id, resource_type)
+        logger.warning(
+            "IAM binding %s: unsupported resource_type '%s' — skip",
+            resource_id, resource_type,
+        )
 
 
-# ── Terraform helper ───────────────────────────────────────────────────────────
+# ── Terraform IAM helper ──────────────────────────────────────────────────────
 
 def _append_tf_resource_binding(
-    result:     TFResult,
+    result:      TFResult,
     resource_id: str,
-    rtype:      str,
-    role:       str,
-    member_ref: str,
-    target_tf:  str,
-    region:     str,
+    rtype:       str,
+    role:        str,
+    member_ref:  str,
+    target_tf:   str,
 ) -> None:
-    """Append the appropriate google_*_iam_member TFBlock for a resource binding."""
-
+    """
+    Append the appropriate google_*_iam_member TFBlock for a resource binding.
+    Uses var.project_id and var.region throughout — never hardcoded strings.
+    """
     if rtype == "cloud_run_service" and target_tf:
         result.resources.append(TFBlock(
             block_type="resource",
             labels=["google_cloud_run_v2_service_iam_member", resource_id],
             body={
                 "project":  "var.project_id",
-                "location": region,
+                "location": "var.region",
                 "name":     f"${{google_cloud_run_v2_service.{target_tf}.name}}",
                 "role":     role,
                 "member":   member_ref,
@@ -440,7 +423,7 @@ def _append_tf_resource_binding(
             labels=["google_cloudfunctions_function_iam_member", resource_id],
             body={
                 "project":        "var.project_id",
-                "region":         region,
+                "region":         "var.region",
                 "cloud_function": f"${{google_cloudfunctions_function.{target_tf}.name}}",
                 "role":           role,
                 "member":         member_ref,
@@ -449,7 +432,12 @@ def _append_tf_resource_binding(
         ))
 
     elif rtype == "workflow":
-        # pulumi_gcp has no WorkflowIamMember; same fallback applies to TF
+        # No google_workflows_workflow_iam_member in Terraform provider → project-level fallback
+        logger.warning(
+            "_append_tf_resource_binding: 'workflow' has no resource-level TF IAM resource — "
+            "falling back to google_project_iam_member for role '%s'",
+            role,
+        )
         result.resources.append(TFBlock(
             block_type="resource",
             labels=["google_project_iam_member", resource_id],
@@ -467,7 +455,7 @@ def _append_tf_resource_binding(
             labels=["google_cloud_tasks_queue_iam_member", resource_id],
             body={
                 "project":  "var.project_id",
-                "location": region,
+                "location": "var.region",
                 "name":     f"${{google_cloud_tasks_queue.{target_tf}.name}}",
                 "role":     role,
                 "member":   member_ref,
@@ -476,25 +464,29 @@ def _append_tf_resource_binding(
         ))
 
     else:
-        logger.warning("_append_tf_resource_binding: unsupported rtype '%s' — skip", rtype)
+        logger.warning(
+            "_append_tf_resource_binding: unsupported rtype '%s' (target_tf='%s') — skip",
+            rtype, target_tf,
+        )
 
 
-# ── Parse helpers ──────────────────────────────────────────────────────────────
+# ── Parse helpers ─────────────────────────────────────────────────────────────
 
 def _parse_project_roles(raw: str) -> list[str]:
+    """Parse newline-separated role list, ignoring blank lines and # comments."""
     roles = []
-    for line in raw.splitlines():
+    for line in (raw or "").splitlines():
         line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        roles.append(line)
+        if line and not line.startswith("#"):
+            roles.append(line)
     return roles
 
 
 def _parse_resource_bindings(raw: str | list) -> list[dict]:
+    """Parse JSON array of resource binding dicts; return [] on any error."""
     if isinstance(raw, list):
         return raw
-    if not raw or not raw.strip():
+    if not raw or not str(raw).strip():
         return []
     try:
         parsed = json.loads(raw)

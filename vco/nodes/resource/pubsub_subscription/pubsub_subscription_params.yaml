@@ -1,12 +1,25 @@
 # ── Core ─────────────────────────────────────────────
+
+- key: name
+  label: Subscription Name
+  type: text
+  default: ""
+  placeholder: your-subscription-name
+  category: Basic
+  description: >
+    The unique name of the Pub/Sub subscription within the project.
+    Must be between 3–255 characters and match the pattern [a-zA-Z][a-zA-Z0-9\-_.~+%]*.
+    Cannot start with "goog".
+
 - key: subscription_type
   label: Subscription Type
   type: select
   options: [pull, push]
   default: pull
   category: Core
+  triggers_refresh: true
   description: >
-    Choose Pull for consumers that actively fetch messages (e.g. multiple Cloud Run
+    test Choose Pull for consumers that actively fetch messages (e.g. multiple Cloud Run
     services, workers). Choose Push for a single webhook endpoint that receives
     messages automatically. This setting changes the available output ports:
     Pull exposes a multi-target "messages" port; Push exposes a single-target port.

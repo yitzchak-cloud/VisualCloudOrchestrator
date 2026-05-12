@@ -1,0 +1,44 @@
+# nodes/resource/iam_binding/iam_binding_params.yaml
+# ─────────────────────────────────────────────────────────────────────────────
+# All UI parameters for IamBindingNode.
+
+# ── Principal ─────────────────────────────────────────────────────────────────
+- key: principal
+  label: Principal (member string)
+  type: text
+  default: ""
+  placeholder: "serviceAccount:my-sa@project.iam.gserviceaccount.com"
+  category: Principal
+  description: >
+    Full IAM member string for the principal receiving the role.
+    Examples:
+      serviceAccount:my-sa@project.iam.gserviceaccount.com
+      user:someone@example.com
+      group:devs@example.com
+      allUsers
+      allAuthenticatedUsers
+    Ignored (and replaced automatically) when a ServiceAccountNode is wired in.
+
+# ── Roles ─────────────────────────────────────────────────────────────────────
+- key: project_role
+  label: Project-Level Role
+  type: text
+  default: ""
+  placeholder: "roles/pubsub.publisher"
+  category: Roles
+  description: >
+    IAM role to grant on the entire project.
+    Leave blank to skip the project-level binding.
+    Example: roles/pubsub.publisher, roles/eventarc.eventReceiver.
+
+- key: resource_role
+  label: Resource-Level Role
+  type: text
+  default: ""
+  placeholder: "roles/run.invoker"
+  category: Roles
+  description: >
+    IAM role to grant on the specific resource connected via the output edge.
+    Leave blank to skip the resource-level binding.
+    Requires at least one IAM_BINDING output edge to a target resource.
+    Example: roles/run.invoker, roles/storage.objectViewer.
