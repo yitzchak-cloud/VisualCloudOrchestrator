@@ -173,6 +173,7 @@ class <NodeClassName>(GCPNode):
         ערכים חייבים להיות מחרוזות מוכנות ל-HCL.
         """
         from nodes.base_node import _resource_name, _tf_name, _node_by_id
+        from nodes.ctx_keys import K
         node_dict = ctx.get("node", {})
         props     = node_dict.get("props", {})
 
@@ -181,7 +182,7 @@ class <NodeClassName>(GCPNode):
             "location": f'"{props.get("region", region)}"',
         }
 
-        parent_id = ctx.get("parent_id", "")
+        parent_id = ctx.get(K.PARENT_ID, "")
         if parent_id:
             cv["parent_name"] = f"module.topic_{_tf_name(_node_by_id(all_nodes, parent_id))}.name"
         else:
@@ -535,11 +536,67 @@ ctx = {
       "region": "us-central1",
     }
   },
-  # ← כל שאר המפתחות נוספו על-ידי resolve_edges:
-  "parent_id": "xyz789",   # דוגמה
-  "consumer_ids": [...],   # דוגמה
+  # ← כל שאר המפתחות נוספו על-ידי resolve_edges — תמיד דרך K:
+  K.PARENT_ID:    "xyz789",
+  K.CONSUMER_IDS: [...],
 }
 ```
+
+---
+
+## 10א. ctx_keys — מפתחות עקביים (חובה לעקוב)
+
+> **כלל**: לעולם אל תכתוב מחרוזת ישירה כמפתח ctx.
+> תמיד השתמש בקבועים מ-`nodes.ctx_keys.K`.
+
+```python
+from nodes.ctx_keys import K
+
+# ❌ אסור
+ctx[self.node_id]["service_account_id"] = src_id
+ctx.get("push_target_ids", [])
+
+# ✅ חובה
+ctx[self.node_id][K.SERVICE_ACCOUNT] = src_id
+ctx.get(K.PUSH_TARGET_IDS, [])
+```
+
+### הוספת מפתח חדש
+אם הנוד שלך צריך מפתח שלא קיים ב-`K` — הוסף אותו לקובץ `nodes/ctx_keys.py`.
+אם המפתח ייחודי לנוד אחד בלבד והוא כנראה לא יחזור — אפשר להגדיר אותו כ-`ClassVar` פרטי בנוד עצמו:
+
+```python
+class MyNode(GCPNode):
+    _CTX_MY_FIELD = "my_node_specific_field"   # private, לא מוייצא
+```
+
+### TypedDict לתיעוד ctx של נוד
+כל נוד שמשתמש ביותר מ-2 מפתחות ctx **חייב** להגדיר TypedDict:
+
+```python
+from typing import TypedDict
+from nodes.ctx_keys import K
+
+class MyNodeCtx(TypedDict, total=False):
+    """
+    total=False — כל שדה אופציונלי.
+    שמות השדות חייבים להתאים לערכי K.*
+    """
+    topic_id:           str        # K.TOPIC_ID
+    service_account_id: str        # K.SERVICE_ACCOUNT
+    my_specific_ids:    list[str]  # ייחודי לנוד הזה
+
+# שימוש ב-resolve_edges:
+def resolve_edges(self, src_id, tgt_id, src_type, tgt_type, ctx) -> bool:
+    nctx: MyNodeCtx = ctx[self.node_id]   # type annotation בלבד, ללא casting
+    if tgt_id == self.node_id and src_type == "PubsubTopicNode":
+        nctx[K.TOPIC_ID] = src_id
+        return True
+    ...
+```
+
+TypedDict נותן: autocomplete ב-IDE, שגיאת טיפוס אם תשגה בשם, תיעוד חי של מה ctx מכיל.
+הוא **לא** אוכף בruntime — `total=False` מבטיח שאין צורך לשנות לוגיקת `setdefault`/`get`.
 
 ---
 
@@ -563,6 +620,8 @@ ctx = {
 □ אם יש show_if: patch בJS נוסף (סעיף 7)
 □ אם יש dynamic ports: handlePropChange + rehydrate (סעיף 8)
 □ כל פרמטר שניתן לפתור מחיבור edge — מוגדר כ-auto-from-edge (סעיף 13)
+□ כל מפתח ctx משתמש ב-K.* ולא במחרוזת ישירה (סעיף 10א)
+□ אם > 2 מפתחות ctx — הוגדר TypedDict (סעיף 10א)
 ```
 
 ---
@@ -614,21 +673,23 @@ ctx = {
 
 ```python
 def resolve_edges(self, src_id, tgt_id, src_type, tgt_type, ctx) -> bool:
+    nctx: MyNodeCtx = ctx[self.node_id]   # TypedDict annotation
+
     # ── אני ה-TARGET (מישהו מתחבר אלי) ──────────────────────────────────
     if tgt_id == self.node_id:
         if src_type == "ServiceAccountNode":
-            ctx[self.node_id]["service_account_id"] = src_id
+            nctx[K.SERVICE_ACCOUNT] = src_id
             return True
         if src_type == "SubnetworkNode":
-            ctx[self.node_id]["subnetwork_id"] = src_id
+            nctx[K.SUBNETWORK_ID] = src_id
             return True
         if src_type == "SomeOtherNode":
-            ctx[self.node_id].setdefault("other_ids", []).append(src_id)
+            nctx.setdefault("other_ids", []).append(src_id)  # type: ignore[misc]
             return True
 
     # ── אני ה-SOURCE (אני מתחבר למישהו) ─────────────────────────────────
     if src_id == self.node_id:
-        ctx[tgt_id]["parent_id"] = self.node_id
+        ctx[tgt_id][K.PARENT_ID] = self.node_id
         return True
 
     return False

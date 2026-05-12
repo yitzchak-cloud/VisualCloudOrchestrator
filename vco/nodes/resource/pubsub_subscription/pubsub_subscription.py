@@ -28,15 +28,27 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import ClassVar, TypedDict
 
 from nodes.base_node import GCPNode, LogSource, Port, _resource_name
 from nodes.port_types import PortType
+from nodes.ctx_keys import K
 
 from ._pulumi    import make_pulumi_program
 from ._terraform import make_terraform_call_vars, terraform_instance_prefix
 
 logger = logging.getLogger(__name__)
+
+
+# ── ctx TypedDict ─────────────────────────────────────────────────────────────
+
+class PubsubSubCtx(TypedDict, total=False):
+    """צורת ה-ctx הייחודית לנוד הזה — total=False כי כל שדה אופציונלי."""
+    topic_id:           str        # K.TOPIC_ID       — מ-PubsubTopicNode
+    service_account_id: str        # K.SERVICE_ACCOUNT — מ-ServiceAccountNode (push OIDC)
+    push_target_ids:    list[str]  # K.PUSH_TARGET_IDS — CR שהסאב דוחף אליו
+    consumer_ids:       list[str]  # K.CONSUMER_IDS   — consumers של pull
+    receives_from_subs: list[str]  # K.RECEIVES_FROM  — נשמר על היעד
 
 
 # ── Port definitions ──────────────────────────────────────────────────────────
@@ -126,31 +138,36 @@ class PubsubSubscriptionNode(GCPNode):
 
     def resolve_edges(self, src_id, tgt_id, src_type, tgt_type, ctx) -> bool:
         sub_type = self._current_sub_type()
+        nctx: PubsubSubCtx = ctx[self.node_id]
 
         # ── Subscription is the TARGET (something connects into it) ──────────
 
-        # ServiceAccountNode → sub: wire OIDC SA for push auth
-        if tgt_id == self.node_id and src_type == "ServiceAccountNode":
-            ctx[self.node_id]["service_account_id"] = src_id
-            return True
-        
-        if tgt_id == self.node_id and src_type == "CloudRunNode" and sub_type == "push":
-            ctx[self.node_id]["push_target_ids"] = [src_id]  # single target for push
-            ctx[self.node_id].setdefault("push_ids", []).append(src_id)
-            return True
+        if tgt_id == self.node_id:
+            if src_type == "ServiceAccountNode":
+                # SA → Sub(push): wire OIDC SA email for push auth
+                nctx[K.SERVICE_ACCOUNT] = src_id
+                return True
+            if src_type == "PubsubTopicNode":
+                # Topic → Sub: wire topic reference
+                nctx[K.TOPIC_ID] = src_id
+                return True
 
         # ── Subscription is the SOURCE (it connects out to a consumer) ────────
 
-        if src_id == self.node_id and src_type == "PubsubSubscriptionNode":
-            if sub_type == "push":
-                # Push: record the single target Cloud Run for push_endpoint resolution
-                ctx[self.node_id].setdefault("push_target_ids", []).append(tgt_id)
-                ctx[tgt_id].setdefault("receives_from_subs", []).append(self.node_id)
-            else:
-                # Pull: any number of consumers
-                ctx[self.node_id].setdefault("consumer_ids", []).append(tgt_id)
-                ctx[tgt_id].setdefault("receives_from_subs", []).append(self.node_id)
-            return True
+        if src_id == self.node_id:
+            if sub_type == "push" and tgt_type == "CloudRunNode":
+                # Sub(push) → CR: single push endpoint, resolved from CR uri output
+                nctx[K.PUSH_TARGET_IDS] = [tgt_id]
+                ctx[tgt_id].setdefault(K.RECEIVES_FROM, []).append(self.node_id)
+                print("--------------------------------------------------")
+                print(f"Push Sub {self.node_id} → CR {tgt_id}")
+                print("--------------------------------------------------")
+                return True
+            if sub_type == "pull":
+                # Sub(pull) → any consumer: multi-consumer fanout
+                nctx.setdefault(K.CONSUMER_IDS, []).append(tgt_id)  # type: ignore[misc]
+                ctx[tgt_id].setdefault(K.RECEIVES_FROM, []).append(self.node_id)
+                return True
 
         return False
 
@@ -160,13 +177,11 @@ class PubsubSubscriptionNode(GCPNode):
 
     def dag_deps(self, ctx) -> list[str]:
         deps = []
-        if ctx.get("topic_id"):
-            deps.append(ctx["topic_id"])
-        # Push needs the target CR to be deployed first (for its URI)
-        deps.extend(ctx.get("push_target_ids", []))
-        # Push with wired SA: SA must be deployed before we can read its email
-        if ctx.get("service_account_id"):
-            deps.append(ctx["service_account_id"])
+        if ctx.get(K.TOPIC_ID):
+            deps.append(ctx[K.TOPIC_ID])
+        deps.extend(ctx.get(K.PUSH_TARGET_IDS, []))
+        if ctx.get(K.SERVICE_ACCOUNT):
+            deps.append(ctx[K.SERVICE_ACCOUNT])
         return deps
 
     # ------------------------------------------------------------------

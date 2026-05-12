@@ -2,7 +2,6 @@
 nodes/resource/pubsub_subscription/_terraform.py
 ================================================
 Terraform variable-building helpers for PubsubSubscriptionNode.
-Split from the main node file to keep it readable.
 
 Public API
 ----------
@@ -13,6 +12,7 @@ Public API
 from __future__ import annotations
 
 from nodes.base_node import _resource_name, _tf_name, _node_by_id
+from nodes.ctx_keys import K
 
 
 def terraform_instance_prefix(sub_type: str) -> str:
@@ -30,7 +30,7 @@ def make_terraform_call_vars(node_obj, ctx, project, region, all_nodes) -> dict:
     }
 
     # ── Topic reference ───────────────────────────────────────────────────────
-    topic_id = ctx.get("topic_id", "")
+    topic_id = ctx.get(K.TOPIC_ID, "")
     cv["topic_name"] = (
         f"module.topic_{_tf_name(_node_by_id(all_nodes, topic_id))}.name"
         if topic_id else '""'
@@ -43,14 +43,14 @@ def make_terraform_call_vars(node_obj, ctx, project, region, all_nodes) -> dict:
     if sub_type == "push":
         _add_push_vars(cv, ctx, props, all_nodes)
     else:
-        _add_pull_vars(cv, props, ctx, all_nodes)
+        _add_pull_vars(cv, props)
 
     return cv
 
 
 # ── Pull helpers ──────────────────────────────────────────────────────────────
 
-def _add_pull_vars(cv, props, ctx, all_nodes):
+def _add_pull_vars(cv, props):
     cv["enable_message_ordering"]      = "true" if props.get("enable_message_ordering") else "false"
     cv["enable_exactly_once_delivery"] = "true" if props.get("enable_exactly_once_delivery") else "false"
 
@@ -62,15 +62,16 @@ def _add_pull_vars(cv, props, ctx, all_nodes):
 # ── Push helpers ──────────────────────────────────────────────────────────────
 
 def _add_push_vars(cv, ctx, props, all_nodes):
-    push_ids = ctx.get("push_target_ids", [])
-    cv["push_endpoint"] = (
-        f"module.cr_{_tf_name(_node_by_id(all_nodes, push_ids[0]))}.uri"
-        if push_ids
-        else f'"{props.get("push_endpoint", "")}"'
-    )
+    push_ids = ctx.get(K.PUSH_TARGET_IDS, [])
+    if push_ids:
+        cr_node = _node_by_id(all_nodes, push_ids[0])
+        cv["push_endpoint"] = f"module.cr_{_tf_name(cr_node)}.uri"
+    else:
+        cv["push_endpoint"] = f'"{props.get("push_endpoint", "")}"'
 
-    sa_id = ctx.get("service_account_id", "")
+    sa_id = ctx.get(K.SERVICE_ACCOUNT, "")
     if sa_id:
-        cv["oidc_sa_email"] = f"module.sa_{_tf_name(_node_by_id(all_nodes, sa_id))}.email"
+        sa_node = _node_by_id(all_nodes, sa_id)
+        cv["oidc_sa_email"] = f"module.sa_{_tf_name(sa_node)}.email"
     elif props.get("oidc_service_account_email"):
         cv["oidc_sa_email"] = f'"{props["oidc_service_account_email"]}"'

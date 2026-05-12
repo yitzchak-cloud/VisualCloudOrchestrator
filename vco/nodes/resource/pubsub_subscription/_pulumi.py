@@ -18,6 +18,7 @@ import pulumi
 import pulumi_gcp as gcp
 
 from nodes.base_node import _resource_name
+from nodes.ctx_keys import K
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ def make_pulumi_program(node_obj, ctx, project, region, all_nodes, deployed_outp
     node_dict  = ctx.get("node", {})
     props      = node_dict.get("props", {})
     sub_type   = props.get("subscription_type", "pull")
-    topic_name = deployed_outputs.get(ctx.get("topic_id", ""), {}).get("name", "")
+    topic_name = deployed_outputs.get(ctx.get(K.TOPIC_ID, ""), {}).get("name", "")
 
     if not topic_name:
         logger.warning(
@@ -82,15 +83,14 @@ def _make_pull_program(node_obj, node_dict, props, project, topic_name):
 
 def _make_push_program(node_obj, node_dict, props, ctx, project, topic_name, deployed_outputs):
     # Resolve push endpoint: wired Cloud Run node takes precedence over manual prop
-    push_target_ids = ctx.get("push_target_ids", [])
+    push_target_ids = ctx.get(K.PUSH_TARGET_IDS, [])
     push_endpoint   = (
         deployed_outputs[push_target_ids[0]].get("uri", "")
         if push_target_ids and push_target_ids[0] in deployed_outputs
         else props.get("push_endpoint", "")
     )
 
-    # Resolve OIDC SA: wired ServiceAccountNode takes precedence over manual prop
-    sa_id   = ctx.get("service_account_id", "")
+    sa_id   = ctx.get(K.SERVICE_ACCOUNT, "")
     oidc_sa = (
         deployed_outputs.get(sa_id, {}).get("email", "")
         if sa_id
