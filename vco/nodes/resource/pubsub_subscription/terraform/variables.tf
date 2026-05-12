@@ -1,33 +1,16 @@
-# modules/pubsub_subscription/variables.tf
-
 variable "project_id" {
   description = "GCP project ID"
   type        = string
 }
 
-variable "region" {
-  description = "GCP region"
-  type        = string
-}
-
 variable "name" {
-  description = "Subscription name"
+  description = "Subscription resource name"
   type        = string
 }
 
 variable "topic_name" {
-  description = "Parent topic name"
+  description = "Full topic name this subscription attaches to"
   type        = string
-}
-
-variable "subscription_type" {
-  description = "Subscription type: 'pull' or 'push'"
-  type        = string
-  default     = "pull"
-  validation {
-    condition     = contains(["pull", "push"], var.subscription_type)
-    error_message = "subscription_type must be 'pull' or 'push'."
-  }
 }
 
 variable "ack_deadline_seconds" {
@@ -37,35 +20,41 @@ variable "ack_deadline_seconds" {
 }
 
 variable "filter" {
-  description = "Subscription filter expression (empty = no filter)"
+  description = "CEL filter expression (empty = no filter)"
   type        = string
   default     = ""
 }
 
-# ── pull-only ─────────────────────────────────────────────────────────────────
+# ── Pull-only ──────────────────────────────────────────────────────────────
 
 variable "enable_message_ordering" {
-  description = "(pull) Enable message ordering"
+  description = "Enable ordered delivery (pull only)"
   type        = bool
   default     = false
 }
 
 variable "enable_exactly_once_delivery" {
-  description = "(pull) Enable exactly-once delivery"
+  description = "Enable exactly-once delivery (pull only)"
   type        = bool
   default     = false
 }
 
-# ── push-only ─────────────────────────────────────────────────────────────────
+variable "dead_letter_topic" {
+  description = "Dead-letter topic resource name (pull only, empty = disabled)"
+  type        = string
+  default     = ""
+}
+
+# ── Push-only ──────────────────────────────────────────────────────────────
 
 variable "push_endpoint" {
-  description = "(push) HTTPS endpoint to deliver messages to"
+  description = "HTTPS push endpoint URL (push only)"
   type        = string
   default     = ""
 }
 
 variable "oidc_sa_email" {
-  description = "(push) OIDC service account email for authenticated push (empty = no OIDC)"
+  description = "OIDC service account email for push auth (push only)"
   type        = string
   default     = ""
 }

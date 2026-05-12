@@ -1,54 +1,38 @@
 """
-nodes/resource/pubsub_topic/pubsub_topic.py
-==========================================
-Pub/Sub Topic node.
-
-Parameters are loaded from topic_params.yaml (same directory).
-Heavy Pulumi / Terraform logic is kept here because the topic node
-is small enough not to warrant further splitting.
+nodes/resource/pubsub_topic/pubsub_topic.py — Pub/Sub resource nodes (fully self-describing).
 """
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import ClassVar
+from pathlib import Path
+from typing import Any, Callable, ClassVar
 
 import pulumi
 import pulumi_gcp as gcp
 
-from nodes.base_node import GCPNode, LogSource, Port, _resource_name
+from nodes.base_node import GCPNode, LogSource, Port, _resource_name, _node_label
 from nodes.port_types import PortType
 
 logger = logging.getLogger(__name__)
 
 
+# ── PubSub Topic ──────────────────────────────────────────────────────────────
+
 @dataclass
 class PubsubTopicNode(GCPNode):
-    """
-    Pub/Sub Topic — the core messaging hub.
-
-    Publishers wire into the `publishers` input port.
-    Subscriptions wire out of the `subscriptions` output port.
-
-    Parameters loaded from topic_params.yaml:
-      - name                       : topic resource name
-      - message_retention_duration : how long messages are kept
-      - kms_key_name               : CMEK key (optional)
-    """
-
-    # params_schema loaded automatically from topic_params.yaml
-
+    # name:                 str = ""
+    # test_message:         str = ""    
+    message_retention_duration: str = "604800s"
+    kms_key_name:               str = ""
+    
+     
     inputs:  ClassVar = [Port("publishers",    PortType.TOPIC,        multi_in=True)]
     outputs: ClassVar = [Port("subscriptions", PortType.SUBSCRIPTION, multi=True)]
-
     node_color:  ClassVar = "#3b82f6"
     icon:        ClassVar = "pubsub"
     category:    ClassVar = "Messaging"
     description: ClassVar = "Pub/Sub Topic — the core messaging hub"
-
-    # ------------------------------------------------------------------
-    # Edge wiring
-    # ------------------------------------------------------------------
 
     def resolve_edges(self, src_id, tgt_id, src_type, tgt_type, ctx) -> bool:
         if tgt_id == self.node_id and tgt_type == "PubsubTopicNode":
@@ -62,25 +46,16 @@ class PubsubTopicNode(GCPNode):
     def dag_deps(self, ctx) -> list[str]:
         return []
 
-    # ------------------------------------------------------------------
-    # Pulumi
-    # ------------------------------------------------------------------
-
     def pulumi_program(self, ctx, project, region, all_nodes, deployed_outputs):
         node_dict = ctx.get("node", {})
         props     = node_dict.get("props", {})
 
         def program() -> None:
-            name = props.get("name") or _resource_name(node_dict)
-            kms  = props.get("kms_key_name", "").strip() or None
-
+            name = props.get("topic_name") or _resource_name(node_dict)
             t = gcp.pubsub.Topic(
                 self.node_id,
                 name=name,
-                message_retention_duration=props.get(
-                    "message_retention_duration", "604800s"
-                ),
-                kms_key_name=kms,
+                message_retention_duration=props.get("message_retention_duration", "604800s"),
                 project=project,
             )
             pulumi.export("name", t.name)
@@ -88,25 +63,20 @@ class PubsubTopicNode(GCPNode):
 
         return program
 
-    # ------------------------------------------------------------------
-    # Terraform
-    # ------------------------------------------------------------------
 
     @property
     def terraform_instance_prefix(self): return "topic"
 
     def terraform_call_vars(self, ctx, project, region, all_nodes):
+        from nodes.base_node import _resource_name, _tf_name
         props = ctx.get("node", {}).get("props", {})
         return {
-            "name":      f'"{props.get("name") or _resource_name(ctx.get("node", {}))}"',
+            "name":      f'"{props.get("name") or _resource_name(ctx.get("node",{}))}"  ',
             "retention": f'"{props.get("message_retention_duration", "604800s")}"',
         }
 
-    # ------------------------------------------------------------------
-    # Live outputs & logging
-    # ------------------------------------------------------------------
-
     def live_outputs(self, pulumi_outputs, project, region) -> dict:
+        # Topics have no interesting URL to show, just expose the name
         return {"topic_name": pulumi_outputs.get("name", "")}
 
     def log_source(self, pulumi_outputs, project, region) -> LogSource | None:
@@ -120,3 +90,4 @@ class PubsubTopicNode(GCPNode):
             ),
             project=project,
         )
+

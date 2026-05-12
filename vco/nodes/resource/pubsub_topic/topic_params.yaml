@@ -1,0 +1,32 @@
+# ── Basic ─────────────────────────────────────────────
+- key: name
+  label: Topic Name
+  type: text
+  default: ""
+  placeholder: your-topic-name
+  category: Basic
+  description: >
+    The unique name of the Pub/Sub topic within the project.
+    Must be between 3–255 characters and match the pattern [a-zA-Z][a-zA-Z0-9\-_.~+%]*.
+    Cannot start with "goog".
+
+- key: message_retention_duration
+  label: Retention Duration
+  type: text
+  default: "604800s"
+  category: Basic
+  description: >
+    How long unacknowledged messages are retained in the topic.
+    Format: seconds with 's' suffix (e.g. "604800s" = 7 days).
+    Range: 600s (10 min) to 2678400s (31 days).
+    Messages older than this are dropped even if no subscription has consumed them.
+
+- key: kms_key_name
+  label: KMS Key Name
+  type: text
+  default: ""
+  category: Encryption
+  description: >
+    Customer-managed encryption key (CMEK) resource name from Cloud KMS.
+    Format: projects/{project}/locations/{location}/keyRings/{ring}/cryptoKeys/{key}
+    Leave empty to use Google-managed encryption.

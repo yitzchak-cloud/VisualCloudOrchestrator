@@ -1,0 +1,103 @@
+# ── Core ─────────────────────────────────────────────
+- key: subscription_type
+  label: Subscription Type
+  type: select
+  options: [pull, push]
+  default: pull
+  category: Core
+  description: >
+    Choose Pull for consumers that actively fetch messages (e.g. multiple Cloud Run
+    services, workers). Choose Push for a single webhook endpoint that receives
+    messages automatically. This setting changes the available output ports:
+    Pull exposes a multi-target "messages" port; Push exposes a single-target port.
+
+- key: ack_deadline_seconds
+  label: Ack Deadline (s)
+  type: number
+  default: 20
+  category: Core
+  description: >
+    How long (in seconds) Pub/Sub waits for a subscriber to acknowledge a message
+    before re-delivering it. Range: 10–600 seconds.
+
+- key: filter
+  label: Filter Expression
+  type: text
+  default: ""
+  category: Core
+  description: >
+    CEL expression to filter messages before delivery.
+    Example: attributes.env = "prod"
+    Leave empty to receive all messages.
+
+# ── Pull-only ─────────────────────────────────────────
+- key: enable_message_ordering
+  label: Message Ordering
+  type: checkbox
+  default: false
+  category: Pull Options
+  show_if:
+    subscription_type: pull
+  description: >
+    When enabled, messages with the same ordering key are delivered
+    in the order they were published. Requires publishers to set an
+    ordering key on each message.
+
+- key: enable_exactly_once_delivery
+  label: Exactly Once Delivery
+  type: checkbox
+  default: false
+  category: Pull Options
+  show_if:
+    subscription_type: pull
+  description: >
+    Guarantees that each message is delivered exactly once, at the cost of
+    higher latency. Use for critical workloads where duplicate processing
+    is not acceptable.
+
+- key: dead_letter_topic
+  label: Dead Letter Topic
+  type: text
+  default: ""
+  category: Pull Options
+  show_if:
+    subscription_type: pull
+  description: >
+    Full topic resource name for dead-lettering undeliverable messages.
+    Format: projects/{project}/topics/{topic}
+
+# ── Push-only ─────────────────────────────────────────
+- key: push_endpoint
+  label: Push Endpoint URL
+  type: text
+  default: ""
+  placeholder: "https://..."
+  category: Push Options
+  show_if:
+    subscription_type: push
+  description: >
+    The HTTPS URL to which Pub/Sub will POST messages.
+    Can be wired automatically when a Cloud Run node is connected.
+    Leave empty to auto-resolve from the connected node.
+
+- key: oidc_service_account_email
+  label: OIDC Service Account
+  type: text
+  default: ""
+  category: Push Options
+  show_if:
+    subscription_type: push
+  description: >
+    Service account email used to generate an OIDC token that is attached
+    to each push request. Required when the push endpoint validates identity.
+
+- key: audience
+  label: OIDC Audience
+  type: text
+  default: ""
+  category: Push Options
+  show_if:
+    subscription_type: push
+  description: >
+    The audience claim in the OIDC token. Typically the push endpoint URL.
+    Leave blank to default to the push endpoint URL.

@@ -1,0 +1,215 @@
+# nodes/resource/cloud_run/cloud_run_params.yaml
+# ─────────────────────────────────────────────────────────────────────────────
+# All UI parameters for CloudRunNode.
+# Loaded automatically by base_node via params_schema: ClassVar = _load_params()
+
+# ── Basic ─────────────────────────────────────────────────────────────────────
+- key: name
+  label: Service Name
+  type: text
+  default: ""
+  placeholder: my-service
+  category: Basic
+  description: >
+    Unique name for the Cloud Run service within the project and region.
+    Must be lowercase, start with a letter, and contain only letters, digits, and hyphens.
+
+- key: image
+  label: Container Image
+  type: text
+  default: ""
+  placeholder: "gcr.io/project/image:tag"
+  category: Basic
+  description: >
+    Full container image URI including registry, image name, and tag.
+    Example: us-central1-docker.pkg.dev/my-project/repo/app:latest
+
+- key: region
+  label: Region
+  type: select
+  options: [me-west1, us-central1, us-east1, us-west1, europe-west1, europe-west4, asia-east1, asia-northeast1]
+  default: me-west1
+  category: Basic
+  description: GCP region where the Cloud Run service is deployed.
+
+# ── Container ─────────────────────────────────────────────────────────────────
+- key: port
+  label: Container Port
+  type: number
+  default: 8080
+  category: Container
+  description: >
+    TCP port the container listens on.
+    Cloud Run sends all HTTP traffic to this port.
+
+- key: cpu
+  label: CPU
+  type: select
+  options: ["0.08", "0.17", "0.25", "0.33", "0.5", "1", "2", "4", "6", "8"]
+  default: "1"
+  category: Container
+  description: >
+    Number of vCPUs allocated per container instance.
+    Values below 1 are fractional (e.g. "0.5" = half a vCPU).
+    CPU >= 4 requires memory >= 2Gi.
+
+- key: memory
+  label: Memory
+  type: select
+  options: [128Mi, 256Mi, 512Mi, 1Gi, 2Gi, 4Gi, 8Gi, 16Gi, 32Gi]
+  default: 512Mi
+  category: Container
+  description: >
+    Memory limit per container instance.
+    Must be compatible with the chosen CPU count.
+
+- key: concurrency
+  label: Max Concurrent Requests
+  type: number
+  default: 80
+  category: Container
+  description: >
+    Maximum number of concurrent requests a single container instance will handle.
+    Set to 1 for request-isolated workloads. Max is 1000.
+
+- key: timeout_seconds
+  label: Request Timeout (seconds)
+  type: number
+  default: 300
+  category: Container
+  description: >
+    Maximum time in seconds a request can take before Cloud Run returns a 504.
+    Range: 1–3600. Default is 300 (5 minutes).
+
+- key: execution_environment
+  label: Execution Environment
+  type: select
+  options:
+    - EXECUTION_ENVIRONMENT_GEN1
+    - EXECUTION_ENVIRONMENT_GEN2
+  default: EXECUTION_ENVIRONMENT_GEN2
+  category: Container
+  description: >
+    Gen2 is recommended — it provides better performance, NFS/GCS volume mounts,
+    and full Linux compatibility. Gen1 is legacy.
+
+- key: startup_cpu_boost
+  label: Startup CPU Boost
+  type: checkbox
+  default: false
+  category: Container
+  description: >
+    Temporarily allocate extra CPU during container startup to reduce cold-start latency.
+    Recommended for services with slow initialization.
+
+# ── Scaling ───────────────────────────────────────────────────────────────────
+- key: min_instances
+  label: Min Instances
+  type: number
+  default: 0
+  category: Scaling
+  description: >
+    Minimum number of container instances to keep warm.
+    Set > 0 to eliminate cold starts at the cost of always-on billing.
+
+- key: max_instances
+  label: Max Instances
+  type: number
+  default: 10
+  category: Scaling
+  description: >
+    Maximum number of container instances that can be scaled up simultaneously.
+    Limits cost and downstream load. Hard cap is 1000.
+
+# ── Access ────────────────────────────────────────────────────────────────────
+- key: ingress
+  label: Ingress
+  type: select
+  options:
+    - INGRESS_TRAFFIC_ALL
+    - INGRESS_TRAFFIC_INTERNAL_ONLY
+    - INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER
+  default: INGRESS_TRAFFIC_INTERNAL_ONLY
+  category: Access
+  description: >
+    Controls which traffic sources can reach the service.
+    ALL = public internet + internal.
+    INTERNAL_ONLY = VPC and Google services only.
+    INTERNAL_LOAD_BALANCER = only via an internal HTTP(S) Load Balancer.
+
+- key: allow_unauthenticated
+  label: Allow Unauthenticated (public access)
+  type: checkbox
+  default: false
+  category: Access
+  description: >
+    Grant allUsers the roles/run.invoker role, making the service publicly accessible.
+    Leave unchecked for private services (IAM-authenticated only).
+    Has no effect when Ingress is INTERNAL_ONLY.
+
+# ── Networking ────────────────────────────────────────────────────────────────
+- key: vpc_egress
+  label: VPC Egress
+  type: select
+  options:
+    - PRIVATE_RANGES_ONLY
+    - ALL_TRAFFIC
+  default: PRIVATE_RANGES_ONLY
+  category: Networking
+  description: >
+    Controls which outbound traffic is routed through the VPC.
+    PRIVATE_RANGES_ONLY routes RFC-1918 addresses via VPC (recommended).
+    ALL_TRAFFIC routes everything including internet via VPC (requires NAT).
+    Only active when a SubnetworkNode is connected or vpc_network/vpc_subnetwork are set.
+
+- key: vpc_network
+  label: VPC Network (fallback)
+  type: text
+  default: ""
+  placeholder: "projects/HOST/global/networks/NETWORK"
+  category: Networking
+  description: >
+    VPC network self-link. Only used when no SubnetworkNode is connected.
+    Leave blank to skip VPC egress configuration.
+
+- key: vpc_subnetwork
+  label: VPC Subnetwork (fallback)
+  type: text
+  default: ""
+  placeholder: "projects/HOST/regions/REGION/subnetworks/SUBNET"
+  category: Networking
+  description: >
+    VPC subnetwork self-link. Only used when no SubnetworkNode is connected.
+
+# ── Labels & Annotations ──────────────────────────────────────────────────────
+- key: labels
+  label: Labels (JSON)
+  type: text
+  default: ""
+  placeholder: '{"env":"prod","team":"backend"}'
+  category: Advanced
+  description: >
+    Key-value labels attached to the Cloud Run service for billing, filtering, and organisation.
+    Provide as a JSON object string. Keys and values must follow GCP label constraints.
+
+- key: annotations
+  label: Annotations (JSON)
+  type: text
+  default: ""
+  placeholder: '{"run.googleapis.com/description":"my service"}'
+  category: Advanced
+  description: >
+    Unstructured key-value metadata for external tools.
+    run.googleapis.com, cloud.googleapis.com, serving.knative.dev,
+    and autoscaling.knative.dev namespaces are reserved and will be rejected.
+
+# ── Output ────────────────────────────────────────────────────────────────────
+- key: service_url
+  label: Service URL
+  type: text
+  default: ""
+  placeholder: "https://my-service-xxxx-ew.a.run.app"
+  category: Output
+  description: >
+    Read-only. Populated automatically after deployment.
+    Can be pre-filled to reference an existing service.

@@ -1159,6 +1159,42 @@
       );
     };
 
+    // ── Shared field-visibility helper (used by all render paths) ────────────────
+    // Handles show_if as {key:val} dict OR [{key:val}] array (defensive).
+    // Falls back to field's declared `default` when prop not yet set.
+    const isFieldVisible = (f, currentProps, allFields) => {
+      if (!f.show_if) return true;
+
+      // Normalise: {k:v} or [{k:v}]
+      const conditions = Array.isArray(f.show_if)
+        ? Object.assign({}, ...f.show_if)
+        : f.show_if;
+      if (typeof conditions !== 'object' || conditions === null) return true;
+
+      let visible = true;
+      Object.entries(conditions).forEach(([k, expected]) => {
+        let actual = currentProps[k];
+        const fromProps = actual !== undefined && actual !== null && actual !== '';
+        if (!fromProps) {
+          const defField = allFields.find(nf => nf.key === k);
+          actual = defField?.default;
+        }
+        const match = String(actual ?? '') === String(expected);
+        console.log(
+          '%c[show_if] field=' + f.key +
+          ' | ' + k + ' expected=' + JSON.stringify(expected) +
+          ' actual=' + JSON.stringify(actual) +
+          ' (src=' + (fromProps ? 'props' : 'default') + ')' +
+          ' MATCH=' + match,
+          match ? 'color:#4ade80;font-weight:bold' : 'color:#f87171;font-weight:bold'
+        );
+        if (!match) visible = false;
+      });
+      console.log('%c[show_if] => ' + f.key + ' visible=' + visible,
+        visible ? 'color:#86efac' : 'color:#fca5a5');
+      return visible;
+    };
+
     // ── Node Edit Modal ───────────────────────────────────────────────────────────
     const NodeEditModal = ({ node, onClose, onChange, nodeEvent }) => {
       if (!node) return null;
@@ -1168,82 +1204,6 @@
       const props = node.data.props || {};
       const isVisualGroup = node.type === 'groupBox';
       const nodeColor = node.data.accentColor || schema?.color || 'var(--accent)';
-
-      // Fields definition (same as PropertyPanel)
-      const fieldDefs = {
-        CloudRunNode: [
-          { key: 'image', label: 'Container Image', type: 'text', placeholder: 'gcr.io/project/image:tag' },
-          { key: 'memory', label: 'Memory', type: 'select', options: ['256Mi', '512Mi', '1Gi', '2Gi', '4Gi', '8Gi'] },
-          { key: 'cpu', label: 'CPU', type: 'select', options: ['1', '2', '4', '8'] },
-          { key: 'min_instances', label: 'Min Instances', type: 'number' },
-          { key: 'max_instances', label: 'Max Instances', type: 'number' },
-          { key: 'port', label: 'Container Port', type: 'number' },
-        ],
-        CloudSQLNode: [
-          { key: 'database_version', label: 'Engine', type: 'select', options: ['POSTGRES_15', 'POSTGRES_14', 'MYSQL_8_0', 'SQLSERVER_2019_STANDARD'] },
-          { key: 'tier', label: 'Machine Tier', type: 'select', options: ['db-f1-micro', 'db-g1-small', 'db-n1-standard-1', 'db-n1-standard-2', 'db-n1-standard-4'] },
-          { key: 'region', label: 'Region', type: 'select', options: ['us-central1', 'us-east1', 'europe-west1', 'asia-east1'] },
-          { key: 'disk_size_gb', label: 'Disk (GB)', type: 'number' },
-          { key: 'ha', label: 'High Availability', type: 'checkbox' },
-        ],
-        PubSubNode: [
-          { key: 'ack_deadline_seconds', label: 'Ack Deadline (sec)', type: 'number' },
-          { key: 'message_retention_duration', label: 'Retention', type: 'text', placeholder: '604800s' },
-        ],
-        GCSBucketNode: [
-          { key: 'location', label: 'Location', type: 'select', options: ['US', 'EU', 'ASIA', 'us-central1', 'europe-west1'] },
-          { key: 'storage_class', label: 'Storage Class', type: 'select', options: ['STANDARD', 'NEARLINE', 'COLDLINE', 'ARCHIVE'] },
-          { key: 'versioning', label: 'Versioning', type: 'checkbox' },
-          { key: 'public_access', label: 'Public Access', type: 'checkbox' },
-        ],
-        ServiceAccountNode: [
-          { key: 'description_sa', label: 'Description', type: 'text', placeholder: 'Service account for...' },
-        ],
-        VPCNode: [
-          { key: 'subnet_cidr', label: 'Subnet CIDR', type: 'text', placeholder: '10.0.0.0/24' },
-          { key: 'region', label: 'Region', type: 'select', options: ['us-central1', 'us-east1', 'europe-west1', 'asia-east1'] },
-          { key: 'private_google_access', label: 'Private Google Access', type: 'checkbox' },
-        ],
-        SecretManagerNode: [
-          { key: 'replication', label: 'Replication', type: 'select', options: ['automatic', 'user-managed'] },
-          { key: 'rotation_days', label: 'Rotation (days, 0=off)', type: 'number' },
-        ],
-        SubscriptionNode: [
-          { key: 'ack_deadline_seconds', label: 'Ack Deadline (sec)', type: 'number' },
-          { key: 'retain_acked_messages', label: 'Retain Acked Messages', type: 'checkbox' },
-          { key: 'filter_expr', label: 'Filter Expression', type: 'text', placeholder: 'attributes.env="prod"' },
-          { key: 'push_endpoint', label: 'Push Endpoint (empty = pull)', type: 'text', placeholder: 'https://...' },
-        ],
-        CloudFunctionNode: [
-          { key: 'runtime', label: 'Runtime', type: 'select', options: ['python311', 'python310', 'nodejs20', 'nodejs18', 'go121', 'java21'] },
-          { key: 'memory', label: 'Memory', type: 'select', options: ['128Mi', '256Mi', '512Mi', '1Gi', '2Gi', '4Gi'] },
-          { key: 'timeout', label: 'Timeout (sec)', type: 'number' },
-          { key: 'trigger', label: 'Trigger', type: 'select', options: ['http', 'pubsub', 'storage'] },
-        ],
-        BigQueryNode: [
-          { key: 'location', label: 'Location', type: 'select', options: ['US', 'EU', 'asia-northeast1', 'europe-west1'] },
-          { key: 'dataset_id', label: 'Dataset ID', type: 'text', placeholder: 'my_dataset' },
-          { key: 'partition_by', label: 'Partition Field', type: 'text', placeholder: '_PARTITIONTIME' },
-          { key: 'expiration_ms', label: 'Table Expiration (ms, 0=never)', type: 'number' },
-        ],
-        FirestoreNode: [
-          { key: 'mode', label: 'Mode', type: 'select', options: ['NATIVE', 'DATASTORE_COMPAT'] },
-          { key: 'location', label: 'Location', type: 'select', options: ['us-central', 'us-east1', 'europe-west1', 'asia-east1'] },
-          { key: 'ttl_field', label: 'TTL Field', type: 'text', placeholder: 'expireAt' },
-        ],
-        MemorystoreNode: [
-          { key: 'tier', label: 'Tier', type: 'select', options: ['BASIC', 'STANDARD_HA'] },
-          { key: 'memory_size_gb', label: 'Memory (GB)', type: 'number' },
-          { key: 'redis_version', label: 'Redis Version', type: 'select', options: ['REDIS_7_0', 'REDIS_6_X', 'REDIS_5_0'] },
-          { key: 'region', label: 'Region', type: 'select', options: ['us-central1', 'us-east1', 'europe-west1', 'asia-east1'] },
-        ],
-        LoadBalancerNode: [
-          { key: 'lb_type', label: 'Type', type: 'select', options: ['EXTERNAL', 'INTERNAL'] },
-          { key: 'protocol', label: 'Protocol', type: 'select', options: ['HTTP', 'HTTPS', 'TCP', 'UDP'] },
-          { key: 'ssl_cert', label: 'SSL Certificate', type: 'text', placeholder: 'projects/.../sslCertificates/...' },
-          { key: 'cdn_enabled', label: 'Cloud CDN', type: 'checkbox' },
-        ],
-      };
 
       const nodeFields = schema?.params_schema || fieldDefs[schema?.type] || [];
 
@@ -1285,13 +1245,7 @@
       const toggleModalCat = (cat) => setModalCollapsedCats(prev => ({ ...prev, [cat]: !prev[cat] }));
 
       const renderField = (f) => {
-        // show_if: hide field when condition not met
-        if (f.show_if) {
-          const conditionMet = Object.entries(f.show_if).every(
-            ([k, v]) => (props[k] || '') === v
-          );
-          if (!conditionMet) return null;
-        }
+        if (!isFieldVisible(f, props, nodeFields)) return null;
 
         const isCodeField = f.type === 'yaml' || f.type === 'code' || f.type === 'json';
         const codeLang = f.type === 'yaml' ? 'yaml' : f.type === 'json' ? 'json' : (f.language || 'yaml');
@@ -1409,8 +1363,9 @@
       };
 
       // Split fields into two columns — code fields always go full-width
-      const checkboxFields = nodeFields.filter(f => f.type === 'checkbox');
-      const normalFields = nodeFields.filter(f => f.type !== 'checkbox');
+      const visibleFields = nodeFields.filter(f => isFieldVisible(f, props, nodeFields));
+      const checkboxFields = visibleFields.filter(f => f.type === 'checkbox');
+      const normalFields = visibleFields.filter(f => f.type !== 'checkbox');
 
       const statusColors = { idle: 'var(--text2)', deployed: 'var(--green)', deploying: 'var(--yellow)', error: 'var(--red)', working: '#fff', failed: 'var(--red)' };
       const currentStatus = node.data.status || 'idle';
@@ -1868,10 +1823,7 @@
       const toggleCat = (cat) => setCollapsedCats(prev => ({ ...prev, [cat]: !prev[cat] }));
 
       const renderPanelField = (f) => {
-        if (f.show_if) {
-          const conditionMet = Object.entries(f.show_if).every(([k, v]) => (props[k] || '') === v);
-          if (!conditionMet) return null;
-        }
+        if (!isFieldVisible(f, props, nodeFields)) return null;
 
         const isCodeField = f.type === 'yaml' || f.type === 'code' || f.type === 'json';
         const codeLang = f.type === 'yaml' ? 'yaml' : f.type === 'json' ? 'json' : (f.language || 'yaml');
@@ -1960,9 +1912,10 @@
 
       // ── Group fields by category and render collapsible sections ──────────────
       const renderCategorizedFields = (fields) => {
-        // Build ordered map: category → fields[]
+        // Build ordered map: category → visible fields only
         const catMap = new Map();
         fields.forEach(f => {
+          if (!isFieldVisible(f, props, nodeFields)) return;
           const cat = f.category || 'General';
           if (!catMap.has(cat)) catMap.set(cat, []);
           catMap.get(cat).push(f);
@@ -3284,7 +3237,7 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
       const [isDeploying, setIsDeploying] = useState(false);
       const [wsConnected, setWsConnected] = useState(false);
       const [menuOpen, setMenuOpen] = useState(false);
-      const [theme, setTheme] = useState('dark');
+      const [theme, setTheme] = useState('light');
       const [ctxMenu, setCtxMenu] = useState(null);
       const [edgeCtxMenu, setEdgeCtxMenu] = useState(null);
       const [defaultEdgeType, setDefaultEdgeType] = useState('bezier');
@@ -3455,6 +3408,23 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
             const typesData = await typesRes.json();
             if (typesData?.length) setNodeTypesData(typesData);
 
+            // ── DEBUG: log every node type and its params_schema ─────────────
+            console.group('%c[node-types] Loaded ' + (typesData?.length || 0) + ' types', 'color:#60a5fa;font-weight:bold');
+            (typesData || []).forEach(t => {
+              const hasShowIf = (t.params_schema || []).some(f => f.show_if);
+              const fieldsWithShowIf = (t.params_schema || []).filter(f => f.show_if);
+              console.log(
+                '%c' + t.type + (hasShowIf ? ' [has show_if]' : ''),
+                hasShowIf ? 'color:#4ade80;font-weight:bold' : 'color:#94a3b8',
+                '| params:', (t.params_schema || []).map(f => f.key)
+              );
+              if (fieldsWithShowIf.length) {
+                fieldsWithShowIf.forEach(f => console.log('  show_if field:', f.key, '| show_if:', JSON.stringify(f.show_if)));
+              }
+            });
+            console.groupEnd();
+            // ── END DEBUG ────────────────────────────────────────────────────
+
             // 2. Then get the saved graph (schemas are now available in typesData)
             const stateRes = await fetch(`${SERVER_BASE_URL}/api/state?namespace=${encodeURIComponent(namespaceRef.current)}`);
             const state = await stateRes.json();
@@ -3481,7 +3451,12 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
                 position: n.position || { x: Math.random() * 600, y: Math.random() * 400 },
                 data: {
                   label: n.label,
-                  schema,
+                  // Rehydrate dynamic outputs for PubsubSubscriptionNode on load
+                  schema: (schema?.type === 'PubsubSubscriptionNode')
+                    ? { ...schema, outputs: (n.props?.subscription_type === 'push')
+                        ? [{ name: 'messages', type: 'message', multi: false, label: 'messages (push)' }]
+                        : [{ name: 'messages', type: 'message', multi: true,  label: 'messages' }] }
+                    : schema,
                   status: n.status || (n.deployed ? 'deployed' : 'idle'),
                   props: n.props || {},
                 },
@@ -3847,6 +3822,24 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
       const onNodeClick = useCallback((_, node) => {
         setSelectedNode(node);
         // Do NOT open editModalNode here — user must double-click for that
+        // ── DEBUG: log selected node schema + props ───────────────────────
+        const s = node.data?.schema;
+        const p = node.data?.props || {};
+        console.group('%c[node-click] ' + (s?.type || node.type), 'color:#f59e0b;font-weight:bold');
+        console.log('props:', JSON.stringify(p));
+        console.log('params_schema keys:', (s?.params_schema || []).map(f => f.key));
+        const showIfFields = (s?.params_schema || []).filter(f => f.show_if);
+        if (showIfFields.length) {
+          console.log('fields with show_if:');
+          showIfFields.forEach(f => {
+            const actual = p[Object.keys(f.show_if)[0]];
+            console.log(' ', f.key, '| show_if:', JSON.stringify(f.show_if), '| current prop value:', JSON.stringify(actual));
+          });
+        } else {
+          console.log('%cNO show_if fields found in params_schema', 'color:#f87171');
+        }
+        console.groupEnd();
+        // ── END DEBUG ─────────────────────────────────────────────────────
       }, []);
       const onNodeDoubleClick = useCallback((_, node) => {
         setSelectedNode(node);
@@ -3898,12 +3891,32 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
       }, [setNodes, addLog]);
 
       // Property change
+      // ── Dynamic port definitions for PubsubSubscriptionNode ──────────────
+      const PULL_OUTPUT_PORT = { name: 'messages', type: 'message', multi: true,  label: 'messages' };
+      const PUSH_OUTPUT_PORT = { name: 'messages', type: 'message', multi: false, label: 'messages (push)' };
+      const getSubscriptionOutputs = (subType) =>
+        subType === 'push' ? [PUSH_OUTPUT_PORT] : [PULL_OUTPUT_PORT];
+
       const handlePropChange = useCallback((nodeId, key, value, isProp = false) => {
         setNodes(nds => nds.map(n => {
           if (n.id !== nodeId) return n;
-          if (isProp) return { ...n, data: { ...n.data, props: { ...n.data.props, [key]: value } } };
+          // Recompute schema.outputs when subscription_type changes
+          let updatedSchema = n.data.schema;
+          if (isProp && key === 'subscription_type' && n.data.schema?.type === 'PubsubSubscriptionNode') {
+            updatedSchema = { ...n.data.schema, outputs: getSubscriptionOutputs(value) };
+          }
+          if (isProp) return { ...n, data: { ...n.data, props: { ...n.data.props, [key]: value }, schema: updatedSchema } };
           return { ...n, data: { ...n.data, [key]: value } };
         }));
+        // When switching to push: drop extra outgoing edges (push allows only 1)
+        if (isProp && key === 'subscription_type' && value === 'push') {
+          setEdges(eds => {
+            const msgEdges = eds.filter(e => e.source === nodeId && e.sourceHandle === 'messages');
+            if (msgEdges.length <= 1) return eds;
+            const keepId = msgEdges[0].id;
+            return eds.filter(e => !(e.source === nodeId && e.sourceHandle === 'messages' && e.id !== keepId));
+          });
+        }
         // Keep selectedNode in sync
         setSelectedNode(prev => {
           if (!prev || prev.id !== nodeId) return prev;
@@ -3916,7 +3929,7 @@ ${filtered.map((l, i) => `<div class="entry ${l.level || 'info'}"><span class="t
           if (isProp) return { ...prev, data: { ...prev.data, props: { ...prev.data.props, [key]: value } } };
           return { ...prev, data: { ...prev.data, [key]: value } };
         });
-      }, []);
+      }, [setEdges]);
 
       // Deploy
       const handleDeploy = async () => {

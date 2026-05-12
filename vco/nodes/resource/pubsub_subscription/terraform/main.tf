@@ -1,36 +1,47 @@
-# modules/pubsub_subscription/main.tf
-# ─────────────────────────────────────────────────────────────────────────────
-# Unified Pub/Sub subscription module — supports both pull and push.
-# subscription_type = "pull" → standard pull subscription (no push_config)
-# subscription_type = "push" → push delivery to push_endpoint
-# ─────────────────────────────────────────────────────────────────────────────
-
 locals {
-  is_push  = var.subscription_type == "push"
-  use_oidc = local.is_push && var.oidc_sa_email != ""
+  is_push = var.push_endpoint != ""
 }
 
-resource "google_pubsub_subscription" "this" {
-  name                         = var.name
-  topic                        = var.topic_name
-  project                      = var.project_id
-  ack_deadline_seconds         = var.ack_deadline_seconds
-  filter                       = var.filter != "" ? var.filter : null
+# ── Pull subscription (created when push_endpoint is empty) ───────────────────
+resource "google_pubsub_subscription" "pull" {
+  count = local.is_push ? 0 : 1
 
-  # pull-only settings — ignored by GCP when push_config is present
-  enable_message_ordering      = local.is_push ? false : var.enable_message_ordering
-  enable_exactly_once_delivery = local.is_push ? false : var.enable_exactly_once_delivery
+  name    = var.name
+  topic   = var.topic_name
+  project = var.project_id
 
-  dynamic "push_config" {
-    for_each = local.is_push ? [1] : []
+  ack_deadline_seconds          = var.ack_deadline_seconds
+  enable_message_ordering       = var.enable_message_ordering
+  enable_exactly_once_delivery  = var.enable_exactly_once_delivery
+
+  dynamic "dead_letter_policy" {
+    for_each = var.dead_letter_topic != "" ? [1] : []
     content {
-      push_endpoint = var.push_endpoint
+      dead_letter_topic = var.dead_letter_topic
+    }
+  }
 
-      dynamic "oidc_token" {
-        for_each = local.use_oidc ? [1] : []
-        content {
-          service_account_email = var.oidc_sa_email
-        }
+  filter = var.filter != "" ? var.filter : null
+}
+
+# ── Push subscription (created when push_endpoint is set) ─────────────────────
+resource "google_pubsub_subscription" "push" {
+  count = local.is_push ? 1 : 0
+
+  name    = var.name
+  topic   = var.topic_name
+  project = var.project_id
+
+  ack_deadline_seconds = var.ack_deadline_seconds
+  filter               = var.filter != "" ? var.filter : null
+
+  push_config {
+    push_endpoint = var.push_endpoint
+
+    dynamic "oidc_token" {
+      for_each = var.oidc_sa_email != "" ? [1] : []
+      content {
+        service_account_email = var.oidc_sa_email
       }
     }
   }
