@@ -8,6 +8,11 @@ variable "name" {
   type        = string
 }
 
+variable "region" {
+  description = "GCP region (used for resource-scoped IAM bindings)"
+  type        = string
+}
+
 variable "topic_name" {
   description = "Full topic name this subscription attaches to"
   type        = string

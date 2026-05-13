@@ -318,14 +318,14 @@ class IamBindingNode(GCPNode):
         node_dict = ctx.get("node", {})
         props     = node_dict.get("props", {})
 
-        # Resolve member string for TF module
+        # ── Resolve member ────────────────────────────────────────────────────
         sa_id   = ctx.get("service_account_id", "")
         sa_node = _node_by_id(all_nodes, sa_id) if sa_id else None
         if sa_node:
             if sa_node.get("props", {}).get("create_sa", True):
-                member = f"serviceAccount:${{google_service_account.{_tf_name(sa_node)}.email}}"
+                member = f"serviceAccount:${{module.sa_{_tf_name(sa_node)}.email}}"
             else:
-                member = f"serviceAccount:{sa_node.get('props',{}).get('email','')}"
+                member = f"serviceAccount:{sa_node.get('props', {}).get('email', '')}"
         else:
             member = props.get("principal", "")
 
@@ -335,21 +335,46 @@ class IamBindingNode(GCPNode):
             "resource_role": f'"{props.get("resource_role", "")}"',
         }
 
-        # Pass target resource names as a TF list
-        target_names: list[str] = []
-        target_types: list[str] = []
-        for binding in ctx.get("target_bindings", []):
-            tgt_node = _node_by_id(all_nodes, binding["node_id"])
-            if tgt_node:
-                target_names.append(_tf_name(tgt_node))
-                target_types.append(binding["resource_type"])
+        # ── Resource-level: one var per resource type ─────────────────────────
+        # Maps rtype → (module_var_name, module_prefix)
+        # pubsub_subscription is handled separately (dynamic prefix push/pull)
+        _MODULE_PREFIX: dict[str, tuple[str, str]] = {
+            "cloud_run_service":   ("cloud_run_service_name",   "cr"),
+            "gcs_bucket":          ("gcs_bucket_name",          "gcs"),
+            "cloud_tasks_queue":   ("cloud_tasks_queue_name",   "tasks_queue"),
+            "cloud_function":      ("cloud_function_name",      "func"),
+            "pubsub_topic":        ("pubsub_topic_name",        "topic"),
+        }
 
-        cv["target_resource_names"] = (
-            '["' + '", "'.join(target_names) + '"]' if target_names else "[]"
-        )
-        cv["target_resource_types"] = (
-            '["' + '", "'.join(target_types) + '"]' if target_types else "[]"
-        )
+        # Initialise all resource vars to empty (disabled)
+        for var_name, _ in _MODULE_PREFIX.values():
+            cv[var_name] = '""'
+        cv["pubsub_subscription_name"] = '""'
+
+        # Override vars for wired targets
+        for binding in ctx.get("target_bindings", []):
+            rtype    = binding["resource_type"]
+            tgt_node = _node_by_id(all_nodes, binding["node_id"])
+            if not tgt_node:
+                continue
+
+            tgt_tf_name = _tf_name(tgt_node)
+
+            if rtype == "pubsub_subscription":
+                sub_type      = tgt_node.get("props", {}).get("subscription_type", "pull")
+                module_prefix = "push_sub" if sub_type == "push" else "pull_sub"
+                cv["pubsub_subscription_name"] = f"module.{module_prefix}_{tgt_tf_name}.name"
+
+            elif rtype in _MODULE_PREFIX:
+                var_name, module_prefix = _MODULE_PREFIX[rtype]
+                cv[var_name] = f"module.{module_prefix}_{tgt_tf_name}.name"
+
+            else:
+                # workflow / eventarc_trigger / unknown → no resource-level TF support
+                logger.warning(
+                    "IamBindingNode %s: rtype '%s' has no module-level TF support — skipping",
+                    self.node_id, rtype,
+                )
 
         return cv
 

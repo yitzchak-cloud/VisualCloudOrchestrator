@@ -1,43 +1,76 @@
+# ── Core ──────────────────────────────────────────────────────────────────────
+
 variable "project_id" {
-  description = "GCP project ID"
-  type        = string
+  type = string
 }
 
 variable "region" {
-  description = "GCP region (used for resource-level bindings that require location)"
-  type        = string
+  type = string
 }
 
 variable "member" {
-  description = "IAM member string (e.g. serviceAccount:..., user:..., allUsers)"
   type        = string
+  description = "Full IAM member string, e.g. serviceAccount:sa@project.iam.gserviceaccount.com"
 }
+
+# ── Project-level binding ──────────────────────────────────────────────────────
 
 variable "project_role" {
-  description = "IAM role to grant at project level. Empty string = skip."
-  type        = string
-  default     = ""
+  type    = string
+  default = ""
 }
+
+# ── Resource-level binding ─────────────────────────────────────────────────────
 
 variable "resource_role" {
-  description = "IAM role to grant on each target resource. Empty string = skip."
-  type        = string
-  default     = ""
+  type    = string
+  default = ""
 }
 
-# Note: resource-level bindings are expressed as separate inline TFBlocks by
-# terraform_blocks() rather than passing resource names into this module.
-# These variables are retained for the static terraform_call_vars() interface
-# used by the module-based code path.
+# ── Cloud Run ──────────────────────────────────────────────────────────────────
 
-variable "target_resource_names" {
-  description = "List of Terraform resource name identifiers for target resources (informational)"
-  type        = list(string)
-  default     = []
+variable "cloud_run_service_name" {
+  type    = string
+  default = ""
+  description = "Name of the Cloud Run v2 service. Set to enable resource-level binding."
 }
 
-variable "target_resource_types" {
-  description = "List of resource type strings matching target_resource_names"
-  type        = list(string)
-  default     = []
+# ── GCS Bucket ────────────────────────────────────────────────────────────────
+
+variable "gcs_bucket_name" {
+  type    = string
+  default = ""
+  description = "Name of the GCS bucket. Set to enable resource-level binding."
+}
+
+# ── Cloud Tasks Queue ─────────────────────────────────────────────────────────
+
+variable "cloud_tasks_queue_name" {
+  type    = string
+  default = ""
+  description = "Name of the Cloud Tasks queue. Set to enable resource-level binding."
+}
+
+# ── Cloud Function ────────────────────────────────────────────────────────────
+
+variable "cloud_function_name" {
+  type    = string
+  default = ""
+  description = "Name of the Cloud Function. Set to enable resource-level binding."
+}
+
+# ── Pub/Sub Subscription ──────────────────────────────────────────────────────
+
+variable "pubsub_subscription_name" {
+  type    = string
+  default = ""
+  description = "Name of the Pub/Sub subscription. Set to enable resource-level binding."
+}
+
+# ── Pub/Sub Topic ─────────────────────────────────────────────────────────────
+
+variable "pubsub_topic_name" {
+  type    = string
+  default = ""
+  description = "Name of the Pub/Sub topic. Set to enable resource-level binding."
 }

@@ -62,6 +62,7 @@ def resolve_graph(
     for n in nodes:
         inst = _instantiate(n, node_registry)
         if inst is not None:
+            inst._props = n.get("props", {})
             instances[n["id"]] = inst
 
     for edge in edges:
@@ -86,6 +87,7 @@ def resolve_graph(
             )
 
     logger.info("resolve_graph: %d nodes, %d edges processed", len(nodes), len(edges))
+    logger.debug(" resolve_graph: final ctx → %s", ctx)
     return ctx
 
 

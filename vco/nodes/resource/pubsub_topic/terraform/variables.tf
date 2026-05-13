@@ -3,6 +3,11 @@ variable "name" {
   type        = string
 }
 
+variable "region" {
+  description = "GCP region (used for resource-scoped IAM bindings)"
+  type        = string
+}
+
 variable "retention" {
   description = "Message retention duration (e.g. 604800s = 7 days)"
   type        = string
