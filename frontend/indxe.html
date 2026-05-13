@@ -141,7 +141,7 @@
             src={src}
             width={size}
             height={size}
-            style={{ display: 'block', objectFit: 'contain', filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.4))' }}
+            style={{ display: 'block', objectFit: 'contain' }}
             onError={() => { gcpIconCache[nodeType] = false; setFailed(true); setSrc(null); }}
             alt={nodeType}
           />
@@ -760,7 +760,7 @@
             >
               {/* Header */}
               <div className="node-header">
-                <div className="node-header-icon" style={{ background: nodeColor + '18', color: nodeColor }}>
+                <div className="node-header-icon" style={{  color: nodeColor }}>
                   <GCPIcon nodeType={schema.type} fallbackIcon={schema.icon} color={nodeColor} size={18} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>

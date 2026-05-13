@@ -58,6 +58,7 @@ class PortType(Enum):
     # These aliases map to their replacement. Remove once all nodes are updated.
     MESSAGE           = "message"       # alias → use STORAGE or TOPIC
     SUBSCRIPTION      = "subscription"  # alias → not used
+    NOTIFICATION      = "notification"
 
 
 PORT_META: dict[str, dict] = {

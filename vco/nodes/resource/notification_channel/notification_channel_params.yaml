@@ -1,0 +1,157 @@
+# nodes/resource/notification_channel/notification_channel_params.yaml
+# ── Basic ─────────────────────────────────────────────────────────────────────
+- key: name
+  label: Channel Name
+  type: text
+  default: ""
+  placeholder: my-notification-channel
+  category: Basic
+  description: >
+    Display name for this notification channel in Cloud Monitoring.
+
+- key: channel_type
+  label: Channel Type
+  type: select
+  options: [email, slack, pagerduty, webhook, pubsub]
+  default: email
+  category: Basic
+  triggers_refresh: true
+  description: >
+    The delivery mechanism for notifications.
+    Changing this value reveals the relevant configuration fields below.
+
+# ── Email ─────────────────────────────────────────────────────────────────────
+- key: email_address
+  label: Email Address
+  type: text
+  default: ""
+  placeholder: "alerts@example.com"
+  category: Email
+  show_if:
+    channel_type: email
+  description: >
+    The email address to send notifications to.
+
+# ── Slack ─────────────────────────────────────────────────────────────────────
+- key: slack_channel_name
+  label: Slack Channel
+  type: text
+  default: ""
+  placeholder: "#alerts"
+  category: Slack
+  show_if:
+    channel_type: slack
+  description: >
+    The Slack channel name (including the # prefix).
+
+- key: slack_auth_token
+  label: Slack Auth Token (Secret)
+  type: text
+  default: ""
+  placeholder: "xoxb-..."
+  category: Slack
+  show_if:
+    channel_type: slack
+  description: >
+    Slack Bot OAuth token. Store this in Secret Manager and reference it here,
+    or paste the token directly (not recommended for production).
+
+# ── PagerDuty ─────────────────────────────────────────────────────────────────
+- key: pagerduty_service_key
+  label: PagerDuty Service Key
+  type: text
+  default: ""
+  placeholder: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  category: PagerDuty
+  show_if:
+    channel_type: pagerduty
+  description: >
+    PagerDuty integration key (service-level Events API v2 key).
+
+# ── Webhook ───────────────────────────────────────────────────────────────────
+- key: webhook_url
+  label: Webhook URL
+  type: text
+  default: ""
+  placeholder: "https://hooks.example.com/notify"
+  category: Webhook
+  show_if:
+    channel_type: webhook
+  description: >
+    HTTPS endpoint that will receive POST requests with JSON alert payloads.
+
+- key: webhook_username
+  label: Basic Auth Username (optional)
+  type: text
+  default: ""
+  category: Webhook
+  show_if:
+    channel_type: webhook
+  description: >
+    Username for basic authentication on the webhook endpoint (optional).
+
+- key: webhook_password
+  label: Basic Auth Password (optional)
+  type: text
+  default: ""
+  category: Webhook
+  show_if:
+    channel_type: webhook
+  description: >
+    Password for basic authentication on the webhook endpoint (optional).
+
+# ── Pub/Sub ───────────────────────────────────────────────────────────────────
+- key: pubsub_topic
+  label: Pub/Sub Topic Name
+  type: text
+  default: ""
+  placeholder: "projects/my-project/topics/alerts"
+  category: Pub/Sub
+  show_if:
+    channel_type: pubsub
+  description: >
+    Full Pub/Sub topic resource name that will receive notification messages.
+    Format: projects/{project}/topics/{topic}
+
+# ── Alert Policy ──────────────────────────────────────────────────────────────
+- key: alert_display_name
+  label: Alert Policy Name
+  type: text
+  default: ""
+  placeholder: "my-resource-alert"
+  category: Alert Policy
+  description: >
+    Display name for the Cloud Monitoring alert policy created for the wired
+    resource. Defaults to "<resource_name>-alert" if left blank.
+
+- key: alert_duration_seconds
+  label: Alert Duration (seconds)
+  type: number
+  default: 60
+  category: Alert Policy
+  description: >
+    How long the condition must be true before an alert fires (0 = immediate).
+
+- key: auto_close_seconds
+  label: Auto-close Incidents After (seconds)
+  type: number
+  default: 86400
+  category: Alert Policy
+  description: >
+    Seconds before an open incident is automatically closed (default 24 hours).
+
+# ── GCS-specific (shown only when source is GcsBucketNode) ────────────────────
+- key: gcs_event_types
+  label: GCS Event Types
+  type: select
+  options:
+    - OBJECT_FINALIZE
+    - OBJECT_DELETE
+    - OBJECT_ARCHIVE
+    - OBJECT_METADATA_UPDATE
+  default: OBJECT_FINALIZE
+  category: GCS Options
+  description: >
+    Which GCS object event triggers the notification.
+    Only applies when a Cloud Storage bucket is wired as the source.
+    (OBJECT_FINALIZE = new or overwritten object)

@@ -85,6 +85,7 @@ class GcsBucketNode(GCPNode):
     outputs: ClassVar = [
         Port("storage", PortType.STORAGE, multi=True),   # → CloudRun (env var reader)
         Port("events",  PortType.STORAGE, multi=True),   # → EventarcTriggerNode (trigger source)
+        Port("notification",  PortType.NOTIFICATION,  multi=True)
     ]
 
     node_color:  ClassVar = "#fbbf24"
