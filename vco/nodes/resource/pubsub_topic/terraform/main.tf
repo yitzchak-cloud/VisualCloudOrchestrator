@@ -6,7 +6,9 @@ resource "google_pubsub_topic" "topic" {
 
   dynamic "message_storage_policy" {
     for_each = []  # reserved for future region restrictions
-    content {}
+    content {
+      allowed_persistence_regions = []
+    }
   }
 
   kms_key_name = var.kms_key_name != "" ? var.kms_key_name : null
