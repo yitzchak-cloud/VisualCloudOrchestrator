@@ -77,4 +77,5 @@ PORT_META: dict[str, dict] = {
     PortType.IAM_BINDING.value:       {"color": "#34d399", "label": "IAM"},
     PortType.VISUAL_CONNECTION.value: {"color": "#9ca3af", "label": "Visual"},
     PortType.MESSAGE.value:           {"color": "#ec4899", "label": "Msg"},
+    PortType.NOTIFICATION.value:      {"color": "#fbbf24", "label": "Notif"},
 }
