@@ -1,0 +1,194 @@
+edges:
+- color: '#60a5fa'
+  id: reactflow__edge-CloudRunNode-1778584332035publishes_to-PubsubTopicNode-1778584083885publishers
+  source: CloudRunNode-1778584332035
+  sourceHandle: publishes_to
+  target: PubsubTopicNode-1778584083885
+  targetHandle: publishers
+- color: '#1523bd'
+  id: reactflow__edge-PubsubTopicNode-1778584083885subscriptions-PubsubSubscriptionNode-1778584084804topic_link
+  source: PubsubTopicNode-1778584083885
+  sourceHandle: subscriptions
+  target: PubsubSubscriptionNode-1778584084804
+  targetHandle: topic_link
+- color: '#1523bd'
+  id: reactflow__edge-PubsubTopicNode-1778584083885subscriptions-PubsubSubscriptionNode-1778584085949topic_link
+  source: PubsubTopicNode-1778584083885
+  sourceHandle: subscriptions
+  target: PubsubSubscriptionNode-1778584085949
+  targetHandle: topic_link
+- color: '#34d399'
+  id: reactflow__edge-IamBindingNode-1778586211292grants_on-CloudRunNode-1778585015584iam_binding
+  source: IamBindingNode-1778586211292
+  sourceHandle: grants_on
+  target: CloudRunNode-1778585015584
+  targetHandle: iam_binding
+- color: '#ec4899'
+  id: reactflow__edge-PubsubSubscriptionNode-1778584085949messages-CloudRunNode-1778585015584MESSAGE
+  source: PubsubSubscriptionNode-1778584085949
+  sourceHandle: messages
+  target: CloudRunNode-1778585015584
+  targetHandle: MESSAGE
+- color: '#ec4899'
+  id: reactflow__edge-PubsubSubscriptionNode-1778584084804messages-CloudRunNode-1778594621647MESSAGE
+  source: PubsubSubscriptionNode-1778584084804
+  sourceHandle: messages
+  target: CloudRunNode-1778594621647
+  targetHandle: MESSAGE
+- color: '#34d399'
+  id: reactflow__edge-IamBindingNode-1778594686136grants_on-CloudRunNode-1778594621647iam_binding
+  source: IamBindingNode-1778594686136
+  sourceHandle: grants_on
+  target: CloudRunNode-1778594621647
+  targetHandle: iam_binding
+- color: '#a78bfa'
+  id: reactflow__edge-ServiceAccountNode-1778586210380service_account-IamBindingNode-1778594686136service_account
+  source: ServiceAccountNode-1778586210380
+  sourceHandle: service_account
+  target: IamBindingNode-1778594686136
+  targetHandle: service_account
+- color: '#a78bfa'
+  id: reactflow__edge-ServiceAccountNode-1778586210380service_account-IamBindingNode-1778586211292service_account
+  source: ServiceAccountNode-1778586210380
+  sourceHandle: service_account
+  target: IamBindingNode-1778586211292
+  targetHandle: service_account
+- color: '#a78bfa'
+  id: reactflow__edge-ServiceAccountNode-1778586210380service_account-PubsubSubscriptionNode-1778584084804oidc_service_account
+  source: ServiceAccountNode-1778586210380
+  sourceHandle: service_account
+  target: PubsubSubscriptionNode-1778584084804
+  targetHandle: oidc_service_account
+- color: '#a78bfa'
+  id: reactflow__edge-ServiceAccountNode-1778586210380service_account-PubsubSubscriptionNode-1778584085949oidc_service_account
+  source: ServiceAccountNode-1778586210380
+  sourceHandle: service_account
+  target: PubsubSubscriptionNode-1778584085949
+  targetHandle: oidc_service_account
+nodes:
+- deployed: false
+  id: PubsubTopicNode-1778584083885
+  label: PubsubTopic
+  position:
+    x: 355.2848634129692
+    y: 456.6976287626697
+  props:
+    name: new-lab-report
+  status: pending
+  type: PubsubTopicNode
+- deployed: false
+  id: PubsubSubscriptionNode-1778584084804
+  label: PubsubSubscription
+  position:
+    x: 759.9229587656044
+    y: 241.6651557506916
+  props:
+    name: email-service-sub
+    subscription_type: push
+  status: pending
+  type: PubsubSubscriptionNode
+- deployed: false
+  id: PubsubSubscriptionNode-1778584085949
+  label: PubsubSubscription
+  position:
+    x: 762.0021677645271
+    y: 624.3701469713656
+  props:
+    name: sms-service-sub
+    subscription_type: push
+  status: pending
+  type: PubsubSubscriptionNode
+- deployed: false
+  id: CloudRunNode-1778584332035
+  label: CloudRun
+  position:
+    x: 55.42489605993222
+    y: 289.32823037736375
+  props:
+    allow_unauthenticated: true
+    cpu: '1'
+    image: gcr.io/qwiklabs-gcp-04-fab6f24f0949/lab-report-service
+    max_instances: 1
+    memory: 512Mi
+    name: lab-report-service
+    region: us-west1
+    service_url: ''
+  status: pending
+  type: CloudRunNode
+- deployed: false
+  id: CloudRunNode-1778585015584
+  label: CloudRun
+  position:
+    x: 1167.1047485438796
+    y: 608.4812101354464
+  props:
+    allow_unauthenticated: false
+    cpu: '1'
+    image: gcr.io/qwiklabs-gcp-04-fab6f24f0949/sms-service
+    max_instances: 1
+    memory: 512Mi
+    name: sms-service
+    region: us-west1
+    service_url: ''
+  status: pending
+  type: CloudRunNode
+- deployed: false
+  id: ServiceAccountNode-1778586210380
+  label: ServiceAccount
+  position:
+    x: 361.671953694339
+    y: 332.2217074041334
+  props:
+    account_id: pubsub-cloud-run-invoker
+    display_name: PubSub Cloud Run Invoker
+  status: pending
+  type: ServiceAccountNode
+- deployed: false
+  id: IamBindingNode-1778586211292
+  label: IamBinding-sms-service
+  position:
+    x: 761.5420853772996
+    y: 808.113735591381
+  props: {}
+  status: pending
+  type: IamBindingNode
+- deployed: false
+  id: CloudRunNode-1778594621647
+  label: CloudRun
+  position:
+    x: 1134.8687991853499
+    y: 74.54639363636426
+  props:
+    allow_unauthenticated: false
+    cpu: '1'
+    image: gcr.io/qwiklabs-gcp-04-fab6f24f0949/email-service
+    max_instances: 1
+    memory: 512Mi
+    name: email-service
+    region: us-west1
+    service_url: ''
+  status: pending
+  type: CloudRunNode
+- deployed: false
+  id: IamBindingNode-1778594686136
+  label: IamBinding-email-service
+  position:
+    x: 751.9710601910645
+    y: 73.75224800410126
+  props:
+    resource_role: roles/run.invoker
+  status: pending
+  type: IamBindingNode
+- deployed: false
+  id: ServiceAccountNode-1778755473397
+  label: ServiceAccount
+  position:
+    x: 374.3117014375256
+    y: 103.59377615542004
+  props:
+    account_id: ''
+    display_name: ''
+    email: service-$PROJECT_NUMBER@gcp-sa-pubsub.iam.gserviceaccount.com
+    project_roles: roles/iam.serviceAccountTokenCreator
+  status: pending
+  type: ServiceAccountNode
