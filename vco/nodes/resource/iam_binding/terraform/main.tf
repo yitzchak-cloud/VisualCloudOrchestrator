@@ -68,3 +68,12 @@ resource "google_pubsub_topic_iam_member" "pubsub_topic_binding" {
   role    = var.resource_role
   member  = var.member
 }
+
+resource "google_artifact_registry_repository_iam_member" "artifact_registry_binding" {
+  count   = (var.resource_role != "" && var.artifact_registry_repository_name != "") ? 1 : 0
+  project = var.project_id
+  location = var.region
+  repository = var.artifact_registry_repository_name
+  role    = var.resource_role
+  member  = var.member
+}

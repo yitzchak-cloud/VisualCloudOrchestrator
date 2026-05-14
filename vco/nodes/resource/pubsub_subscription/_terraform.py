@@ -11,6 +11,7 @@ Public API
 """
 from __future__ import annotations
 
+
 from nodes.base_node import _resource_name, _tf_name, _node_by_id
 from nodes.ctx_keys import K
 
@@ -63,6 +64,7 @@ def _add_pull_vars(cv, props):
 
 def _add_push_vars(cv, ctx, props, all_nodes):
     push_ids = ctx.get(K.PUSH_TARGET_IDS, [])
+    cv["create_push_subscription"] = "true"
     if push_ids:
         cr_node = _node_by_id(all_nodes, push_ids[0])
         cv["push_endpoint"] = f"module.cr_{_tf_name(cr_node)}.uri"

@@ -30,6 +30,8 @@ variable "filter" {
   default     = ""
 }
 
+
+
 # ── Pull-only ──────────────────────────────────────────────────────────────
 
 variable "enable_message_ordering" {
@@ -62,4 +64,10 @@ variable "oidc_sa_email" {
   description = "OIDC service account email for push auth (push only)"
   type        = string
   default     = ""
+}
+
+variable "create_push_subscription" {
+  description = "Whether to create a push subscription"
+  type        = bool
+  default     = false
 }

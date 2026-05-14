@@ -74,3 +74,10 @@ variable "pubsub_topic_name" {
   default = ""
   description = "Name of the Pub/Sub topic. Set to enable resource-level binding."
 }
+
+# ── Artifact Registry Repository ─────────────────────────────────────────────
+variable "artifact_registry_repository_name" {
+  type    = string
+  default = ""
+  description = "Name of the Artifact Registry repository. Set to enable resource-level binding."
+}

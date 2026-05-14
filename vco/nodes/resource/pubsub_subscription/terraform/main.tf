@@ -1,5 +1,5 @@
 locals {
-  is_push = var.push_endpoint != ""
+  is_push = var.create_push_subscription
 }
 
 # ── Pull subscription (created when push_endpoint is empty) ───────────────────

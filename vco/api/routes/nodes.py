@@ -21,7 +21,16 @@ router = APIRouter(prefix="/api", tags=["nodes"])
 @router.get("/node-types")
 def get_node_types():
     """Return the UI schema for every registered node type."""
-    schemas = [cls.ui_schema() for cls in NODE_REGISTRY.values()]
+    schemas = []
+    errors = []
+
+    for cls in NODE_REGISTRY.values():
+        try:
+            schemas.append(cls.ui_schema())
+        except Exception as e:
+            errors.append((cls.__name__, str(e)))
+
+    logger.error(errors)
     logger.debug("Returning %d node-type schemas", len(schemas))
     return schemas
 

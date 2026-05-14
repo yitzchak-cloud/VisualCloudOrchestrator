@@ -51,6 +51,7 @@ _RESOURCE_TYPE_MAP: dict[str, str] = {
     "EventarcTriggerNode":       "eventarc_trigger",
     "PubsubSubscriptionNode":    "pubsub_subscription",
     "PubsubTopicNode":           "pubsub_topic",
+    "ArtifactRegistryNode":      "artifact_registry_repository",
 }
 
 # Terraform resource types for each GCP resource kind
@@ -64,6 +65,7 @@ _TF_RESOURCE: dict[str, str] = {
     "pubsub_subscription": "google_pubsub_subscription_iam_member",
     "pubsub_topic":        "google_pubsub_topic_iam_member",
     "unknown":             "google_project_iam_member",
+    "artifact_registry_repository": "google_artifact_registry_repository_iam_member",
 }
 
 
@@ -287,6 +289,11 @@ class IamBindingNode(GCPNode):
                 elif rtype == "pubsub_topic":
                     body["project"] = "var.project_id"
                     body["topic"]   = f"${{google_pubsub_topic.{tf_tgt}.name}}"
+                
+                elif rtype == "artifact_registry_repository":
+                    body["project"]    = "var.project_id"
+                    body["location"]   = "var.region"
+                    body["repository"] = f"${{google_artifact_registry_repository.{tf_tgt}.name}}"
 
                 else:
                     # workflow / eventarc_trigger / unknown → project-level fallback

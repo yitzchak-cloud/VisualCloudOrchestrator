@@ -196,7 +196,9 @@ class ServiceAccountNode(GCPNode):
         node_dict = ctx.get("node", {})
         props     = node_dict.get("props", {})
 
-        create_sa    = props.get("create_sa", True)
+        ref_email = props.get("email", "").strip()
+        create_sa_explicit = props.get("create_sa")
+        create_sa = (not bool(ref_email)) if create_sa_explicit is None else bool(create_sa_explicit)
         account_id   = props.get("account_id", _resource_name(node_dict)).strip()
         display_name = props.get("display_name", node_dict.get("label", account_id))
         ref_email    = props.get("email", "").strip()
@@ -227,7 +229,7 @@ class ServiceAccountNode(GCPNode):
             block_type="output",
             labels=[f"{tf_id}_email"],
             body={
-                "description": f"Email of service account {account_id}",
+                "description": f"Email of service account {ref_email if not create_sa else account_id}",
                 "value":       sa_email_ref,
             },
         ))
@@ -281,26 +283,34 @@ class ServiceAccountNode(GCPNode):
         node_dict = ctx.get("node", {})
         props     = node_dict.get("props", {})
 
+        ref_email = props.get("email", "").strip()
+
+        # הסקה אוטומטית: אם יש email ו-create_sa לא הוגדר במפורש → reference mode
+        create_sa_explicit = props.get("create_sa")
+        if create_sa_explicit is None:
+            create_sa = not bool(ref_email)   # יש email → reference mode
+        else:
+            create_sa = bool(create_sa_explicit)
+
         roles     = _parse_project_roles(props.get("project_roles", ""))
         roles_hcl = "[" + ", ".join(f'"{r}"' for r in roles) + "]"
 
-        # Serialise resource_bindings for the TF module as a JSON string variable
         bindings     = _parse_resource_bindings(props.get("resource_bindings", "[]"))
-        bindings_hcl = json.dumps(bindings)   # module receives as jsonencode-compatible string
+        bindings_hcl = json.dumps(bindings)
 
         cv: dict[str, str] = {
-            "account_id":        f'"{props.get("account_id") or _resource_name(node_dict)}"',
-            "display_name":      f'"{props.get("display_name") or node_dict.get("label", "")}"',
-            "create_sa":         "false" if not props.get("create_sa", True) else "true",
+            "create_sa":         "true" if create_sa else "false",
             "project_roles":     roles_hcl,
             "resource_bindings": f'"{bindings_hcl}"',
         }
 
-        if not props.get("create_sa", True) and props.get("email"):
-            cv["existing_email"] = f'"{props["email"]}"'
+        if create_sa:
+            cv["account_id"]   = f'"{props.get("account_id") or _resource_name(node_dict)}"'
+            cv["display_name"] = f'"{props.get("display_name") or node_dict.get("label", "")}"'
+        else:
+            cv["existing_email"] = f'"{ref_email}"'
 
         return cv
-
     # ──────────────────────────────────────────────────────────────────────────
     # Post-deploy
     # ──────────────────────────────────────────────────────────────────────────
