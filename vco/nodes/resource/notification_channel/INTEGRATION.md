@@ -19,7 +19,7 @@ NOTIFICATION = "notification"
 outputs: ClassVar = [
     Port("storage",       PortType.STORAGE,       multi=True),
     Port("notification",  PortType.NOTIFICATION,  multi=True, label="notify"),  # ← חדש
-]
+] 
 ```
 
 ### CloudRunNode
